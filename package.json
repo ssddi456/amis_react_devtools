@@ -1,0 +1,24 @@
+{
+  "dependencies": {
+    "@rspack/cli": "^1.4.7",
+    "amis": "^6.12.0",
+    "node-polyfill-webpack-plugin": "^4.1.0"
+  },
+  "name": "amis_devtools",
+  "version": "1.0.0",
+  "main": "index.js",
+  "devDependencies": {
+    "@rspack/core": "^1.4.7",
+    "@types/react-dom": "^17.0.2",
+    "react": "17.0.2",
+    "react-devtools": "^6.1.5",
+    "react-dom": "17.0.2",
+    "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "dev": "rspack dev --config ./config/rspack.config.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}
