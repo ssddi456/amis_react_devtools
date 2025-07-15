@@ -1,0 +1,1 @@
+用于演示使用自定义的SchemaRenderer组件来将schema关联到react fiber。
