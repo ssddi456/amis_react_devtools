@@ -1,3 +1,10 @@
+import { connectToDevTools } from 'react-devtools-core/dist/backend';
+
+connectToDevTools({
+  host: 'localhost',
+  port: 8097
+});
+
 import React from 'react';
 import { jsxDEV } from "react/jsx-dev-runtime";
 import { render } from 'react-dom';
@@ -7,11 +14,6 @@ import { makeEnv } from './helper';
 const AppComponent = amisRender(
   {
     type: 'hbox',
-    _source: {
-      fileName: 'demo/index.tsx',
-      lineNumber: 1,
-      columnNumber: 1
-    },
     columns: [
       {
         type: 'tpl',
@@ -19,11 +21,6 @@ const AppComponent = amisRender(
         className: 'bg-info',
         inline: false,
         columnClassName: 'w-xs',
-        __source: {
-          fileName: "E:\\projects\\amis_devtools\\demo\\index.tsx",
-          lineNumber: 21,
-          columnNumber: 10
-        }
       },
       {
         type: 'tpl',
