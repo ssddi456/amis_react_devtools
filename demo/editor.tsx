@@ -8,9 +8,15 @@ export default {
     allowFullscreen: true,
     "editorDidMount": (editor: editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
         // editor 是 monaco 实例，monaco 是全局的名称空间
-        // const dispose = monaco.languages.registerCompletionItemProvider('json', {
-        //     /// 其他细节参考 monaco 手册
-        // });
+        const disposeCompletion = monaco.languages.registerCompletionItemProvider('json', {
+            /// 其他细节参考 monaco 手册
+        });
+
+        const dispose = () => {
+            disposeCompletion.dispose();
+            editor.dispose();
+        }
+
         monaco.languages.json.jsonDefaults.setModeConfiguration({
             hovers: true,
             completionItems: true,
@@ -27,5 +33,7 @@ export default {
         //         schema: amisSchema
         //     }]
         // });
+
+        return dispose;
     }
 }
