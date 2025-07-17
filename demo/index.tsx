@@ -10,44 +10,74 @@ import { jsxDEV } from "react/jsx-dev-runtime";
 import { render } from 'react-dom';
 import { render as amisRender, SchemaRenderer } from 'amis';
 import { makeEnv } from './helper';
+import editor from "./editor";
+import 'amis/lib/themes/default.css'
+import 'amis/lib/helper.css'
+
+
+(window as any).MonacoEnvironment = {
+  getWorker(workerId: string, label:string) {
+    if (label === 'json') {
+      return new Worker(
+        new URL(
+          "monaco-editor/esm/vs/language/json/json.worker",
+          import.meta.url
+        )
+      );    }
+    return null;
+  }
+}
 
 const AppComponent = amisRender(
   {
-    type: 'hbox',
-    columns: [
+    type: "page",
+    data: {
+      json_schema: `{
+  "type": "hbox",
+  "columns": []
+}`
+    },
+    body: [
       {
-        type: 'tpl',
-        tpl: 'w-xs',
-        className: 'bg-info',
-        inline: false,
-        columnClassName: 'w-xs',
+        type: 'hbox',
+        columns: [
+          {
+            type: 'tpl',
+            tpl: 'w-xs',
+            className: 'bg-info',
+            inline: false,
+            columnClassName: 'w-xs',
+          },
+          {
+            type: 'tpl',
+            tpl: 'w-sm',
+            className: 'bg-info lter',
+            inline: false,
+            columnClassName: 'w-sm'
+          },
+          {
+            type: 'tpl',
+            tpl: 'w',
+            className: 'bg-info dk',
+            inline: false,
+            columnClassName: 'w'
+          },
+          {
+            type: 'tpl',
+            tpl: '平均分配',
+            className: 'bg-success',
+            inline: false
+          },
+          {
+            type: 'tpl',
+            tpl: '平均分配',
+            className: 'bg-primary',
+            inline: false
+          },
+
+        ]
       },
-      {
-        type: 'tpl',
-        tpl: 'w-sm',
-        className: 'bg-info lter',
-        inline: false,
-        columnClassName: 'w-sm'
-      },
-      {
-        type: 'tpl',
-        tpl: 'w',
-        className: 'bg-info dk',
-        inline: false,
-        columnClassName: 'w'
-      },
-      {
-        type: 'tpl',
-        tpl: '平均分配',
-        className: 'bg-success',
-        inline: false
-      },
-      {
-        type: 'tpl',
-        tpl: '平均分配',
-        className: 'bg-primary',
-        inline: false
-      }
+      editor
     ]
   },
   {},

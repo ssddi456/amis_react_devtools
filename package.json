@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@rspack/cli": "^1.4.7",
+    "@swc/core": "^1.12.14",
     "amis": "^6.12.0",
     "node-polyfill-webpack-plugin": "^4.1.0"
   },

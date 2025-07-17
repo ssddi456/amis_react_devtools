@@ -24,24 +24,30 @@ module.exports = {
             {
                 test: /\.tsx?$/,
                 exclude: /node_modules/,
-                use: {
-                    loader: "builtin:swc-loader",
-                    options: {
-                        sourceMap: true,
-                        jsc: {
-                            parser: {
-                                syntax: "typescript",
-                                tsx: true,
-                            },
-                            transform: {
-                                react: {
-                                    development: true,
-                                    runtime: "automatic",
+                use: [
+                    {
+                        loader: "builtin:swc-loader",
+                        options: {
+                            sourceMap: true,
+                            jsc: {
+                                parser: {
+                                    syntax: "typescript",
+                                    tsx: true,
+                                },
+                                transform: {
+                                    react: {
+                                        development: true,
+                                        runtime: "automatic",
+                                    },
                                 },
                             },
                         },
                     },
-                },
+                    // 我们的自定义 loader 在 swc-loader 之前运行
+                    {
+                        loader: path.resolve(__dirname, "../plugins/swc-add-source-plugin.js"),
+                    }
+                ],
             },
             {
                 test: /\.css$/,
@@ -63,14 +69,13 @@ module.exports = {
     experiments: {
         css: true,
         cache: {
-            type: "filesystem",
-            buildDependencies: {
-                config: [
-                    __filename,
-                    path.resolve(__dirname, "../tsconfig.json"),
-                    path.resolve(__dirname, "../package.json"),
-                ],
-            },
+            type: "persistent",
+            buildDependencies: [
+                __filename,
+                path.resolve(__dirname, "../tsconfig.json"),
+                path.resolve(__dirname, "../package.json"),
+                path.resolve(__dirname, "../plugins/swc-add-source-plugin.js")
+            ],
         },
     },
 };
