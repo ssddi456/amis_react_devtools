@@ -17,7 +17,8 @@ import { ClickToComponent } from 'click-to-react-component';
           "monaco-editor/esm/vs/language/json/json.worker",
           import.meta.url
         )
-      );    }
+      );
+    }
     return null;
   }
 }
