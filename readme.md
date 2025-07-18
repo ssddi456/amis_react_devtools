@@ -6,6 +6,14 @@ devtools for configuring amis schema rendering
 
 # 使用方法
 
+当前演示使用 click-to-react-component 的方式来打开编辑器中的配置文件。
+
+win: alt + click / mac: option + click
+
+将会在编辑器中打开对应的源码位置，若是 amis 生成的组件，则会打开对应的配置
+
+或安装 react-devtools v5
+
 1. ```npm run dev```
 
 1. ```npx react-devtools```

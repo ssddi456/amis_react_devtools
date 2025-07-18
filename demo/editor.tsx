@@ -41,9 +41,10 @@ export default {
         })
 
         monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+            enableSchemaRequest: true,
             validate: true,
             schemas: [{
-                uri: "amis/schema.json",
+                uri: "http://myserver/foo-schema.json",
                 schema: amisSchema
             }]
         });
