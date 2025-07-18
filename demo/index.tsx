@@ -1,10 +1,3 @@
-import { connectToDevTools } from 'react-devtools-core/dist/backend';
-
-connectToDevTools({
-  host: 'localhost',
-  port: 8097
-});
-
 import React from 'react';
 import { jsxDEV } from "react/jsx-dev-runtime";
 import { render } from 'react-dom';
@@ -13,6 +6,7 @@ import { makeEnv } from './helper';
 import editor from "./editor";
 import 'amis/lib/themes/default.css'
 import 'amis/lib/helper.css'
+import { ClickToComponent } from 'click-to-react-component';
 
 
 (window as any).MonacoEnvironment = {
@@ -23,7 +17,8 @@ import 'amis/lib/helper.css'
           "monaco-editor/esm/vs/language/json/json.worker",
           import.meta.url
         )
-      );    }
+      );
+    }
     return null;
   }
 }
@@ -38,6 +33,7 @@ const AppComponent = amisRender(
 }`
     },
     body: [
+      "control + click or option + click to go to source",
       {
         type: 'hbox',
         columns: [
@@ -95,8 +91,17 @@ const AppComponent = amisRender(
   })
 );
 
+const App = () => {
+  return (
+    <div className="container">
+      <ClickToComponent />
+      {AppComponent}
+    </div>
+  );
+}
+
 
 const root = document.querySelector('#root');
 if (root) {
-  render(AppComponent, root);
+  render(<App />, root);
 }

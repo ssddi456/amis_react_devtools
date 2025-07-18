@@ -2,7 +2,7 @@
 // 这是一个自定义的 rspack loader
 const ts = require('typescript');
 
-module.exports = function(source) {
+module.exports = function (source) {
     const callback = this.async();
     const resourcePath = this.resourcePath.replace(/\\/g, '/'); // 处理 Windows 路径
 
@@ -22,16 +22,23 @@ module.exports = function(source) {
         function visitNode(node) {
             if (ts.isObjectLiteralExpression(node)) {
                 // 检查是否包含 type 属性
-                const hasTypeProperty = node.properties.some(prop => 
-                    ts.isPropertyAssignment(prop) && 
-                    ts.isIdentifier(prop.name) && 
-                    prop.name.text === 'type'
+                const hasTypeProperty = node.properties.some(prop =>
+                    ts.isPropertyAssignment(prop) && (
+                        (
+                            ts.isIdentifier(prop.name) &&
+                            prop.name.text === 'type'
+                        )
+                        || (
+                            ts.isStringLiteral(prop.name) &&
+                            prop.name.text === 'type'
+                        )
+                    )
                 );
 
                 // 检查是否已经包含 __source 属性
-                const hasSourceProperty = node.properties.some(prop => 
-                    ts.isPropertyAssignment(prop) && 
-                    ts.isIdentifier(prop.name) && 
+                const hasSourceProperty = node.properties.some(prop =>
+                    ts.isPropertyAssignment(prop) &&
+                    ts.isIdentifier(prop.name) &&
                     prop.name.text === '__source'
                 );
 
@@ -44,7 +51,7 @@ module.exports = function(source) {
                     // 查找插入位置（最后一个属性后面或右大括号前面）
                     let insertPosition;
                     let needsComma = false;
-                    
+
                     if (node.properties.length > 0) {
                         const lastProperty = node.properties[node.properties.length - 1];
                         insertPosition = lastProperty.getEnd();
@@ -54,11 +61,11 @@ module.exports = function(source) {
                     }
 
                     const sourceInfo = [needsComma ? ',' : '',
-    '__source: {',
-        `fileName: "${resourcePath}",`,
-        `lineNumber: ${lineNumber},`,
-        `columnNumber: ${columnNumber}`,
-    '}'].join('')
+                        '__source: {',
+                    `fileName: "${resourcePath}",`,
+                    `lineNumber: ${lineNumber},`,
+                    `columnNumber: ${columnNumber}`,
+                        '}'].join('')
 
                     transformations.push({
                         position: insertPosition,
@@ -77,9 +84,9 @@ module.exports = function(source) {
 
         // 应用所有转换
         for (const transformation of transformations) {
-            result = result.substring(0, transformation.position) + 
-                    transformation.insertion + 
-                    result.substring(transformation.position);
+            result = result.substring(0, transformation.position) +
+                transformation.insertion +
+                result.substring(transformation.position);
         }
 
         // console.log('result:', result);
