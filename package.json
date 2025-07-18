@@ -3,6 +3,7 @@
     "@rspack/cli": "^1.4.7",
     "@swc/core": "^1.12.14",
     "amis": "^6.12.0",
+    "click-to-react-component": "^1.1.2",
     "node-polyfill-webpack-plugin": "^4.1.0"
   },
   "name": "amis_devtools",
@@ -12,7 +13,6 @@
     "@rspack/core": "^1.4.7",
     "@types/react-dom": "^17.0.2",
     "react": "17.0.2",
-    "react-devtools": "^5.0.0",
     "react-dom": "17.0.2",
     "typescript": "^5.8.3"
   },
