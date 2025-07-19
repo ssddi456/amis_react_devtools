@@ -1,6 +1,20 @@
 import type { editor } from "monaco-editor";
 const amisSchema = require("amis/schema.json");
 
+console.log('amisSchema.definitions', amisSchema.definitions);
+
+const {
+    RootSchema,
+    ...anyOtherSchema
+} = amisSchema.definitions;
+
+const amisSchemaAny =  {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    anyOf: {
+        ...anyOtherSchema
+    }
+}
+
 export default {
     "type": "editor",
     "name": "json_schema",
@@ -36,8 +50,11 @@ export default {
             }
         });
         monaco.languages.json.jsonDefaults.setModeConfiguration({
+            colors: true,
             hovers: true,
             completionItems: true,
+            foldingRanges: true,
+            diagnostics: true,
         })
 
         monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
@@ -45,7 +62,8 @@ export default {
             validate: true,
             schemas: [{
                 uri: "http://myserver/foo-schema.json",
-                schema: amisSchema
+                fileMatch: ["*"],
+                schema: amisSchemaAny
             }]
         });
 
