@@ -20,7 +20,9 @@ export default {
                 const word = model.getWordUntilPosition(position);
 
                 const completion = await getJSONType(model).doComplete(position);
-
+                if (!completion) {
+                    return;
+                }
                 console.log("completion", completion);
                 const wordRange = {
                     startLineNumber: position.lineNumber,
@@ -79,7 +81,10 @@ export default {
                 const hover = await getJSONType(model).doHover(position);
 
                 console.log("hover", hover);
-
+                
+                if (!hover) {
+                    return;
+                }
                 return {
                     contents: toMarkedStringArray(hover.contents) || [],
                     range: toRange(hover.range)
