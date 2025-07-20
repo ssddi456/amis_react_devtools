@@ -1,19 +1,20 @@
 import { languages, type editor, } from "monaco-editor";
-import { getJSONType, toCompletionItemKind, isInsertReplaceEdit, toRange, toTextEdit, toMarkedStringArray } from "./amis_json_ls";
+import { getJSONType, toCompletionItemKind, isInsertReplaceEdit, toTextEdit, toMarkedStringArray } from "./amis_json_ls";
+import { toRange } from "./ls_helper";
 
-
+const languageId = 'json';
 export default {
     "type": "editor",
     "name": "json_schema",
     "label": "编辑器",
-    "language": "json",
+    "language": languageId,
     allowFullscreen: true,
     "editorDidMount": (editor: editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
 
         console.log("editorDidMount", editor, monaco);
-        
+
         // editor 是 monaco 实例，monaco 是全局的名称空间
-        const completionDispose = monaco.languages.registerCompletionItemProvider('json', {
+        const completionDispose = monaco.languages.registerCompletionItemProvider(languageId, {
             triggerCharacters: ['.', '"'],
             provideCompletionItems: async (model, position) => {
                 console.log("provideCompletionItems", model, position);
@@ -72,12 +73,9 @@ export default {
             }
         });
 
-        const hoverDispose = monaco.languages.registerHoverProvider('json', {
+        const hoverDispose = monaco.languages.registerHoverProvider(languageId, {
             provideHover: async (model, position) => {
                 console.log("provideHover", model, position);
-                const word = model.getWordUntilPosition(position);
-
-
                 const hover = await getJSONType(model).doHover(position);
 
                 console.log("hover", hover);
@@ -85,9 +83,16 @@ export default {
                 if (!hover) {
                     return;
                 }
+                const contents = toMarkedStringArray(hover.contents || []);
+                console.log("hover contents", contents);
+                if (!contents || contents.length === 0) {
+                    return;
+                }
+                const range = toRange(hover.range!);
+                console.log("hover range", range);
                 return {
-                    contents: toMarkedStringArray(hover.contents) || [],
-                    range: toRange(hover.range)
+                    contents,
+                    range
                 };
             },
         });
@@ -96,6 +101,7 @@ export default {
 
         return () => {
             completionDispose.dispose();
+            hoverDispose.dispose();
         }
     }
 }

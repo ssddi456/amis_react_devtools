@@ -1,7 +1,8 @@
 import { editor, languages, type IMarkdownString } from "monaco-editor";
-import { getLanguageService } from 'monaco-editor/esm/vs/language/json/_deps/vscode-json-languageservice/jsonLanguageService.js';
-import { TextDocument } from 'monaco-editor/esm/vs/language/json/_deps/vscode-json-languageservice/jsonLanguageService.js';
-import * as lsTypes from 'monaco-editor/esm/vs/language/json/_deps/vscode-languageserver-types/main.js';
+import { getLanguageService } from 'vscode-json-languageservice';
+import { TextDocument } from 'vscode-json-languageservice';
+import * as lsTypes from 'vscode-languageserver-types';
+import { toRange, posToPosition } from "./ls_helper";
 
 const amisSchema = require("amis/schema.json");
 
@@ -43,34 +44,6 @@ export function makeSchemaForType(type: string) {
         $ref: `#/definitions/${definitionKey}`,
     };
     return schema;
-}
-
-export function posToJsonLSPosition(position: {
-    lineNumber: number;
-    column: number;
-}) {
-    return {
-        line: position.lineNumber - 1,
-        character: position.column - 1
-    };
-}
-
-export function toRange(position: {
-    start: {
-        line: number;
-        character: number;
-    };
-    end: {
-        line: number;
-        character: number;
-    };
-}) {
-    return {
-        startLineNumber: position.start.line + 1,
-        startColumn: position.start.character + 1,
-        endLineNumber: position.end.line + 1,
-        endColumn: position.end.character + 1
-    };
 }
 
 export function toTextEdit(textEdit: lsTypes.TextEdit | undefined): languages.TextEdit | undefined {
@@ -163,7 +136,7 @@ export function toMarkdownString(entry: any): IMarkdownString {
 }
 
 export function toMarkedStringArray(
-    contents: any[]
+    contents: any
 ): IMarkdownString[] | undefined {
     if (!contents) {
         return void 0;
@@ -203,13 +176,13 @@ export const getJSONType = (model: editor.ITextModel) => {
             lineNumber: number;
             column: number;
         }) => {
-            return jsonls.doComplete(document, posToJsonLSPosition(position), jsonDocument);
+            return jsonls.doComplete(document, posToPosition(position), jsonDocument);
         },
         doHover: (position: {
             lineNumber: number;
             column: number;
         }) => {
-            return jsonls.doHover(document, posToJsonLSPosition(position), jsonDocument);
+            return jsonls.doHover(document, posToPosition(position), jsonDocument);
         },
     };
 }

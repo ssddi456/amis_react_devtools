@@ -3,7 +3,8 @@ import { jsxDEV } from "react/jsx-dev-runtime";
 import { render } from 'react-dom';
 import { render as amisRender, SchemaRenderer } from 'amis';
 import { makeEnv } from './helper';
-import editor from "./editor";
+import amisEditor from "./amis_editor";
+import sqlEditor from "./sql_editor";
 import 'amis/lib/themes/default.css'
 import 'amis/lib/helper.css'
 import { ClickToComponent } from 'click-to-react-component';
@@ -19,6 +20,14 @@ import { ClickToComponent } from 'click-to-react-component';
         )
       );
     }
+    if (label === 'hivesql') {
+      return new Worker(
+        new URL(
+          "monaco-sql-languages/esm/languages/hive/hive.worker",
+          import.meta.url
+        )
+      );
+    }
     return null;
   }
 }
@@ -30,7 +39,14 @@ const AppComponent = amisRender(
       json_schema: `{
   "type": "hbox",
   "columns": []
-}`
+}`,
+      hive_sql: `select * from table where id = 1;
+select
+  field_1,
+  field_2,
+from table2
+where id = 2;
+`
     },
     body: [
       "control + click or option + click to go to source",
@@ -73,7 +89,8 @@ const AppComponent = amisRender(
 
         ]
       },
-      editor
+      amisEditor,
+      sqlEditor,
     ]
   },
   {},
