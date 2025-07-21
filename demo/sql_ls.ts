@@ -5,7 +5,7 @@ import { toRange, posToPosition, posInRange } from "./ls_helper";
 import { TextSlice, WordRange } from "dt-sql-parser/dist/parser/common/textAndWord";
 import { ProgramContext, HiveSqlParser } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { RuleStmtContext } from "dt-sql-parser/dist/lib/postgresql/PostgreSqlParser";
-import { RuleContext } from "antlr4ng";
+import { ParserRuleContext, RuleContext } from "antlr4ng";
 
 
 function sliceToRange(slice: {
@@ -40,13 +40,11 @@ function wordToRange(slice?: WordRange) {
 function isPosInParserRuleContext(position: Position, context: {
     start: {
         line: number;
-        start: number;
-        stop: number;
+        column: number;
     } | null;
     stop: {
         line: number;
-        start: number;
-        stop: number;
+        column: number;
     } | null;
 }): boolean {
     const startToken = context.start;
@@ -55,9 +53,9 @@ function isPosInParserRuleContext(position: Position, context: {
         return false;
     }
     const startLine = startToken.line;
-    const startColumn = startToken.start;
+    const startColumn = startToken.column;
     const endLine = endToken.line;
-    const endColumn = endToken.stop;
+    const endColumn = endToken.column;
 
     if (position.lineNumber === startLine && position.column >= startColumn) {
         return true;
@@ -74,13 +72,12 @@ function isPosInParserRuleContext(position: Position, context: {
 function findTokenAtPosition(
     position: Position,
     tree: ProgramContext
-): RuleContext | null {
+): ParserRuleContext | null {
     let foundNode = null;
     const visitor = new class extends HiveSqlParserVisitor<any> {
         visit(node: any): any {
             if (isPosInParserRuleContext(position, node)) {
                 foundNode = node;
-                console.log('Found node at position:', position, 'Node:', node);
             }
             return super.visit(tree);
         }
@@ -88,7 +85,6 @@ function findTokenAtPosition(
         visitChildren(node: any): any {
             if (isPosInParserRuleContext(position, node)) {
                 foundNode = node;
-                console.log('Found node at position:', position, 'Node:', node);
             }
             return super.visitChildren(node);
         }
@@ -129,7 +125,7 @@ export const getHiveType = (model: editor.ITextModel) => {
 
     const getCtxFromPos = (position: Position) => {
         if (!sqlSlices || sqlSlices.length === 0) {
-            return;
+            return null;
         }
         for (let i = 0; i < sqlSlices.length; i++) {
             const slice = sqlSlices[i];
@@ -142,6 +138,7 @@ export const getHiveType = (model: editor.ITextModel) => {
                 return foundNode;
             }
         }
+        return null;
     };
 
     return {
@@ -239,6 +236,29 @@ export const getHiveType = (model: editor.ITextModel) => {
                         range: wordToRange(table.wordRanges[0])
                     };
                 }
+            }
+
+            if (parent.ruleIndex === HiveSqlParser.RULE_poolPath
+                && (
+                    parent.parent?.ruleIndex === HiveSqlParser.RULE_columnName
+                    || parent.parent?.ruleIndex === HiveSqlParser.RULE_columnNamePath
+                )
+            ) {
+                const tableIdExp = parent.children?.length === 1 ? undefined : parent.children![0].getText();
+                const columnName = parent.children?.length === 1 ? parent.children![0].getText() : parent.children![2].getText();
+                return {
+                    contents: [
+                        {
+                            value: `**Table:** ${tableIdExp}, **Column:** ${columnName}`
+                        },
+                    ],
+                    range: {
+                        startLineNumber: foundNode.start!.line,
+                        startColumn: foundNode.start!.start,
+                        endLineNumber: foundNode.stop!.line,
+                        endColumn: foundNode.stop!.stop,
+                    }
+                };
             }
 
             // columnName -> poolPath -> id_(from default table name)
