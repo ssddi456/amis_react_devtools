@@ -66,15 +66,65 @@ export const getHiveType = (model: editor.ITextModel) => {
             lineNumber: number;
             column: number;
         }) => {
-            const ctx = getCtxFromPos(position);
+            getCtxFromPos(position);
             const syntaxSuggestions = hiveSqlParse.getSuggestionAtCaretPosition(document.getText(), position)?.syntax;
-            if (!ctx || !syntaxSuggestions) {
+            console.log('do completes syntaxSuggestions', syntaxSuggestions);
+            if (!syntaxSuggestions) {
                 return;
             }
 
             const table = syntaxSuggestions.find(s => s.syntaxContextType === EntityContextType.TABLE);
             if (table) {
                 // 这里搞一下找表名
+            }
+            const column = syntaxSuggestions.find(s => s.syntaxContextType === EntityContextType.COLUMN);
+            if (column) {
+                const entities = hiveSqlParse.getAllEntities(document.getText(), position) || [];
+                const currentEntities = entities.filter(e => e.belongStmt.isContainCaret);
+                console.log("do completes currentEntities", currentEntities);
+                if (currentEntities.length > 0
+                    && currentEntities[0].entityContextType === EntityContextType.TABLE
+                ) {
+                    const cursorRange = {
+                        startLineNumber: position.lineNumber,
+                        startColumn: position.column,
+                        endLineNumber: position.lineNumber,
+                        endColumn: position.column
+                    };
+                    let range = column.wordRanges[0] ? wordToRange(column.wordRanges[0]) : cursorRange;
+                    // check if is table_name.column_name
+                    if (column.wordRanges[1]?.text === '.') {
+                        if (column.wordRanges[2]) {
+                            range = wordToRange(column.wordRanges[2]);
+                        } else {
+                            range = {
+                                startLineNumber: position.lineNumber,
+                                startColumn: position.column + 1,
+                                endLineNumber: position.lineNumber,
+                                endColumn: position.column + 1
+                            };
+                        }
+                    }
+                    console.log("do completes range", range);
+                    return {
+                        suggestions: [
+                            {
+                                label: `column test`,
+                                sortText: '$$test',
+                                kind: languages.CompletionItemKind.Field,
+                                insertText: 'test',
+                                range,
+                                documentation: {
+                                    value: [
+                                        `**Table:** ${currentEntities[0].text}`,
+                                        `**Column:** test`
+                                    ].join('\n\n'),
+                                    isTrusted: true
+                                } as IMarkdownString
+                            }
+                        ]
+                    };
+                }
             }
         },
         doHover: (position: {
@@ -86,6 +136,7 @@ export const getHiveType = (model: editor.ITextModel) => {
                 return;
             }
             const syntaxSuggestions = hiveSqlParse.getSuggestionAtCaretPosition(document.getText(), position)?.syntax;
+            console.log('do hover syntaxSuggestions', syntaxSuggestions);
 
             if (syntaxSuggestions) {
                 const table = syntaxSuggestions.find(s => s.syntaxContextType === EntityContextType.TABLE);
@@ -99,10 +150,54 @@ export const getHiveType = (model: editor.ITextModel) => {
                         range: wordToRange(table.wordRanges[0])
                     };
                 }
+                const column = syntaxSuggestions.find(s => s.syntaxContextType === EntityContextType.COLUMN);
+                if (column) {
+                    const entities = hiveSqlParse.getAllEntities(document.getText(), position) || [];
+                    const currentEntities = entities.filter(e => e.belongStmt.isContainCaret);
+                    console.log("currentEntities", currentEntities);
+                    if (currentEntities.length > 0
+                        && currentEntities[0].entityContextType === EntityContextType.TABLE
+                    ) {
+                        let range = wordToRange(column.wordRanges[0]);
+                        // check if is table_name.column_name
+                        if (column.wordRanges[1]?.text === '.') {
+                            if (column.wordRanges[2]) {
+                                range = wordToRange(column.wordRanges[2]);
+                            } else {
+                                range = {
+                                    startLineNumber: position.lineNumber,
+                                    startColumn: position.column + 1,
+                                    endLineNumber: position.lineNumber,
+                                    endColumn: position.column + 1
+                                };
+                            }
+                        }
+                        return {
+                            contents: [
+                                {
+                                    value: [
+                                        `**Table:** ${currentEntities[0].text}`,
+                                        `**Column:** ${column.wordRanges[0].text}`
+                                    ].join('\n\n'),
+                                },
+                            ],
+                            range
+                        };
+                    }
+
+                    return {
+                        contents: [
+                            {
+                                value: `**Column:** ${column.wordRanges[0].text}`
+                            },
+                        ],
+                        range: wordToRange(column.wordRanges[0])
+                    };
+                }
             }
         },
         doValidation() {
-            const errors =hiveSqlParse.validate(document.getText());
+            const errors = hiveSqlParse.validate(document.getText());
             if (errors.length === 0) {
                 return [];
             }

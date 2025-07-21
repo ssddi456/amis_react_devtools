@@ -46,12 +46,14 @@ export default {
         doValidate();
 
         console.log(editorInstance.getOptions());
-        // monaco.languages.registerCompletionItemProvider(LanguageIdEnum.HIVE, {
-        //     provideCompletionItems: (model, position) => {
-        //         const context = getHiveType(model);
-        //         return context.doComplete(position);
-        //     }
-        // });
+
+        monaco.languages.registerCompletionItemProvider(LanguageIdEnum.HIVE, {
+            triggerCharacters: ['.', '"', ' '],
+            provideCompletionItems: (model, position) => {
+                const context = getHiveType(model);
+                return context.doComplete(position);
+            }
+        });
 
         monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
             provideHover: (model, position) => {

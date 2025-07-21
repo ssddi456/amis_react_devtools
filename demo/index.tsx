@@ -40,11 +40,11 @@ const AppComponent = amisRender(
   "type": "hbox",
   "columns": []
 }`,
-      hive_sql: `select * from table where id = 1;
+      hive_sql: `select * from hive_table where id = 1;
 select
   field_1,
-  field_2,
-from table2
+  field_2
+from hive_table2
 where id = 2;
 `
     },
