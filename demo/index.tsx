@@ -42,9 +42,8 @@ const AppComponent = amisRender(
 }`,
       hive_sql: `select * from hive_table where id = 1;
 select
-  field_1,
-  field_2
-from hive_table2
+  field_2, t.test
+from hive_table2 t
 where id = 2;
 `
     },
