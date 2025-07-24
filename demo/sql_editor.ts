@@ -1,4 +1,4 @@
-import { editor } from 'monaco-editor';
+import { editor, Position } from 'monaco-editor';
 import { LanguageIdEnum, setupLanguageFeatures, vsPlusTheme } from 'monaco-sql-languages';
 import 'monaco-sql-languages/esm/languages/hive/hive.contribution';
 import { getHiveType } from './sql_ls';
@@ -20,7 +20,6 @@ export default {
     "language": LanguageIdEnum.HIVE,
     allowFullscreen: true,
     "editorDidMount": (editorInstance: editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
-
         monaco.editor.setTheme('sql-light');
         const doValidate = () => {
             const model = editorInstance.getModel();
@@ -39,13 +38,24 @@ export default {
                 }));
             }
         }
+
+        const testHover = () => {
+            const model = editorInstance.getModel();
+            const context = getHiveType(model!);
+            const hoverInfo = context.doHover({
+                lineNumber: 3,
+                column: 4
+            } as Position);
+            console.log('test hover', hoverInfo);
+        }
+
         editorInstance.onDidChangeModelContent((e) => {
             doValidate();
+
         });
-
+        
         doValidate();
-
-        console.log(editorInstance.getOptions());
+        testHover();
 
         monaco.languages.registerCompletionItemProvider(LanguageIdEnum.HIVE, {
             triggerCharacters: ['.', '"', ' '],

@@ -1,12 +1,11 @@
 import { editor, languages, type IMarkdownString, Position } from "monaco-editor";
 import { TextDocument } from 'vscode-json-languageservice';
 import { EntityContextType, HiveSQL, HiveSqlParserVisitor } from 'dt-sql-parser';
-import { toRange, posToPosition, posInRange } from "./ls_helper";
+import { posInRange } from "./ls_helper";
 import { TextSlice, WordRange } from "dt-sql-parser/dist/parser/common/textAndWord";
 import { ProgramContext, HiveSqlParser } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { RuleStmtContext } from "dt-sql-parser/dist/lib/postgresql/PostgreSqlParser";
-import { ParserRuleContext, RuleContext } from "antlr4ng";
-
+import { ParserRuleContext } from "antlr4ng";
+import tableData from './data/table_descriptions.json'
 
 function sliceToRange(slice: {
     readonly startLine: number;
@@ -57,27 +56,44 @@ function isPosInParserRuleContext(position: Position, context: {
     const endLine = endToken.line;
     const endColumn = endToken.column;
 
-    if (position.lineNumber === startLine && position.column >= startColumn) {
+    if (position.lineNumber === startLine && position.column >= startColumn && position.lineNumber === endLine && position.column <= endColumn) {
         return true;
     }
-    if (position.lineNumber === endLine && position.column <= endColumn) {
+
+    if (position.lineNumber === startLine && position.lineNumber !== endLine && position.column >= startColumn) {
         return true;
     }
+
+    if (position.lineNumber !== startLine && position.lineNumber === endLine && position.column <= endColumn) {
+        return true;
+    }
+
     if (position.lineNumber > startLine && position.lineNumber < endLine) {
         return true;
     }
     return false;
 }
 
+function printNode(node: ParserRuleContext | null): string {
+    if (!node) {
+        return 'null';
+    }
+    const start = node.start ? `${node.start.line}:${node.start.column}` : 'null';
+    const stop = node.stop ? `${node.stop.line}:${node.stop.column}` : 'null';
+
+    return `Node(${ruleIndexToDisplayName(node.ruleIndex)}, ${start} -> ${stop})`;
+}
+
 function findTokenAtPosition(
     position: Position,
     tree: ProgramContext
 ): ParserRuleContext | null {
-    let foundNode = null;
+    let foundNode: any = null;
     const visitor = new class extends HiveSqlParserVisitor<any> {
         visit(node: any): any {
             if (isPosInParserRuleContext(position, node)) {
                 foundNode = node;
+                console.log('visit', JSON.stringify(position), printNode(foundNode));
             }
             return super.visit(tree);
         }
@@ -85,17 +101,59 @@ function findTokenAtPosition(
         visitChildren(node: any): any {
             if (isPosInParserRuleContext(position, node)) {
                 foundNode = node;
+                console.log('visitChildren', JSON.stringify(position), printNode(foundNode));
             }
             return super.visitChildren(node);
         }
+
+        visitTerminal(node: any) :any {
+            if (isPosInParserRuleContext(position, node)) {
+                foundNode = node;
+                console.log('visitTerminal', JSON.stringify(position), printNode(foundNode));
+            }
+            return super.visitTerminal(node);
+        }
+
+        visitErrorNode(node: any): any {
+            if (isPosInParserRuleContext(position, node)) {
+                foundNode = node;
+                console.log('visitErrorNode', JSON.stringify(position), printNode(foundNode));
+            }
+            return super.visitErrorNode(node);
+        }
+
     };
     visitor.visit(tree);
     if (!foundNode) {
-        console.warn('No node found at position:', position, 'tree:', tree);
+        console.warn('No node found at position:', JSON.stringify(position), 'tree:', tree);
     } else {
-        console.log('Found node at position:', position, 'Node:', foundNode);
+        console.log(
+            'Found node at position:', JSON.stringify(position),
+            'Node:', printNode(foundNode),
+        );
     }
     return foundNode;
+}
+
+function getTableInfoByName(tableName: string) {
+    if (!tableName) {
+        return null;
+    }
+    const tableInfo = tableData.find(t => t.table_name === tableName);
+    return tableInfo || null;
+}
+
+function getColumnInfoByName(tableName: string, columnName: string) {
+    if (!tableName || !columnName) {
+        return null;
+    }
+    const tableInfo = getTableInfoByName(tableName);
+    if (!tableInfo) {
+        return null;
+    }
+    const columnInfo = tableInfo.column_list.find(c => c.column_name === columnName);
+
+    return columnInfo || null;
 }
 
 function penddingSliceText(slice: TextSlice, full: string): string {
@@ -117,7 +175,10 @@ function ruleIndexToDisplayName(ruleIndex: number): string | undefined {
 
 // 这里列一下表
 
-export const getHiveType = (model: editor.ITextModel) => {
+export const getHiveType = (model: {
+    uri: { toString: () => string; };
+    getValue: () => string;
+}) => {
 
     const document = TextDocument.create(model.uri.toString(), 'hivesql', 0, model.getValue());
     const hiveSqlParse = new HiveSQL();
@@ -132,7 +193,7 @@ export const getHiveType = (model: editor.ITextModel) => {
             if (posInRange(position, sliceToRange(slice))) {
                 const text = penddingSliceText(slice, document.getText());
                 console.log('getCtxFromPos text', '-->' + text + '<--');
-                const ctx = hiveSqlParse.createParser(text);
+                const ctx = hiveSqlParse.createParser(document.getText());
                 const tree = ctx.program();
                 const foundNode = findTokenAtPosition(position, tree);
                 return foundNode;
@@ -145,9 +206,8 @@ export const getHiveType = (model: editor.ITextModel) => {
         doComplete: (position: Position) => {
             getCtxFromPos(position);
             const syntaxSuggestions = hiveSqlParse.getSuggestionAtCaretPosition(document.getText(), position)?.syntax;
-            const word = model.getWordAtPosition(position);
 
-            console.log('do completes syntaxSuggestions', syntaxSuggestions, word);
+            console.log('do completes syntaxSuggestions', syntaxSuggestions);
             if (!syntaxSuggestions) {
                 return;
             }
@@ -210,23 +270,42 @@ export const getHiveType = (model: editor.ITextModel) => {
             position: Position,
         ) => {
             const foundNode = getCtxFromPos(position);
-            if (!foundNode || foundNode.ruleIndex !== HiveSqlParser.RULE_id_) {
+            if (!foundNode || (
+                foundNode.ruleIndex !== HiveSqlParser.RULE_id_
+                && foundNode.ruleIndex !== HiveSqlParser.RULE_columnNamePath
+                && foundNode.ruleIndex !== HiveSqlParser.RULE_poolPath
+                && foundNode.ruleIndex !== HiveSqlParser.RULE_constant
+            )) {
                 return;
             }
 
             const parent = foundNode.parent!;
-            console.log('parent type', ruleIndexToDisplayName(parent.ruleIndex));
+            const parentRuleName = ruleIndexToDisplayName(parent.ruleIndex);
+            const currentRuleName = ruleIndexToDisplayName(foundNode.ruleIndex);
+            const parentParentRuleName = ruleIndexToDisplayName(parent.parent?.ruleIndex || -1);
+            console.log (parentParentRuleName, '->', parentRuleName, '-> *', currentRuleName);
 
             const syntaxSuggestions = hiveSqlParse.getSuggestionAtCaretPosition(document.getText(), position)?.syntax;
-            const word = model.getWordAtPosition(position);
-            const nextChar = model.getLineContent(position.lineNumber).charAt(position.column);
             const entities = hiveSqlParse.getAllEntities(document.getText(), position) || [];
+            const currentEntities = entities.filter(e => e.belongStmt.isContainCaret);
 
-            console.log('do hover syntaxSuggestions', position, syntaxSuggestions, word, nextChar, entities);
+            console.log('do hover syntaxSuggestions', position, syntaxSuggestions,  currentEntities);
 
             if (syntaxSuggestions) {
                 const table = syntaxSuggestions.find(s => s.syntaxContextType === EntityContextType.TABLE);
                 if (table) {
+                    const tableInfo = getTableInfoByName(currentEntities[0].text)
+                    if (!tableInfo) {
+                        return {
+                            contents: [
+                                {
+                                    value: `table not found: ${currentEntities[0].text}`
+                                },
+                            ],
+                            range: wordToRange(table.wordRanges[0])
+                        };
+                    }
+                    // find table in 
                     return {
                         contents: [
                             {
@@ -238,6 +317,7 @@ export const getHiveType = (model: editor.ITextModel) => {
                 }
             }
 
+
             if (parent.ruleIndex === HiveSqlParser.RULE_poolPath
                 && (
                     parent.parent?.ruleIndex === HiveSqlParser.RULE_columnName
@@ -246,6 +326,45 @@ export const getHiveType = (model: editor.ITextModel) => {
             ) {
                 const tableIdExp = parent.children?.length === 1 ? undefined : parent.children![0].getText();
                 const columnName = parent.children?.length === 1 ? parent.children![0].getText() : parent.children![2].getText();
+                const range = {
+                    startLineNumber: foundNode.start!.line,
+                    startColumn: foundNode.start!.start,
+                    endLineNumber: foundNode.stop!.line,
+                    endColumn: foundNode.stop!.stop,
+                };
+                if (!tableIdExp) {
+                    const tableInfo = getTableInfoByName(currentEntities[0].text)
+                    if (!tableInfo) {
+                        return {
+                            contents: [
+                                {
+                                    value: `table not found: ${currentEntities[0].text}`
+                                },
+                            ],
+                            range,
+                        };
+                    }
+                    const columnInfo = getColumnInfoByName(currentEntities[0].text, columnName);
+                    if (!columnInfo) {
+                        return {
+                            contents: [
+                                {
+                                    value: `column not found: ${columnName} in table ${currentEntities[0].text}`
+                                },
+                            ],
+                            range,
+                        };
+                    }
+                    return {
+                        contents: [
+                            {
+                                value: `**Table:** ${currentEntities[0].text}, **Column:** ${columnName}`
+                            },
+                        ],
+                        range,
+                    };
+                }
+                const tableInfo = getTableInfoByName(tableIdExp);
                 return {
                     contents: [
                         {
