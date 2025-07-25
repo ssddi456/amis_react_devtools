@@ -11,7 +11,7 @@ import { ClickToComponent } from 'click-to-react-component';
 
 
 (window as any).MonacoEnvironment = {
-  getWorker(workerId: string, label:string) {
+  getWorker(workerId: string, label: string) {
     if (label === 'json') {
       return new Worker(
         new URL(
@@ -40,21 +40,33 @@ const AppComponent = amisRender(
   "type": "hbox",
   "columns": []
 }`,
-      hive_sql: `select * from hive_table where id = 1;
-select
+      hive_sql: [
+        // simple
+        `select * from data_test_news_record_di where pt = 1;`,
+        `select * from data.data_test_news_record_di where pt = 1;`,
+        // simple with alias
+        `select
   field_2, t.test
-from hive_table2 t
-where id = 2;
-select
-  field_2, t.test
-from hive_table2
-where id = 2;
-select
-  field_2, t.test
-from hive_table2
-  left join hive_table3 t
-where id = 2;
-`
+from data_test_news_record_da t
+where pt = 2;`,
+
+        `select
+  t.field_2, t.test,
+  count(*) as cnt
+from data.data_test_news_record_da t
+where pt = 2
+group by
+  t.field_2, t.test
+;`,
+        `select
+  t1.house_code, t1.resblock_id, t2.quota_date
+from data.data_test_news_record_di t1
+  left join data.data_test_quota_similar_house_region_da t2
+  on t1.house_code = t2.house_code
+    and t1.resblock_id = t2.resblock_id
+where t1.pt = 2;`,
+
+].join('\n\n'),
     },
     body: [
       "control + click or option + click to go to source",

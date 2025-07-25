@@ -6,7 +6,7 @@ import { posInRange } from "./ls_helper";
 import { TextSlice, WordRange } from "dt-sql-parser/dist/parser/common/textAndWord";
 import { ProgramContext, HiveSqlParser } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ParserRuleContext } from "antlr4ng";
-import tableData from './data/table_descriptions.json'
+import tableData from './data/example'
 
 function sliceToRange(slice: {
     readonly startLine: number;
@@ -221,7 +221,7 @@ const noTableInfoRes = (text: string, range: IRange) => ({
 const noColumnInfoRes = (table: TableInfo, columnName: string, range: IRange) => ({
     contents: [
         {
-            value: `column not found: ${columnName} in table ${table.table_name}`
+            value: `column: ${columnName} not found in table ${table.table_name}`
         },
     ],
     range,
@@ -229,7 +229,12 @@ const noColumnInfoRes = (table: TableInfo, columnName: string, range: IRange) =>
 const tableAndColumn = (table: TableInfo, column: ColumnInfo, range: IRange) => ({
     contents: [
         {
-            value: `**Table:** ${table.table_name}, **Column:** ${column.column_name}`
+            value: [
+                `**Table:** ${table.table_name}`,
+                table.description,
+                `**Column:** ${column.column_name} [${column.data_type_string}]`,
+                column.description
+            ].filter(Boolean).join('\n\n'), 
         },
     ],
     range,
@@ -237,7 +242,10 @@ const tableAndColumn = (table: TableInfo, column: ColumnInfo, range: IRange) => 
 const tableRes = (table: TableInfo, range: IRange) => ({
     contents: [
         {
-            value: `**Table:** ${table.table_name}`
+            value: [
+                `**Table:** ${table.table_name}`,
+                table.description
+            ].filter(Boolean).join('\n\n')
         },
     ],
     range,
@@ -256,6 +264,23 @@ function findTableInfoById(tableIdExp: string, tableEntities: EntityContext[]) {
     }
 
     return null;
+}
+
+
+function matchSubTree(node: ParserRuleContext, ruleIndex: number[]): boolean {
+    const checkedRuleIndex = ruleIndex.slice(0).reverse();
+    if (node.ruleIndex === checkedRuleIndex[0]) {
+        return true;
+    }
+    let parent = node.parent;
+    while (checkedRuleIndex.length > 0 && parent) {
+        if (parent.ruleIndex !== checkedRuleIndex[0]) {
+            return false;
+        }
+        parent = parent.parent;
+        checkedRuleIndex.shift();
+    }
+    return true;
 }
 
 // 这里列一下表
@@ -356,10 +381,11 @@ export const getHiveType = (model: {
         ) => {
             const foundNode = getCtxFromPos(position);
             if (!foundNode || (
-                foundNode.ruleIndex !== HiveSqlParser.RULE_id_
-                && foundNode.ruleIndex !== HiveSqlParser.RULE_columnNamePath
-                && foundNode.ruleIndex !== HiveSqlParser.RULE_poolPath
-                && foundNode.ruleIndex !== HiveSqlParser.RULE_constant
+                matchSubTree(foundNode, [HiveSqlParser.RULE_id_])
+
+                && !matchSubTree(foundNode., [HiveSqlParser.RULE_columnNamePath])
+                && !matchSubTree(foundNode, [HiveSqlParser.RULE_poolPath])
+                && !matchSubTree(foundNode, [HiveSqlParser.RULE_constant])
             )) {
                 return;
             }
@@ -374,11 +400,9 @@ export const getHiveType = (model: {
             const entities = hiveSqlParse.getAllEntities(document.getText(), position) || [];
             const currentEntities = entities.filter(e => e.belongStmt.isContainCaret);
 
-            console.log('do hover syntaxSuggestions', position, syntaxSuggestions, currentEntities);
+            console.log('do hover syntaxSuggestions', printNode(parent), position, syntaxSuggestions, currentEntities);
 
-            if (parent.ruleIndex === HiveSqlParser.RULE_tableSource
-                || parent.ruleIndex === HiveSqlParser.RULE_tableName
-            ) {
+            if (parent.ruleIndex === HiveSqlParser.RULE_tableSource) {
                 const tableIdExp = parent.children![0].getText();
                 const tableInfo = getTableInfoByName(tableIdExp);
                 if (!tableInfo) {
@@ -387,12 +411,23 @@ export const getHiveType = (model: {
                 const range = rangeFromNode(foundNode);
                 return tableRes(tableInfo, range);
             }
-
+            if (parent.ruleIndex === HiveSqlParser.RULE_tableName) {
+                const tableIdExp = parent.children![0].getText();
+                const tableInfo = getTableInfoByName(tableIdExp);
+                console.log('do hover tableName', parent, 'tableIdExp', tableIdExp, 'tableInfo', tableInfo);
+                if (!tableInfo) {
+                    return noTableInfoRes(tableIdExp, rangeFromNode(foundNode));
+                }
+                const range = rangeFromNode(foundNode);
+                return tableRes(tableInfo, range);
+            }
             if (parent.ruleIndex === HiveSqlParser.RULE_viewName) {
                 console.log('do hover tableSource', parent);
                 return;
             }
 
+            // columnName -> poolPath -> id_(from default table name)
+            // columnName -> poolPath -> id_(table name or alias), ., _id
             if (
                 parent.ruleIndex === HiveSqlParser.RULE_poolPath
                 && (
@@ -458,8 +493,7 @@ export const getHiveType = (model: {
                 }
             }
 
-            // columnName -> poolPath -> id_(from default table name)
-            // columnName -> poolPath -> id_(table name or alias), ., _id
+
             // tableName look up
         },
         doValidation() {
