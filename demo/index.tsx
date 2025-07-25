@@ -45,6 +45,15 @@ select
   field_2, t.test
 from hive_table2 t
 where id = 2;
+select
+  field_2, t.test
+from hive_table2
+where id = 2;
+select
+  field_2, t.test
+from hive_table2
+  left join hive_table3 t
+where id = 2;
 `
     },
     body: [

@@ -2,6 +2,7 @@ import { editor, Position } from 'monaco-editor';
 import { LanguageIdEnum, setupLanguageFeatures, vsPlusTheme } from 'monaco-sql-languages';
 import 'monaco-sql-languages/esm/languages/hive/hive.contribution';
 import { getHiveType } from './sql_ls';
+import { posFromString, stringFromPos } from './ls_helper';
 
 // Customize the various tokens style
 editor.defineTheme('sql-dark', vsPlusTheme.darkThemeData);
@@ -42,12 +43,11 @@ export default {
         const testHover = () => {
             const model = editorInstance.getModel();
             const context = getHiveType(model!);
-            const hoverInfo = context.doHover({
-                lineNumber: 3,
-                column: 4
-            } as Position);
+            // const hoverInfo = context.doHover(posFromString('3:4'));
+            // const hoverInfo = context.doHover(posFromString('3:11'));
+            const hoverInfo = context.doHover(posFromString('4:18'));
             console.log('test hover', hoverInfo);
-        }
+        };
 
         editorInstance.onDidChangeModelContent((e) => {
             doValidate();
@@ -61,14 +61,18 @@ export default {
             triggerCharacters: ['.', '"', ' '],
             provideCompletionItems: (model, position) => {
                 const context = getHiveType(model);
-                return context.doComplete(position);
+                const ret = context.doComplete(position);
+                console.log('hover result', stringFromPos(position), ret);
+                return ret;
             }
         });
 
         monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
             provideHover: (model, position) => {
                 const context = getHiveType(model);
-                return context.doHover(position);
+                const ret = context.doHover(position);
+                console.log('hover result', stringFromPos(position), ret);
+                return ret;
             }
         });
 

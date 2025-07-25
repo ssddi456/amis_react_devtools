@@ -1,3 +1,4 @@
+import { Position } from 'monaco-editor';
 
 export function posToPosition(position: {
     lineNumber: number;
@@ -32,4 +33,19 @@ export function posInRange(pos: { lineNumber: number; column: number; }, range: 
         pos.lineNumber <= range.endLineNumber &&
         (pos.lineNumber > range.startLineNumber || pos.column >= range.startColumn) &&
         (pos.lineNumber < range.endLineNumber || pos.column <= range.endColumn);
+}
+
+export function posFromString(str: string): Position {
+    const parts = str.split(':');
+    if (parts.length === 2) {
+        return {
+            lineNumber: parseInt(parts[0], 10),
+            column: parseInt(parts[1], 10)
+        } as Position;
+    }
+    return { lineNumber: 0, column: 0 } as Position;
+}
+
+export function stringFromPos(pos: Position): string {
+    return `${pos.lineNumber}:${pos.column}`;
 }
