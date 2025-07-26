@@ -92,6 +92,26 @@ function printNode(node: ParserRuleContext | null): string {
     return `Node(${ruleIndexToDisplayName(node.ruleIndex)}, ${start} -> ${end})`;
 }
 
+function printNodeTree(node: ParserRuleContext | null): string {
+    if (!node) {
+        return 'null';
+    }
+    const result: string[] = [];
+    while (true) {
+        result.push(printNode(node));
+        if (!node.parent) {
+            break;
+        }
+        node = node.parent;
+    }
+    return result.reverse().map((x, i) => {
+        if (i == 0) {
+            return x;
+        }
+        return `  ->${x}`;
+    }).join('\n');
+}
+
 function rangeFromNode(node: ParserRuleContext) {
     const ret = {
         startLineNumber: node.start!.line,
@@ -210,47 +230,62 @@ function ruleIndexToDisplayName(ruleIndex: number): string | undefined {
 
 
 
-const noTableInfoRes = (text: string, range: IRange) => ({
+const noTableInfoRes = (text: string, range: IRange, ext?: string[]) => ({
     contents: [
         {
-            value: `table not found: ${text}`
+            value: [`table not found: ${text}`, ...(ext || [])].filter(Boolean).join('\n')
         },
     ],
     range,
 });
-const noColumnInfoRes = (table: TableInfo, columnName: string, range: IRange) => ({
+const noColumnInfoRes = (table: TableInfo, columnName: string, range: IRange, ext?: string[]) => ({
     contents: [
         {
-            value: `column: ${columnName} not found in table ${table.table_name}`
+            value: [
+                `column: ${columnName} not found in table ${table.table_name}`,
+                ...(ext || [])].filter(Boolean).join('\n')
         },
     ],
     range,
 });
-const tableAndColumn = (table: TableInfo, column: ColumnInfo, range: IRange) => ({
+const tableAndColumn = (table: TableInfo, column: ColumnInfo, range: IRange, ext?: string[]) => ({
     contents: [
         {
             value: [
                 `**Table:** ${table.table_name}`,
                 table.description,
                 `**Column:** ${column.column_name} [${column.data_type_string}]`,
-                column.description
-            ].filter(Boolean).join('\n\n'), 
+                column.description,
+                ...(ext || [])
+            ].filter(Boolean).join('\n\n'),
         },
     ],
     range,
 });
-const tableRes = (table: TableInfo, range: IRange) => ({
+const tableRes = (table: TableInfo, range: IRange, ext?: string[]) => ({
     contents: [
         {
             value: [
                 `**Table:** ${table.table_name}`,
-                table.description
+                table.description,
+                ...(ext || [])
             ].filter(Boolean).join('\n\n')
         },
     ],
     range,
 });
 
+const unknownRes = (text: string, range: IRange, ext?: string[]) => ({
+    contents: [
+        {
+            value: [
+                `unknown: ${text}`,
+                ...(ext || [])
+            ].filter(Boolean).join('\n')
+        },
+    ],
+    range,
+});
 
 function findTableInfoById(tableIdExp: string, tableEntities: EntityContext[]) {
     if (!tableIdExp || !tableEntities || tableEntities.length === 0) {
@@ -269,8 +304,8 @@ function findTableInfoById(tableIdExp: string, tableEntities: EntityContext[]) {
 
 function matchSubTree(node: ParserRuleContext, ruleIndex: number[]): boolean {
     const checkedRuleIndex = ruleIndex.slice(0).reverse();
-    if (node.ruleIndex === checkedRuleIndex[0]) {
-        return true;
+    if (node.ruleIndex !== checkedRuleIndex[0]) {
+        return false;
     }
     let parent = node.parent;
     while (checkedRuleIndex.length > 0 && parent) {
@@ -285,7 +320,7 @@ function matchSubTree(node: ParserRuleContext, ruleIndex: number[]): boolean {
 
 // 这里列一下表
 
-export const getHiveType = (model: {
+export const createHiveLs = (model: {
     uri: { toString: () => string; };
     getValue: () => string;
 }) => {
@@ -383,7 +418,7 @@ export const getHiveType = (model: {
             if (!foundNode || (
                 matchSubTree(foundNode, [HiveSqlParser.RULE_id_])
 
-                && !matchSubTree(foundNode., [HiveSqlParser.RULE_columnNamePath])
+                && !matchSubTree(foundNode, [HiveSqlParser.RULE_columnNamePath])
                 && !matchSubTree(foundNode, [HiveSqlParser.RULE_poolPath])
                 && !matchSubTree(foundNode, [HiveSqlParser.RULE_constant])
             )) {
@@ -391,11 +426,8 @@ export const getHiveType = (model: {
             }
 
             const parent = foundNode.parent!;
-            const parentRuleName = ruleIndexToDisplayName(parent.ruleIndex);
-            const currentRuleName = ruleIndexToDisplayName(foundNode.ruleIndex);
-            const parentParentRuleName = ruleIndexToDisplayName(parent.parent?.ruleIndex || -1);
-            console.log(parentParentRuleName, '->', parentRuleName, '-> *', currentRuleName);
-
+            const ext: string[] = [];
+            ext.push(printNodeTree(foundNode));
             const syntaxSuggestions = hiveSqlParse.getSuggestionAtCaretPosition(document.getText(), position)?.syntax;
             const entities = hiveSqlParse.getAllEntities(document.getText(), position) || [];
             const currentEntities = entities.filter(e => e.belongStmt.isContainCaret);
@@ -406,24 +438,23 @@ export const getHiveType = (model: {
                 const tableIdExp = parent.children![0].getText();
                 const tableInfo = getTableInfoByName(tableIdExp);
                 if (!tableInfo) {
-                    return noTableInfoRes(tableIdExp, rangeFromNode(foundNode));
+                    return noTableInfoRes(tableIdExp, rangeFromNode(foundNode), ext);
                 }
                 const range = rangeFromNode(foundNode);
-                return tableRes(tableInfo, range);
+                return tableRes(tableInfo, range, ext);
             }
             if (parent.ruleIndex === HiveSqlParser.RULE_tableName) {
                 const tableIdExp = parent.children![0].getText();
                 const tableInfo = getTableInfoByName(tableIdExp);
                 console.log('do hover tableName', parent, 'tableIdExp', tableIdExp, 'tableInfo', tableInfo);
                 if (!tableInfo) {
-                    return noTableInfoRes(tableIdExp, rangeFromNode(foundNode));
+                    return noTableInfoRes(tableIdExp, rangeFromNode(foundNode), ext);
                 }
                 const range = rangeFromNode(foundNode);
-                return tableRes(tableInfo, range);
+                return tableRes(tableInfo, range, ext);
             }
             if (parent.ruleIndex === HiveSqlParser.RULE_viewName) {
-                console.log('do hover tableSource', parent);
-                return;
+                return unknownRes(foundNode.getText(), rangeFromNode(foundNode), ext);
             }
 
             // columnName -> poolPath -> id_(from default table name)
@@ -442,59 +473,44 @@ export const getHiveType = (model: {
                 if (!tableIdExp) {
                     const tableInfo = getTableInfoByName(currentEntities[0].text)
                     if (!tableInfo) {
-                        return noTableInfoRes(currentEntities[0].text, range);
+                        return noTableInfoRes(currentEntities[0].text, range, ext);
                     }
                     const columnInfo = getColumnInfoByName(currentEntities[0].text, columnName);
                     if (!columnInfo) {
-                        return noColumnInfoRes(tableInfo, columnName, range);
+                        return noColumnInfoRes(tableInfo, columnName, range, ext);
                     }
-                    return tableAndColumn(tableInfo, columnInfo, range);
+                    return tableAndColumn(tableInfo, columnInfo, range, ext);
                 }
                 const realTableName = findTableInfoById(tableIdExp, currentEntities.filter(e => e.entityContextType === EntityContextType.TABLE));
                 if (!realTableName) {
-                    return noTableInfoRes(tableIdExp, range);
+                    return noTableInfoRes(tableIdExp, range, ext);
                 }
                 const tableInfo = getTableInfoByName(realTableName);
                 if (!tableInfo) {
-                    return noTableInfoRes(realTableName, range);
+                    return noTableInfoRes(realTableName, range, ext);
                 }
                 const columnInfo = getColumnInfoByName(tableIdExp, columnName);
                 if (!columnInfo) {
-                    return noColumnInfoRes(tableInfo, columnName, range);
+                    return noColumnInfoRes(tableInfo, columnName, range, ext);
                 }
-                return tableAndColumn(tableInfo, columnInfo, range);
+                return tableAndColumn(tableInfo, columnInfo, range, ext);
             }
-
-
 
             if (syntaxSuggestions) {
                 const table = syntaxSuggestions.find(s => s.syntaxContextType === EntityContextType.TABLE);
                 if (table) {
+                    const range = wordToRange(table.wordRanges[0]) || rangeFromNode(foundNode);
                     const tableInfo = getTableInfoByName(currentEntities[0].text)
                     if (!tableInfo) {
-                        return {
-                            contents: [
-                                {
-                                    value: `table not found: ${currentEntities[0].text}`
-                                },
-                            ],
-                            range: wordToRange(table.wordRanges[0])
-                        };
+                        return noTableInfoRes(currentEntities[0].text, range, ext);
                     }
                     // find table in 
-                    return {
-                        contents: [
-                            {
-                                value: `**Table:** ${table.wordRanges[0].text}`
-                            },
-                        ],
-                        range: wordToRange(table.wordRanges[0])
-                    };
+                    return tableRes(tableInfo, range, ext);
                 }
             }
 
 
-            // tableName look up
+            return unknownRes(foundNode.getText(), rangeFromNode(foundNode), ext);
         },
         doValidation() {
             const errors = hiveSqlParse.validate(document.getText());

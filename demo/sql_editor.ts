@@ -1,7 +1,7 @@
 import { editor, Position } from 'monaco-editor';
 import { LanguageIdEnum, setupLanguageFeatures, vsPlusTheme } from 'monaco-sql-languages';
 import 'monaco-sql-languages/esm/languages/hive/hive.contribution';
-import { getHiveType } from './sql_ls';
+import { createHiveLs } from './sql_ls';
 import { posFromString, stringFromPos } from './ls_helper';
 
 // Customize the various tokens style
@@ -25,7 +25,7 @@ export default {
         const doValidate = () => {
             const model = editorInstance.getModel();
             if (model) {
-                const context = getHiveType(model);
+                const context = createHiveLs(model);
                 const errors = context.doValidation();
                 monaco.editor.setModelMarkers(model, LanguageIdEnum.HIVE, errors.map(err => {
                     return {
@@ -40,27 +40,17 @@ export default {
             }
         }
 
-        const testHover = () => {
-            const model = editorInstance.getModel();
-            const context = getHiveType(model!);
-            // const hoverInfo = context.doHover(posFromString('3:4'));
-            // const hoverInfo = context.doHover(posFromString('3:11'));
-            const hoverInfo = context.doHover(posFromString('4:18'));
-            console.log('test hover', hoverInfo);
-        };
-
         editorInstance.onDidChangeModelContent((e) => {
             doValidate();
 
         });
         
         doValidate();
-        testHover();
 
         monaco.languages.registerCompletionItemProvider(LanguageIdEnum.HIVE, {
             triggerCharacters: ['.', '"', ' '],
             provideCompletionItems: (model, position) => {
-                const context = getHiveType(model);
+                const context = createHiveLs(model);
                 const ret = context.doComplete(position);
                 console.log('hover result', stringFromPos(position), ret);
                 return ret;
@@ -69,7 +59,7 @@ export default {
 
         monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
             provideHover: (model, position) => {
-                const context = getHiveType(model);
+                const context = createHiveLs(model);
                 const ret = context.doHover(position);
                 console.log('hover result', stringFromPos(position), ret);
                 return ret;

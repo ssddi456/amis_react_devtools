@@ -8,6 +8,7 @@ import sqlEditor from "./sql_editor";
 import 'amis/lib/themes/default.css'
 import 'amis/lib/helper.css'
 import { ClickToComponent } from 'click-to-react-component';
+import { DoSqlTest, sqlTest } from './hiveLsTest';
 
 
 (window as any).MonacoEnvironment = {
@@ -40,33 +41,7 @@ const AppComponent = amisRender(
   "type": "hbox",
   "columns": []
 }`,
-      hive_sql: [
-        // simple
-        `select * from data_test_news_record_di where pt = 1;`,
-        `select * from data.data_test_news_record_di where pt = 1;`,
-        // simple with alias
-        `select
-  field_2, t.test
-from data_test_news_record_da t
-where pt = 2;`,
-
-        `select
-  t.field_2, t.test,
-  count(*) as cnt
-from data.data_test_news_record_da t
-where pt = 2
-group by
-  t.field_2, t.test
-;`,
-        `select
-  t1.house_code, t1.resblock_id, t2.quota_date
-from data.data_test_news_record_di t1
-  left join data.data_test_quota_similar_house_region_da t2
-  on t1.house_code = t2.house_code
-    and t1.resblock_id = t2.resblock_id
-where t1.pt = 2;`,
-
-].join('\n\n'),
+      hive_sql: sqlTest.map(x => x.model.getValue()).join('\n\n'),
     },
     body: [
       "control + click or option + click to go to source",
@@ -133,6 +108,14 @@ const App = () => {
     <div className="container">
       <ClickToComponent />
       {AppComponent}
+
+      {
+        sqlTest.slice(1, 2).map((testCase, index) => (
+          <div key={index}>
+            <DoSqlTest case={testCase} />
+          </div>
+        ))
+      }
     </div>
   );
 }
