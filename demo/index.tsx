@@ -110,7 +110,7 @@ const App = () => {
       {AppComponent}
 
       {
-        [sqlTest[5]].map((testCase, index) => (
+        [sqlTest[6]].map((testCase, index) => (
           <div key={index}>
             <DoSqlTest case={testCase} />
           </div>
