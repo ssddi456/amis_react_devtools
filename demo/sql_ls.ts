@@ -37,18 +37,23 @@ function wordToRange(slice?: WordRange): IRange | undefined {
     };
 }
 
-function isPosInParserRuleContext(position: Position, context: {
-    start: {
-        line: number;
-        column: number;
-    } | null;
-    stop: {
-        line: number;
-        column: number;
-    } | null;
-    ruleIndex: number;
-    getText?(): string;
-}): boolean {
+function isPosInParserRuleContext(position: Position, context: ParserRuleContext | TerminalNode): boolean {
+    const lineNumber = position.lineNumber;
+    const column = position.column - 1;
+    
+    if (context instanceof TerminalNode) {
+        if (context.symbol.type === HiveSqlParser.Identifier) {
+            return false;
+        }
+        if (context.symbol.line === lineNumber) {
+            if (context.symbol.column <= column
+                && context.symbol.column + (context.symbol.text || '').length > column
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
     const startToken = context.start;
     const endToken = context.stop;
     if (!startToken || !endToken) {
@@ -63,27 +68,30 @@ function isPosInParserRuleContext(position: Position, context: {
         endColumn = startColumn + (context.getText ? context.getText().length : 0);
     }
 
-    if (position.lineNumber === startLine && position.column >= startColumn && position.lineNumber === endLine && position.column <= endColumn) {
+    if (lineNumber === startLine && column >= startColumn && lineNumber === endLine && column < endColumn) {
         return true;
     }
 
-    if (position.lineNumber === startLine && position.lineNumber !== endLine && position.column >= startColumn) {
+    if (lineNumber === startLine && lineNumber !== endLine && column >= startColumn) {
         return true;
     }
 
-    if (position.lineNumber !== startLine && position.lineNumber === endLine && position.column <= endColumn) {
+    if (lineNumber !== startLine && lineNumber === endLine && column < endColumn) {
         return true;
     }
 
-    if (position.lineNumber > startLine && position.lineNumber < endLine) {
+    if (lineNumber > startLine && lineNumber < endLine) {
         return true;
     }
     return false;
 }
 
-function printNode(node: ParserRuleContext | null): string {
+function printNode(node: ParserRuleContext | TerminalNode | null): string {
     if (!node) {
         return 'null';
+    }
+    if (node instanceof TerminalNode) {
+        return `TerminalNode(${ruleIndexToDisplayName(node)}, ${node.symbol.line}:${node.symbol.column})`;
     }
     const range = rangeFromNode(node);
     const start = `${range.startLineNumber}:${range.startColumn}`;
@@ -150,7 +158,7 @@ function findTokenAtPosition(
         visitChildren(node: any): any {
             if (isPosInParserRuleContext(position, node)) {
                 foundNode = node;
-                // console.log('visitChildren +', JSON.stringify(position), printNode(foundNode));
+                console.log('visitChildren +', JSON.stringify(position), printNode(foundNode));
             }
             return super.visitChildren(node);
         }
@@ -158,7 +166,9 @@ function findTokenAtPosition(
         visitTerminal(node: any): any {
             if (isPosInParserRuleContext(position, node)) {
                 foundNode = node;
-                // console.log('visitTerminal', JSON.stringify(position), printNode(foundNode));
+                console.log('visitTerminal +', JSON.stringify(position), printNode(foundNode));
+            } else {
+                // console.log('visitTerminal -', JSON.stringify(position), printNode(node));
             }
             return super.visitTerminal(node);
         }
@@ -231,10 +241,14 @@ function penddingSliceText(slice: TextSlice, full: string): string {
 }
 
 function ruleIndexToDisplayName(node: ParserRuleContext | TerminalNode): string | undefined {
-    const ruleNames = HiveSqlParser.ruleNames;
+    const symbolicNames = HiveSqlParser.symbolicNames;
     if (node instanceof TerminalNode) {
+        if (node.symbol.type >= 0 && node.symbol.type < symbolicNames.length) {
+            return symbolicNames[node.symbol.type] || `Unknown Symbol: ${node.symbol.type}`;
+        }
         return node.getText();
     }
+    const ruleNames = HiveSqlParser.ruleNames;
     const ruleIndex = node.ruleIndex;
 
     if (ruleIndex >= 0 && ruleIndex < ruleNames.length) {
@@ -245,6 +259,7 @@ function ruleIndexToDisplayName(node: ParserRuleContext | TerminalNode): string 
     }
     return node.getText();
 }
+
 
 function isKeyWord(node: ParseTree, key: string): boolean {
     if (node instanceof TerminalNode) {
@@ -337,20 +352,30 @@ function findTableEntityById(tableIdExp: string, tableEntities: EntityContext[])
     return null;
 }
 
+function matchType(node: ParserRuleContext | TerminalNode, ruleIndex: number | string): boolean {
+    if (node instanceof TerminalNode) {
+        if (typeof ruleIndex === 'string') {
+            return node.symbol.type === HiveSqlParser[`KW_${ruleIndex.toUpperCase()}` as keyof typeof HiveSqlParser]
+            || node.symbol.type === HiveSqlParser[ruleIndex as keyof typeof HiveSqlParser];
+        }
+        return node.symbol.type === ruleIndex;
+    }
+    ruleIndex = (typeof ruleIndex === 'string'
+        ? (HiveSqlParser[`RULE_${ruleIndex}` as keyof typeof HiveSqlParser] || -1)
+        : ruleIndex) as number;
+    
+    return node.ruleIndex === ruleIndex;
+}
 
 function matchSubTree(node: ParserRuleContext, ruleIndex: number[] | string[]): boolean {
-    if (typeof ruleIndex[0] === 'string') {
-        ruleIndex = ruleIndex.map(r => HiveSqlParser[`RULE_${r}` as keyof typeof HiveSqlParser] || -1) as number[];
-    }
-
     const checkedRuleIndex = ruleIndex.slice(0);
-    if (node.ruleIndex !== checkedRuleIndex[0]) {
+    if (!matchType(node, checkedRuleIndex[0])) {
         return false;
     }
     let parent = node.parent;
     checkedRuleIndex.shift();
     while (checkedRuleIndex.length > 0 && parent) {
-        if (parent.ruleIndex !== checkedRuleIndex[0]) {
+        if (!matchType(parent, checkedRuleIndex[0])) {
             return false;
         }
         parent = parent.parent;
@@ -459,10 +484,11 @@ export const createHiveLs = (model: {
         ) => {
             const foundNode = getCtxFromPos(position);
             if (!foundNode || (
-                !matchSubTree(foundNode, ['id_'])
-                && !matchSubTree(foundNode, ['columnNamePath'])
-                && !matchSubTree(foundNode, ['poolPath'])
-                && !matchSubTree(foundNode, ['constant'])
+                !matchType(foundNode, 'id_')
+                && !matchType(foundNode, 'DOT')
+                && !matchType(foundNode, 'columnNamePath')
+                && !matchType(foundNode, 'poolPath')
+                && !matchType(foundNode, 'constant')
             )) {
                 return;
             }
@@ -486,14 +512,20 @@ export const createHiveLs = (model: {
                 const range = rangeFromNode(foundNode);
                 return tableRes(tableInfo, range, ext);
             }
-            if (matchSubTree(foundNode, ['id_', 'tableName'])) {
+            if (
+                matchSubTree(foundNode, ['id_', 'tableName'])
+                || matchSubTree(foundNode, ['DOT', 'tableName'])
+            ) {
                 const dbName = parent.children?.length === 3 ? parent.children![0].getText() : undefined;
                 const tableName = parent.children?.length === 3 ? parent.children![2].getText() : parent.children![0].getText();
 
                 const tableInfo = getTableInfoByName(tableName, dbName);
                 ext.push(`do hover tableName ${printNode(parent)}, 'tableIdExp', ${tableName}, 'tableInfo', ${JSON.stringify(tableInfo)}`);
                 if (!tableInfo) {
-                    if (matchSubTree(foundNode, ['id_', 'tableName', 'tableOrView', 'tableSource'])) {
+                    if (
+                        matchSubTree(foundNode, ['id_', 'tableName', 'tableOrView', 'tableSource'])
+                        || matchSubTree(foundNode, ['DOT', 'tableName', 'tableOrView', 'tableSource'])
+                    ) {
                         // to found cte source
                         const cteTables = entities.filter(e => e.entityContextType === EntityContextType.TABLE);
                         const cteTable = cteTables.find(e => e.text === tableName);
@@ -522,6 +554,7 @@ export const createHiveLs = (model: {
             if (
                 matchSubTree(foundNode, ['id_', 'poolPath', 'columnName'])
                 || matchSubTree(foundNode, ['id_', 'poolPath', 'columnNamePath'])
+                || matchSubTree(foundNode, ['DOT', 'poolPath', 'columnNamePath'])
             ) {
                 const tableIdExp = parent.children?.length === 1 ? undefined : parent.children![0].getText();
                 const columnName = parent.children?.length === 1 ? parent.children![0].getText() : parent.children![2].getText();
@@ -553,20 +586,6 @@ export const createHiveLs = (model: {
                 return tableAndColumn(tableInfo, columnInfo, range, ext);
             }
 
-            if (syntaxSuggestions) {
-                const table = syntaxSuggestions.find(s => s.syntaxContextType === EntityContextType.TABLE);
-                if (table) {
-                    const range = wordToRange(table.wordRanges[0]) || rangeFromNode(foundNode);
-                    const tableInfo = getTableInfoByName(currentEntities[0].text)
-                    if (!tableInfo) {
-                        return noTableInfoRes(currentEntities[0].text, range, ext);
-                    }
-                    // find table in 
-                    return tableRes(tableInfo, range, ext);
-                }
-            }
-
-
             if (matchSubTree(foundNode, ['id_', 'selectItem'])) {
                 if (foundNode === parent.children?.[2]
                     && isKeyWord(parent.children[1]!, 'as')
@@ -575,7 +594,6 @@ export const createHiveLs = (model: {
                 }
                 return unknownRes(foundNode.getText(), rangeFromNode(foundNode), ext);
             }
-
 
             return unknownRes(foundNode.getText(), rangeFromNode(foundNode), ext);
         },

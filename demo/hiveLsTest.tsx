@@ -12,6 +12,10 @@ select * from data_test_news_record_di where pt = 1;
 select * from data.data_test_news_record_di where data.pt = 1;
                 ^   ^                               ^   ^
 `,
+    `
+select * from data.data_test_news_record_di where data.pt = 1;
+                  ^                                   ^  
+`,
     // simple with alias
     // simple with alias
     `select
@@ -102,7 +106,9 @@ export function DoSqlTest({ case: testCase }: { case: LsTestCase }) {
             <pre
                 style={{
                     flex: 1,
-                    maxWidth: 'calc(50% - 5px)'
+                    maxWidth: 'calc(50% - 5px)',
+                    wordWrap: 'break-word',
+                    whiteSpace: 'pre-inline',
                 }}
             >
                 {testCase.model.getValue()}
@@ -114,20 +120,34 @@ export function DoSqlTest({ case: testCase }: { case: LsTestCase }) {
                 }}
             >
                 {results.hoverResults.map((res, index) => {
+                    const positionStr = `(${results.positions[index].lineNumber}:${results.positions[index].column})`;
                     if (res) {
+                        const rangeStr = `(${res.range?.startLineNumber}:${res.range?.startColumn} -> ${res.range?.endLineNumber}:${res.range?.endColumn})`;
                         return (
                             <div key={index}>
-                                <h4>Hover Result {index + 1} （
-                                    {res.range?.startLineNumber}:{res.range?.startColumn}
-                                    -&gt;
-                                    {res.range?.endLineNumber}:{res.range?.endColumn}
-                                    ）
+                                <h4>Hover Result {index + 1}
+                                    &nbsp;
+                                    pos: {positionStr}
+                                    &nbsp;
+                                    range: {rangeStr}
                                 </h4>
-                                <pre>{res.contents.map(content => content.value).join('\n')}</pre>
+                                <pre
+                                    style={{
+                                        wordWrap: 'break-word',
+                                        whiteSpace: 'pre-wrap',
+                                    }}
+                                >
+                                    {res.contents.map(content => content.value).join('\n')}
+                                </pre>
                             </div>
                         );
                     }
-                    return null;
+                    return (
+                        <div key={index}>
+                            <h4>Hover Result {index + 1} - No result</h4>
+                            <p>Position: {positionStr}</p>
+                        </div>
+                    );
                 })}
             </div>
         </div>);
