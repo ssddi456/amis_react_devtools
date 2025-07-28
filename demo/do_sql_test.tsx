@@ -41,7 +41,7 @@ export function DoSqlTest({ case: testCase }: { case: LsTestCase; }) {
         const model = testCase.model;
         const positions = testCase.positions;
         const hoverResults = positions.map(pos => {
-            const resInfo = createHiveLs(model).doHover(pos);
+            const resInfo = createHiveLs(model).doHover(pos, true);
             return resInfo;
         });
         return { model, positions, hoverResults };
