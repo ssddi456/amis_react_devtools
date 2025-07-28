@@ -8,7 +8,8 @@ import sqlEditor from "./sql_editor";
 import 'amis/lib/themes/default.css'
 import 'amis/lib/helper.css'
 import { ClickToComponent } from 'click-to-react-component';
-import { DoSqlTest, sqlTest } from './hiveLsTest';
+import { sqlTest } from './hiveLsTest';
+import { DoSqlTest } from "./do_sql_test";
 
 
 (window as any).MonacoEnvironment = {
@@ -103,19 +104,43 @@ const AppComponent = amisRender(
   })
 );
 
+const localStorageKey = 'amis_react_devtools_demo_index';
 const App = () => {
+  const [caseIndex, setCaseIndex] = React.useState(
+    localStorage.getItem(localStorageKey) ? parseInt(localStorage.getItem(localStorageKey)!) : 0
+  );
+
+  const maxIndex = sqlTest.length - 1;
+  const changeCase = (index: number) => {
+    setCaseIndex(Math.max(0, Math.min(maxIndex, index)));
+    localStorage.setItem(localStorageKey, String(index));
+  };
+
   return (
     <div className="container">
       <ClickToComponent />
       {AppComponent}
-
-      {
-        [sqlTest[0]].map((testCase, index) => (
-          <div key={index}>
-            <DoSqlTest case={testCase} />
-          </div>
-        ))
-      }
+      <div style={{ margin: '10px 0' }}>
+        <div>
+          <button
+            onClick={() => changeCase(caseIndex - 1)}
+            disabled={caseIndex <= 0}
+          >
+            Previous
+          </button>
+          <span style={{ margin: '0 10px' }}>
+            Case {caseIndex + 1} of {maxIndex + 1}
+          </span>
+          <button
+            onClick={() => changeCase(caseIndex + 1)}
+            disabled={caseIndex >= maxIndex}
+          >
+            Next
+          </button>
+          <a href='https://dtstack.github.io/monaco-sql-languages/' target='_blank' rel='noopener noreferrer'>ast parser</a>
+        </div>
+        <DoSqlTest case={sqlTest[caseIndex]} key={caseIndex} />
+      </div>
     </div>
   );
 }
