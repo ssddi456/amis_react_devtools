@@ -226,6 +226,8 @@ function tableInfoFromTableSource(
     return null;
 }
 
+const localDbId = 'local db';
+
 function tableInfoFromSubQuerySource(
     subQuerySource: any,
     collection?: TableInfo[]
@@ -241,7 +243,7 @@ function tableInfoFromSubQuerySource(
         return null;
     }
     const ret: TableInfo = {
-        db_name: 'local db',
+        db_name: localDbId,
         table_name: '[subquery]',
         alias: alias,
         table_id: -1,
@@ -266,7 +268,7 @@ function tableInfoFromVirtualTableSource(
     const alias = virtualTableSource.tableAlias()?.getText();
     console.log('collectTableInfo visitVirtualTableSource', printNode(virtualTableSource), 'alias:', alias);
     const ret = {
-        db_name: 'local db',
+        db_name: localDbId,
         table_name: alias,
         alias: alias,
         table_id: -1,
@@ -446,7 +448,7 @@ function getTableInfoByName(
         }
     }
     return {
-        db_name: 'local db',
+        db_name: localDbId,
         table_name: tableEntity.text,
         table_id: 0, // 这里没用
         description: '',
@@ -455,9 +457,16 @@ function getTableInfoByName(
     };
 }
 
-function getColumnInfoByName(tableInfo: TableInfo | null, columnName: string) {
+function getColumnInfoByName(tableInfo: TableInfo | null, columnName: string): ColumnInfo | null {
     if (!tableInfo || !columnName) {
         return null;
+    }
+    if (tableInfo.db_name == localDbId) {
+        return {
+            column_name: columnName,
+            data_type_string: 'unknown',
+            description: 'unknown column'
+        };
     }
     const columnInfo = tableInfo.column_list.find(c => c.column_name === columnName);
     return columnInfo || null;
@@ -663,6 +672,7 @@ const formatHoverRes = (hoverInfo: EntityInfo): languages.Hover => {
 };
 
 const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): languages.Definition | undefined => {
+    console.log('formatDefinitionRes', uri, hoverInfo);
     if (
         (hoverInfo.type === 'table' || hoverInfo.type === 'column')
         && hoverInfo.tableInfo && hoverInfo.tableInfo.range
