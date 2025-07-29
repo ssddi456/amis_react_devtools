@@ -40,14 +40,14 @@ export default {
             }
         }
 
-        editorInstance.onDidChangeModelContent((e) => {
+        const onChangeDisposable = editorInstance.onDidChangeModelContent((e) => {
             doValidate();
 
         });
         
         doValidate();
 
-        monaco.languages.registerCompletionItemProvider(LanguageIdEnum.HIVE, {
+        const onCompeletionDisposable = monaco.languages.registerCompletionItemProvider(LanguageIdEnum.HIVE, {
             triggerCharacters: ['.', '"', ' '],
             provideCompletionItems: (model, position) => {
                 const context = createHiveLs(model);
@@ -57,7 +57,7 @@ export default {
             }
         });
 
-        monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
+        const onHoverDisposable = monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
             provideHover: (model, position) => {
                 const context = createHiveLs(model);
                 const ret = context.doHover(position);
@@ -66,5 +66,22 @@ export default {
             }
         });
 
+        const onDefinitionDisposable = monaco.languages.registerDefinitionProvider(LanguageIdEnum.HIVE, {
+            provideDefinition: (model, position) => {
+                const context = createHiveLs(model);
+                const ret = context.doDefinition(position);
+                console.log('definition result', stringFromPos(position), ret);
+                return ret;
+            }
+        });
+
+        return {
+            dispose: () => {
+                onChangeDisposable.dispose();
+                onCompeletionDisposable.dispose();
+                onHoverDisposable.dispose();
+                onDefinitionDisposable.dispose();
+            }
+        }
     },
 }

@@ -1,9 +1,9 @@
-import { type IRange, languages, type IMarkdownString,  type Position } from "monaco-editor";
+import { type IRange, languages, type IMarkdownString,  type Position, Uri } from "monaco-editor";
 import { TextDocument } from 'vscode-json-languageservice';
 import { EntityContext, EntityContextType, HiveSQL, HiveSqlParserVisitor } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
 import { posInRange } from "./ls_helper";
-import { TextSlice, WordRange } from "dt-sql-parser/dist/parser/common/textAndWord";
+import { TextSlice, WordPosition, WordRange } from "dt-sql-parser/dist/parser/common/textAndWord";
 import { ProgramContext, HiveSqlParser, FromClauseContext, FromSourceContext, JoinSourceContext, AtomjoinSourceContext, JoinSourcePartContext, TableSourceContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ParserRuleContext, ParseTree, RuleContext, TerminalNode } from "antlr4ng";
 import tableData from './data/example'
@@ -25,7 +25,7 @@ function sliceToRange(slice: {
     };
 }
 
-function wordToRange(slice?: WordRange): IRange | undefined {
+function wordToRange(slice?: WordPosition): IRange | undefined {
     if (!slice) {
         return undefined;
     }
@@ -246,7 +246,8 @@ function tableInfoFromSubQuerySource(
         alias: alias,
         table_id: -1,
         description: '',
-        column_list: []
+        column_list: [],
+        range: rangeFromNode(subQuerySource)
     };
     if (collection) {
         collection.push(ret);
@@ -369,6 +370,12 @@ interface TableInfo {
     table_id: number;
     description: string;
     column_list: ColumnInfo[];
+    range?: {
+        startLineNumber: number;
+        startColumn: number;
+        endLineNumber: number;
+        endColumn: number;
+    }
 }
 
 interface ColumnInfo {
@@ -425,14 +432,26 @@ function getTableInfoByName(
         if (!dbName || !tableName) {
             return null;
         }
-        return tableData.find(t => t.table_name === parts[1] && t.db_name === parts[0]) || null;
+        const ret = tableData.find(t => t.table_name === parts[1] && t.db_name === parts[0]) || null;
+        if (ret) {
+            return {
+                db_name: ret.db_name,
+                table_name: ret.table_name,
+                alias: tableEntity[AttrName.alias]?.text || '',
+                table_id: ret.table_id,
+                description: ret.description,
+                column_list: ret.column_list,
+                range: wordToRange(tableEntity.position)
+            };
+        }
     }
     return {
         db_name: 'local db',
         table_name: tableEntity.text,
         table_id: 0, // 这里没用
         description: '',
-        column_list: []
+        column_list: [],
+        range: wordToRange(tableEntity.position)
     };
 }
 
@@ -616,6 +635,47 @@ function matchSubTree(node: ParserRuleContext, ruleIndex: number[] | string[]): 
     return parent;
 }
 
+interface EntityInfo {
+    type: 'table' | 'column' | 'unknown' | 'noTable' | 'noColumn' | 'createColumn';
+    tableInfo?: TableInfo | null;
+    columnInfo?: ColumnInfo | null;
+    text?: string;
+    range: IRange;
+    ext?: string[];
+}
+
+const formatHoverRes = (hoverInfo: EntityInfo): languages.ProviderResult<languages.Hover> => {
+    switch (hoverInfo.type) {
+        case 'table':
+            return tableRes(hoverInfo.tableInfo!, hoverInfo.range, hoverInfo.ext);
+        case 'column':
+            return tableAndColumn(hoverInfo.tableInfo!, hoverInfo.columnInfo!, hoverInfo.range, hoverInfo.ext);
+        case 'noTable':
+            return noTableInfoRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext);
+        case 'noColumn':
+            return noColumnInfoRes(hoverInfo.tableInfo!, hoverInfo.text!, hoverInfo.range, hoverInfo.ext);
+        case 'createColumn':
+            return createColumnRes({ getText: () => hoverInfo.text! } as ParseTree, hoverInfo.range, hoverInfo.ext);
+        case 'unknown':
+        default:
+            return unknownRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext);
+    }
+};
+
+const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): languages.ProviderResult<languages.Definition> => {
+    if (
+        (hoverInfo.type === 'table' || hoverInfo.type === 'column')
+        && hoverInfo.tableInfo && hoverInfo.tableInfo.range
+    ) {
+        return {
+            uri,
+            range: hoverInfo.tableInfo.range
+        };
+    }
+    return null;
+};
+
+
 // 这里列一下表
 // hive is from
 // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4
@@ -645,6 +705,216 @@ export const createHiveLs = (model: {
             }
         }
         return null;
+    };
+
+    const getTableAndColumnInfoAtPosition = (
+        foundNode: ParserRuleContext,
+        position: Position,
+        isTest?: boolean
+    ): EntityInfo | null => {
+        const parent = foundNode.parent!;
+        const ext: string[] = [];
+        const pushExt = isTest ? (content: string) => {
+            ext.push(content);
+        } : () => {};
+        pushExt((position as any).text);
+        pushExt(printNodeTree(foundNode));
+        const syntaxSuggestions = hiveSqlParse.getSuggestionAtCaretPosition(document.getText(), position)?.syntax;
+        const entities = hiveSqlParse.getAllEntities(document.getText(), position) || [];
+        const currentEntities = entities.filter(e => e.belongStmt.isContainCaret);
+        const currentTableEntities = currentEntities.filter(e => e.entityContextType === EntityContextType.TABLE);
+
+        console.log('do hover syntaxSuggestions', printNode(parent), position, syntaxSuggestions, currentEntities);
+
+        if (parent.ruleIndex === HiveSqlParser.RULE_tableSource) {
+            const tableIdExp = parent.children![0].getText();
+            const tableInfo = getTableInfoByName(tableIdExp, undefined, currentTableEntities, null);
+            const range = rangeFromNode(foundNode);
+            return {
+                type: tableInfo ? 'table' : 'noTable',
+                tableInfo,
+                text: tableIdExp,
+                range,
+                ext
+            };
+        }
+        
+        if (
+            matchSubTree(foundNode, ['id_', 'tableName'])
+            || matchSubTree(foundNode, ['DOT', 'tableName'])
+        ) {
+            const dbName = parent.children?.length === 3 ? parent.children![0].getText() : undefined;
+            const tableName = parent.children?.length === 3 ? parent.children![2].getText() : parent.children![0].getText();
+
+            const tableInfo = getTableInfoByName(tableName, dbName, currentTableEntities, null);
+            pushExt(`do hover tableName ${printNode(parent)}, 'tableIdExp', ${tableName}, 'tableInfo', ${JSON.stringify(tableInfo)}`);
+            const range = rangeFromNode(foundNode);
+            
+            if (!tableInfo) {
+                if (
+                    matchSubTree(foundNode, ['id_', 'tableName', 'tableOrView', 'tableSource'])
+                    || matchSubTree(foundNode, ['DOT', 'tableName', 'tableOrView', 'tableSource'])
+                ) {
+                    // to found cte source
+                    const cteTables = entities.filter(e => e.entityContextType === EntityContextType.TABLE);
+                    const cteTable = cteTables.find(e => e.text === tableName);
+                    if (cteTable) {
+                        return {
+                            type: 'table',
+                            tableInfo: {
+                                db_name: '',
+                                table_name: cteTable.text,
+                                table_id: 0,
+                                description: 'cte table',
+                                column_list: [] // 这咋整
+                            },
+                            range,
+                            ext
+                        };
+                    }
+                    return {
+                        type: 'unknown',
+                        text: tableName,
+                        range,
+                        ext
+                    };
+                }
+                return {
+                    type: 'noTable',
+                    text: tableName,
+                    range,
+                    ext
+                };
+            }
+            
+            return {
+                type: 'table',
+                tableInfo,
+                range,
+                ext
+            };
+        }
+        
+        if (parent.ruleIndex === HiveSqlParser.RULE_viewName) {
+            return {
+                type: 'unknown',
+                text: foundNode.getText(),
+                range: rangeFromNode(foundNode),
+                ext
+            };
+        }
+
+        // columnName -> poolPath -> id_(from default table name)
+        // columnName -> poolPath -> id_(table name or alias), ., _id
+        if (
+            matchSubTree(foundNode, ['id_', 'poolPath', 'columnName'])
+            || matchSubTree(foundNode, ['id_', 'poolPath', 'columnNamePath'])
+            || matchSubTree(foundNode, ['DOT', 'poolPath', 'columnNamePath'])
+        ) {
+            // 只支持 table_name.column_name or column_name for now
+            const tableIdExp = parent.children?.length === 1 ? undefined : parent.children![0].getText();
+            const columnName = parent.children?.length === 1 ? parent.children![0].getText() : parent.children![2].getText();
+            const range = rangeFromNode(foundNode);
+
+            // column_name only
+            if (!tableIdExp) {
+                const tableInfo = getTableInfoByName(currentEntities[0].text, undefined, currentTableEntities, null);
+                if (!tableInfo) {
+                    return {
+                        type: 'noTable',
+                        text: currentEntities[0].text,
+                        range,
+                        ext
+                    };
+                }
+                const columnInfo = getColumnInfoByName(tableInfo, columnName);
+                if (!columnInfo) {
+                    return {
+                        type: 'noColumn',
+                        tableInfo,
+                        text: columnName,
+                        range,
+                        ext
+                    };
+                }
+                return {
+                    type: 'column',
+                    tableInfo,
+                    columnInfo,
+                    range,
+                    ext
+                };
+            }
+
+            const selectStmt = matchSubTree(foundNode, ['id_', '*', 'atomSelectStatement']);
+            const extTableInfo = collectTableInfo(selectStmt);
+            // pushExt(`do hover selectStmt ${printNode(selectStmt)}`);
+            // pushExt(`do hover extTableInfo ${JSON.stringify(extTableInfo, null, 2)}`);
+
+            const tableInfo = getTableInfoByName(tableIdExp, undefined, currentTableEntities, extTableInfo);
+            if (!tableInfo) {
+                return {
+                    type: 'noTable',
+                    text: tableIdExp,
+                    range,
+                    ext
+                };
+            }
+            const columnInfo = getColumnInfoByName(tableInfo, columnName);
+            if (!columnInfo) {
+                return {
+                    type: 'noColumn',
+                    tableInfo,
+                    text: columnName,
+                    range,
+                    ext
+                };
+            }
+            return {
+                type: 'column',
+                tableInfo,
+                columnInfo,
+                range,
+                ext
+            };
+        }
+
+        if (matchSubTree(foundNode, ['id_', 'selectItem'])) {
+            if (foundNode === parent.children?.[2]
+                && isKeyWord(parent.children[1]!, 'as')
+            ) {
+                return {
+                    type: 'createColumn',
+                    text: foundNode.getText(),
+                    range: rangeFromNode(foundNode),
+                    ext
+                };
+            }
+            return {
+                type: 'unknown',
+                text: foundNode.getText(),
+                range: rangeFromNode(foundNode),
+                ext
+            };
+        }
+
+        if (matchSubTree(foundNode, ['id_', 'subQuerySource'])) {
+            // pushExt(`entities ${JSON.stringify(entities, null, 2)}`)
+            // pushExt(`currentEntities${JSON.stringify(currentEntities, null, 2)}`);
+            return {
+                type: 'unknown',
+                text: foundNode.getText(),
+                range: rangeFromNode(foundNode),
+                ext
+            };
+        }
+
+        return {
+            type: 'unknown',
+            text: foundNode.getText(),
+            range: rangeFromNode(foundNode),
+            ext
+        };
     };
 
     return {
@@ -714,7 +984,7 @@ export const createHiveLs = (model: {
         doHover: (
             position: Position,
             isTest?: boolean
-        ) => {
+        ): languages.ProviderResult<languages.Hover> => {
             const foundNode = getCtxFromPos(position);
             if (!foundNode || (
                 !matchType(foundNode, 'id_')
@@ -727,123 +997,12 @@ export const createHiveLs = (model: {
                 return;
             }
 
-            const parent = foundNode.parent!;
-            const ext: string[] = [];
-            const pushExt = isTest ? (content: string) => {
-                ext.push(content);
-            } : () => {};
-            pushExt((position as any).text);
-            pushExt(printNodeTree(foundNode));
-            const syntaxSuggestions = hiveSqlParse.getSuggestionAtCaretPosition(document.getText(), position)?.syntax;
-            const entities = hiveSqlParse.getAllEntities(document.getText(), position) || [];
-            const currentEntities = entities.filter(e => e.belongStmt.isContainCaret);
-            const currentTableEntities = currentEntities.filter(e => e.entityContextType === EntityContextType.TABLE);
-
-            console.log('do hover syntaxSuggestions', printNode(parent), position, syntaxSuggestions, currentEntities);
-
-            if (parent.ruleIndex === HiveSqlParser.RULE_tableSource) {
-                const tableIdExp = parent.children![0].getText();
-                const tableInfo = getTableInfoByName(tableIdExp, undefined, currentTableEntities, null);
-                if (!tableInfo) {
-                    return noTableInfoRes(tableIdExp, rangeFromNode(foundNode), ext);
-                }
-                const range = rangeFromNode(foundNode);
-                return tableRes(tableInfo, range, ext);
-            }
-            if (
-                matchSubTree(foundNode, ['id_', 'tableName'])
-                || matchSubTree(foundNode, ['DOT', 'tableName'])
-            ) {
-                const dbName = parent.children?.length === 3 ? parent.children![0].getText() : undefined;
-                const tableName = parent.children?.length === 3 ? parent.children![2].getText() : parent.children![0].getText();
-
-                const tableInfo = getTableInfoByName(tableName, dbName, currentTableEntities, null);
-                pushExt(`do hover tableName ${printNode(parent)}, 'tableIdExp', ${tableName}, 'tableInfo', ${JSON.stringify(tableInfo)}`);
-                if (!tableInfo) {
-                    if (
-                        matchSubTree(foundNode, ['id_', 'tableName', 'tableOrView', 'tableSource'])
-                        || matchSubTree(foundNode, ['DOT', 'tableName', 'tableOrView', 'tableSource'])
-                    ) {
-                        // to found cte source
-                        const cteTables = entities.filter(e => e.entityContextType === EntityContextType.TABLE);
-                        const cteTable = cteTables.find(e => e.text === tableName);
-                        if (cteTable) {
-                            return tableRes({
-                                db_name: '',
-                                table_name: cteTable.text,
-                                table_id: 0,
-                                description: 'cte table',
-                                column_list: [] // 这咋整
-                            }, rangeFromNode(foundNode), ext);
-                        }
-                        return unknownRes(tableName, rangeFromNode(foundNode), ext);
-                    }
-                    return noTableInfoRes(tableName, rangeFromNode(foundNode), ext);
-                }
-                const range = rangeFromNode(foundNode);
-                return tableRes(tableInfo, range, ext);
-            }
-            if (parent.ruleIndex === HiveSqlParser.RULE_viewName) {
-                return unknownRes(foundNode.getText(), rangeFromNode(foundNode), ext);
+            const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, position, isTest);
+            if (!hoverInfo) {
+                return;
             }
 
-            // columnName -> poolPath -> id_(from default table name)
-            // columnName -> poolPath -> id_(table name or alias), ., _id
-            if (
-                matchSubTree(foundNode, ['id_', 'poolPath', 'columnName'])
-                || matchSubTree(foundNode, ['id_', 'poolPath', 'columnNamePath'])
-                || matchSubTree(foundNode, ['DOT', 'poolPath', 'columnNamePath'])
-            ) {
-                // 只支持 table_name.column_name or column_name for now
-                const tableIdExp = parent.children?.length === 1 ? undefined : parent.children![0].getText();
-                const columnName = parent.children?.length === 1 ? parent.children![0].getText() : parent.children![2].getText();
-                const range = rangeFromNode(foundNode);
-
-                // column_name only
-                if (!tableIdExp) {
-                    const tableInfo = getTableInfoByName(currentEntities[0].text, undefined, currentTableEntities, null);
-                    if (!tableInfo) {
-                        return noTableInfoRes(currentEntities[0].text, range, ext);
-                    }
-                    const columnInfo = getColumnInfoByName(tableInfo, columnName);
-                    if (!columnInfo) {
-                        return noColumnInfoRes(tableInfo, columnName, range, ext);
-                    }
-                    return tableAndColumn(tableInfo, columnInfo, range, ext);
-                }
-
-                const selectStmt = matchSubTree(foundNode, ['id_', '*', 'atomSelectStatement']);
-                const extTableInfo = collectTableInfo(selectStmt);
-                // pushExt(`do hover selectStmt ${printNode(selectStmt)}`);
-                // pushExt(`do hover extTableInfo ${JSON.stringify(extTableInfo, null, 2)}`);
-
-                const tableInfo = getTableInfoByName(tableIdExp, undefined, currentTableEntities, extTableInfo);
-                if (!tableInfo) {
-                    return noTableInfoRes(tableIdExp, range, ext);
-                }
-                const columnInfo = getColumnInfoByName(tableInfo, columnName);
-                if (!columnInfo) {
-                    return noColumnInfoRes(tableInfo, columnName, range, ext);
-                }
-                return tableAndColumn(tableInfo, columnInfo, range, ext);
-            }
-
-            if (matchSubTree(foundNode, ['id_', 'selectItem'])) {
-                if (foundNode === parent.children?.[2]
-                    && isKeyWord(parent.children[1]!, 'as')
-                ) {
-                    return createColumnRes(foundNode, rangeFromNode(foundNode), ext);
-                }
-                return unknownRes(foundNode.getText(), rangeFromNode(foundNode), ext);
-            }
-
-            if (matchSubTree(foundNode, ['id_', 'subQuerySource'])) {
-                // pushExt(`entities ${JSON.stringify(entities, null, 2)}`)
-                // pushExt(`currentEntities${JSON.stringify(currentEntities, null, 2)}`);
-                return unknownRes(foundNode.getText(), rangeFromNode(foundNode), ext);
-            }
-
-            return unknownRes(foundNode.getText(), rangeFromNode(foundNode), ext);
+            return formatHoverRes(hoverInfo);
         },
         doValidation() {
             const errors = hiveSqlParse.validate(document.getText());
@@ -856,6 +1015,31 @@ export const createHiveLs = (model: {
                     range: sliceToRange(err)
                 };
             });
+        },
+
+        doDefinition: (
+            position: Position,
+            isTest?: boolean
+        ): languages.ProviderResult<languages.Definition> => {
+            // TODO: implement definition functionality
+            const foundNode = getCtxFromPos(position);
+            if (!foundNode || (
+                !matchType(foundNode, 'id_')
+                && !matchType(foundNode, 'DOT')
+                && !matchType(foundNode, 'columnNamePath')
+                && !matchType(foundNode, 'poolPath')
+                && !matchType(foundNode, 'constant')
+                && !matchType(foundNode, 'select')
+            )) {
+                return;
+            }
+
+            const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, position, isTest);
+            if (!hoverInfo) {
+                return;
+            }
+
+            return formatDefinitionRes(model.uri as Uri, hoverInfo);
         }
     };
 }
