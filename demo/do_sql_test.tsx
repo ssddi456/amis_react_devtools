@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LsTestCase } from "./ls_helper";
 import { languages } from 'monaco-editor';
 import { createHiveLs } from "./sql_ls";
+import { HoverResults, DefinitionResults } from "./results_components";
 
 
 // 创建高亮文本的辅助函数
@@ -38,6 +39,17 @@ export function createHighlightedText(text: string, positions: Array<{ lineNumbe
 
 
 export function DoSqlTest({ case: testCase }: { case: LsTestCase; }) {
+    // 从 localStorage 获取初始 tab 状态，默认为 'hover'
+    const [activeTab, setActiveTab] = useState<'hover' | 'definition'>(() => {
+        const saved = localStorage.getItem('doSqlTest_activeTab');
+        return (saved === 'hover' || saved === 'definition') ? saved : 'hover';
+    });
+
+    // 保存 tab 状态到 localStorage
+    useEffect(() => {
+        localStorage.setItem('doSqlTest_activeTab', activeTab);
+    }, [activeTab]);
+
     const [results, _] = useState(() => {
         const model = testCase.model;
         const positions = testCase.positions;
@@ -54,6 +66,20 @@ export function DoSqlTest({ case: testCase }: { case: LsTestCase; }) {
     });
 
     const highlightedText = createHighlightedText(testCase.model.getValue(), testCase.positions);
+
+    // Tab 按钮样式
+    const tabButtonStyle = (isActive: boolean) => ({
+        padding: '8px 16px',
+        border: 'none',
+        backgroundColor: isActive ? '#007acc' : '#f0f0f0',
+        color: isActive ? 'white' : '#333',
+        cursor: 'pointer',
+        fontSize: '14px',
+        fontWeight: isActive ? 'bold' : 'normal',
+        marginRight: '4px',
+        borderRadius: '4px 4px 0 0',
+        outline: 'none'
+    });
 
     return (
         <div
@@ -84,147 +110,36 @@ export function DoSqlTest({ case: testCase }: { case: LsTestCase; }) {
                     maxWidth: 'calc(50% - 5px)'
                 }}
             >
-                {results.hoverResults.map((res, index) => {
-                    const positionStr = `(${results.positions[index].lineNumber}:${results.positions[index].column})`;
-                    const defRes = results.definitionResults[index];
-                    
-                    return (
-                        <div key={index}>
-                            {/* Hover Results */}
-                            {res ? (
-                                <div>
-                                    <h4
-                                        style={{
-                                            margin: '0 0 5px 0',
-                                            fontSize: '14px',
-                                            color: '#333',
-                                            fontWeight: 'bolder'
-                                        }}
-                                    >Hover Result {index + 1}
-                                        &nbsp;
-                                        pos: {positionStr}
-                                        &nbsp;
-                                        range: {`(${res.range?.startLineNumber}:${res.range?.startColumn} -> ${res.range?.endLineNumber}:${res.range?.endColumn})`}
-                                    </h4>
-                                    <pre
-                                        style={{
-                                            wordWrap: 'break-word',
-                                            whiteSpace: 'pre-wrap',
-                                        }}
-                                    >
-                                        {res.contents.map(content => content.value).join('\n')}
-                                    </pre>
-                                </div>
-                            ) : (
-                                <div>
-                                    <h4
-                                        style={{
-                                            margin: '0 0 5px 0',
-                                            fontSize: '14px',
-                                            color: '#333',
-                                            fontWeight: 'bolder'
-                                        }}
-                                    >Hover Result {index + 1} - No result</h4>
-                                    <p>Position: {positionStr}</p>
-                                </div>
-                            )}
-                            
-                            {/* Definition Results */}
-                            {defRes ? (
-                                <div style={{ marginTop: '10px' }}>
-                                    <h4
-                                        style={{
-                                            margin: '0 0 5px 0',
-                                            fontSize: '14px',
-                                            color: '#666',
-                                            fontWeight: 'bolder'
-                                        }}
-                                    >Definition Result {index + 1}
-                                        &nbsp;
-                                        pos: {positionStr}
-                                    </h4>
-                                    {Array.isArray(defRes) ? (
-                                        defRes.map((def, defIndex) => (
-                                            <div key={defIndex} style={{ marginBottom: '5px' }}>
-                                                <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                                                    URI: {def.uri.toString()}
-                                                </p>
-                                                <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                                                    Range: ({def.range.startLineNumber}:{def.range.startColumn} {'->'} {def.range.endLineNumber}:{def.range.endColumn})
-                                                </p>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div>
-                                            <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                                                URI: {defRes.uri.toString()}
-                                            </p>
-                                            <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                                                Range: ({defRes.range.startLineNumber}:{defRes.range.startColumn} {'->'} {defRes.range.endLineNumber}:{defRes.range.endColumn})
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div style={{ marginTop: '10px' }}>
-                                    <h4
-                                        style={{
-                                            margin: '0 0 5px 0',
-                                            fontSize: '14px',
-                                            color: '#666',
-                                            fontWeight: 'bolder'
-                                        }}
-                                    >Definition Result {index + 1} - No result</h4>
-                                    <p>Position: {positionStr}</p>
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
-                <hr />
-                {results.definitionResults.map((defRes, index) => {
-                    const positionRange = (defRes as languages.Location)?.range;
-                    const positionStr = positionRange
-                        ? `(${positionRange.startLineNumber}:${positionRange.startColumn} -> ${positionRange.endLineNumber}:${positionRange.endColumn})`
-                        : `(${results.positions[index].lineNumber}:${results.positions[index].column})`;
-                    const def = defRes as languages.Location
-                    return (
-                        <div key={index} style={{ marginBottom: '10px' }}>
-                            <h4
-                                style={{
-                                    margin: '0 0 5px 0',
-                                    fontSize: '14px',
-                                    color: '#666',
-                                    fontWeight: 'bolder'
-                                }}
-                            >Definition Result {index + 1}
-                                &nbsp;
-                                pos: {positionStr}
-                            </h4>
-                            {Array.isArray(defRes) ? (
-                                defRes.map((def, defIndex) => (
-                                    <div key={defIndex} style={{ marginBottom: '5px' }}>
-                                        <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                                            URI: {def.uri.toString()}
-                                        </p>
-                                        <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                                            Range: ({def.range.startLineNumber}:{def.range.startColumn} {'->'} {def.range.endLineNumber}:{def.range.endColumn})
-                                        </p>
-                                    </div>
-                                ))
-                            ) : (
-                                <div>
-                                    <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                                        URI: {def?.uri.toString()}
-                                    </p>
-                                    <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                                        Range: ({def?.range.startLineNumber}:{def?.range.startColumn} {'->'} {def?.range.endLineNumber}:{def?.range.endColumn})
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
+                {/* Tab 切换按钮 */}
+                <div style={{ marginBottom: '10px', borderBottom: '1px solid #ddd' }}>
+                    <button
+                        style={tabButtonStyle(activeTab === 'hover')}
+                        onClick={() => setActiveTab('hover')}
+                    >
+                        Hover Results
+                    </button>
+                    <button
+                        style={tabButtonStyle(activeTab === 'definition')}
+                        onClick={() => setActiveTab('definition')}
+                    >
+                        Definition Results
+                    </button>
+                </div>
+
+                {/* Tab 内容 */}
+                {activeTab === 'hover' && (
+                    <HoverResults 
+                        hoverResults={results.hoverResults} 
+                        positions={results.positions} 
+                    />
+                )}
+
+                {activeTab === 'definition' && (
+                    <DefinitionResults 
+                        definitionResults={results.definitionResults} 
+                        positions={results.positions} 
+                    />
+                )}
             </div>
         </div>);
 }

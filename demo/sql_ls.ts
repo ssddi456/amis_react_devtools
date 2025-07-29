@@ -1,10 +1,18 @@
 import { type IRange, languages, type IMarkdownString,  type Position, Uri } from "monaco-editor";
 import { TextDocument } from 'vscode-json-languageservice';
-import { EntityContext, EntityContextType, HiveSQL, HiveSqlParserVisitor } from 'dt-sql-parser';
+import { EntityContext, EntityContextType, HiveSQL, HiveSqlParserVisitor, HiveSqlParser } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
 import { posInRange } from "./ls_helper";
 import { TextSlice, WordPosition, WordRange } from "dt-sql-parser/dist/parser/common/textAndWord";
-import { ProgramContext, HiveSqlParser, FromClauseContext, FromSourceContext, JoinSourceContext, AtomjoinSourceContext, JoinSourcePartContext, TableSourceContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import type {
+    ProgramContext, 
+    FromClauseContext, 
+    JoinSourceContext,
+    AtomjoinSourceContext,
+    JoinSourcePartContext,
+    TableSourceContext,
+    VirtualTableSourceContext
+} from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ParserRuleContext, ParseTree, RuleContext, TerminalNode } from "antlr4ng";
 import tableData from './data/example'
 
@@ -216,7 +224,8 @@ function tableInfoFromTableSource(
             alias: alias,
             table_id: tableInfo.table_id,
             description: tableInfo.description,
-            column_list: tableInfo.column_list
+            column_list: tableInfo.column_list,
+            range: rangeFromNode(tableSource),
         };
         if (collection) {
             collection.push(ret);
@@ -580,6 +589,9 @@ const createColumnRes = (node: ParseTree, range: IRange, ext?: string[]) => ({
 });
 
 function matchType(node: ParseTree, ruleIndex: number | string): boolean {
+    if (ruleIndex === '*') {
+        return true;
+    }
     if (node instanceof TerminalNode) {
         if (typeof ruleIndex === 'string') {
             return node.symbol.type === HiveSqlParser[`KW_${ruleIndex.toUpperCase()}` as keyof typeof HiveSqlParser]
@@ -600,10 +612,26 @@ function matchType(node: ParseTree, ruleIndex: number | string): boolean {
 // from buttom to top
 function matchSubTree(node: ParserRuleContext, ruleIndex: number[] | string[]): ParserRuleContext | null {
     const checkedRuleIndex = ruleIndex.slice(0);
-    if (!matchType(node, checkedRuleIndex[0])) {
+    let parent = node.parent;
+
+    if (checkedRuleIndex[0] === '*') {
+        const nextRule = checkedRuleIndex[1];
+        if (nextRule === '*' || nextRule === '?') {
+            throw new Error(`'*' or '?' should not be used after '*' in ruleIndex: ${ruleIndex}`);
+        }
+        while (parent) {
+            if (matchType(parent, nextRule)) {
+                break;
+            }
+            parent = parent.parent;
+        }
+        if (!parent) {
+            return null;
+        }
+        checkedRuleIndex.shift();
+    } else if (!matchType(node, checkedRuleIndex[0])) {
         return null;
     }
-    let parent = node.parent;
     checkedRuleIndex.shift();
     while (checkedRuleIndex.length > 0 && parent) {
         if (checkedRuleIndex[0] === '?') {
@@ -734,11 +762,19 @@ export const createHiveLs = (model: {
         const currentEntities = entities.filter(e => e.belongStmt.isContainCaret);
         const currentTableEntities = currentEntities.filter(e => e.entityContextType === EntityContextType.TABLE);
 
+        const selectStmt = matchSubTree(foundNode, ['id_', '*', 'atomSelectStatement']);
+        let extTableInfo = collectTableInfo(selectStmt);
+
+        const isInFromClause = matchSubTree(foundNode, ['*', 'fromClause', '*', 'atomSelectStatement']) === selectStmt;
+        if (isInFromClause) {
+            extTableInfo = matchSubTree(foundNode, ['*', 'queryStatementExpression']) as QueryStatementContext
+        }
+
         console.log('do hover syntaxSuggestions', printNode(parent), position, syntaxSuggestions, currentEntities);
 
         if (parent.ruleIndex === HiveSqlParser.RULE_tableSource) {
             const tableIdExp = parent.children![0].getText();
-            const tableInfo = getTableInfoByName(tableIdExp, undefined, currentTableEntities, null);
+            const tableInfo = getTableInfoByName(tableIdExp, undefined, currentTableEntities, extTableInfo);
             const range = rangeFromNode(foundNode);
             return {
                 type: tableInfo ? 'table' : 'noTable',
@@ -756,7 +792,7 @@ export const createHiveLs = (model: {
             const dbName = parent.children?.length === 3 ? parent.children![0].getText() : undefined;
             const tableName = parent.children?.length === 3 ? parent.children![2].getText() : parent.children![0].getText();
 
-            const tableInfo = getTableInfoByName(tableName, dbName, currentTableEntities, null);
+            const tableInfo = getTableInfoByName(tableName, dbName, currentTableEntities, extTableInfo);
             pushExt(`do hover tableName ${printNode(parent)}, 'tableIdExp', ${tableName}, 'tableInfo', ${JSON.stringify(tableInfo)}`);
             const range = rangeFromNode(foundNode);
             
@@ -824,11 +860,12 @@ export const createHiveLs = (model: {
             // 只支持 table_name.column_name or column_name for now
             const tableIdExp = parent.children?.length === 1 ? undefined : parent.children![0].getText();
             const columnName = parent.children?.length === 1 ? parent.children![0].getText() : parent.children![2].getText();
+
             const range = rangeFromNode(foundNode);
 
             // column_name only
             if (!tableIdExp) {
-                const tableInfo = getTableInfoByName(currentEntities[0].text, undefined, currentTableEntities, null);
+                const tableInfo = getTableInfoByName(currentEntities[0].text, undefined, currentTableEntities, extTableInfo);
                 if (!tableInfo) {
                     return {
                         type: 'noTable',
@@ -856,8 +893,7 @@ export const createHiveLs = (model: {
                 };
             }
 
-            const selectStmt = matchSubTree(foundNode, ['id_', '*', 'atomSelectStatement']);
-            const extTableInfo = collectTableInfo(selectStmt);
+
             // pushExt(`do hover selectStmt ${printNode(selectStmt)}`);
             // pushExt(`do hover extTableInfo ${JSON.stringify(extTableInfo, null, 2)}`);
 

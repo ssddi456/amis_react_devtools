@@ -42,7 +42,7 @@ const AppComponent = amisRender(
   "type": "hbox",
   "columns": []
 }`,
-      hive_sql: sqlTest.map(x => x.model.getValue()).join('\n\n'),
+      hive_sql: sqlTest.map((x, index) => '-- case' + (index + 1) + '\n' + x.model.getValue()).join('\n\n'),
     },
     body: [
       "control + click or option + click to go to source",
@@ -118,7 +118,7 @@ const App = () => {
 
   return (
     <div className="container">
-      <ClickToComponent />
+      {/* <ClickToComponent /> */}
       {AppComponent}
       <div style={{ margin: '10px 0' }}>
         <div>
