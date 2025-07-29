@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { LsTestCase } from "./ls_helper";
+import { languages } from 'monaco-editor';
 import { createHiveLs } from "./sql_ls";
 
 
@@ -175,6 +176,50 @@ export function DoSqlTest({ case: testCase }: { case: LsTestCase; }) {
                                         }}
                                     >Definition Result {index + 1} - No result</h4>
                                     <p>Position: {positionStr}</p>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+                <hr />
+                {results.definitionResults.map((defRes, index) => {
+                    const positionRange = (defRes as languages.Location)?.range;
+                    const positionStr = positionRange
+                        ? `(${positionRange.startLineNumber}:${positionRange.startColumn} -> ${positionRange.endLineNumber}:${positionRange.endColumn})`
+                        : `(${results.positions[index].lineNumber}:${results.positions[index].column})`;
+                    const def = defRes as languages.Location
+                    return (
+                        <div key={index} style={{ marginBottom: '10px' }}>
+                            <h4
+                                style={{
+                                    margin: '0 0 5px 0',
+                                    fontSize: '14px',
+                                    color: '#666',
+                                    fontWeight: 'bolder'
+                                }}
+                            >Definition Result {index + 1}
+                                &nbsp;
+                                pos: {positionStr}
+                            </h4>
+                            {Array.isArray(defRes) ? (
+                                defRes.map((def, defIndex) => (
+                                    <div key={defIndex} style={{ marginBottom: '5px' }}>
+                                        <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                                            URI: {def.uri.toString()}
+                                        </p>
+                                        <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                                            Range: ({def.range.startLineNumber}:{def.range.startColumn} {'->'} {def.range.endLineNumber}:{def.range.endColumn})
+                                        </p>
+                                    </div>
+                                ))
+                            ) : (
+                                <div>
+                                    <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                                        URI: {def?.uri.toString()}
+                                    </p>
+                                    <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                                        Range: ({def?.range.startLineNumber}:{def?.range.startColumn} {'->'} {def?.range.endLineNumber}:{def?.range.endColumn})
+                                    </p>
                                 </div>
                             )}
                         </div>

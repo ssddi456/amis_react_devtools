@@ -70,7 +70,7 @@ export default {
             provideDefinition: (model, position) => {
                 const context = createHiveLs(model);
                 const ret = context.doDefinition(position);
-                console.log('definition result', stringFromPos(position), ret);
+                console.log('definition result', stringFromPos(position), model.uri, ret);
                 return ret;
             }
         });
