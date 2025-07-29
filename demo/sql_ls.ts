@@ -644,7 +644,7 @@ interface EntityInfo {
     ext?: string[];
 }
 
-const formatHoverRes = (hoverInfo: EntityInfo): languages.ProviderResult<languages.Hover> => {
+const formatHoverRes = (hoverInfo: EntityInfo): languages.Hover => {
     switch (hoverInfo.type) {
         case 'table':
             return tableRes(hoverInfo.tableInfo!, hoverInfo.range, hoverInfo.ext);
@@ -662,7 +662,7 @@ const formatHoverRes = (hoverInfo: EntityInfo): languages.ProviderResult<languag
     }
 };
 
-const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): languages.ProviderResult<languages.Definition> => {
+const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): languages.Definition | undefined => {
     if (
         (hoverInfo.type === 'table' || hoverInfo.type === 'column')
         && hoverInfo.tableInfo && hoverInfo.tableInfo.range
@@ -672,7 +672,7 @@ const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): languages.Provide
             range: hoverInfo.tableInfo.range
         };
     }
-    return null;
+    return;
 };
 
 
@@ -984,7 +984,7 @@ export const createHiveLs = (model: {
         doHover: (
             position: Position,
             isTest?: boolean
-        ): languages.ProviderResult<languages.Hover> => {
+        ): languages.Hover | undefined => {
             const foundNode = getCtxFromPos(position);
             if (!foundNode || (
                 !matchType(foundNode, 'id_')
@@ -1020,7 +1020,7 @@ export const createHiveLs = (model: {
         doDefinition: (
             position: Position,
             isTest?: boolean
-        ): languages.ProviderResult<languages.Definition> => {
+        ): languages.Definition | undefined => {
             // TODO: implement definition functionality
             const foundNode = getCtxFromPos(position);
             if (!foundNode || (

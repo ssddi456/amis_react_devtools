@@ -40,11 +40,16 @@ export function DoSqlTest({ case: testCase }: { case: LsTestCase; }) {
     const [results, _] = useState(() => {
         const model = testCase.model;
         const positions = testCase.positions;
+        const hiveLs = createHiveLs(model);
         const hoverResults = positions.map(pos => {
-            const resInfo = createHiveLs(model).doHover(pos, true);
+            const resInfo = hiveLs.doHover(pos, true);
             return resInfo;
         });
-        return { model, positions, hoverResults };
+        const definitionResults = positions.map(pos => {
+            const resInfo = hiveLs.doDefinition(pos, true);
+            return resInfo;
+        });
+        return { model, positions, hoverResults, definitionResults };
     });
 
     const highlightedText = createHighlightedText(testCase.model.getValue(), testCase.positions);
@@ -80,45 +85,98 @@ export function DoSqlTest({ case: testCase }: { case: LsTestCase; }) {
             >
                 {results.hoverResults.map((res, index) => {
                     const positionStr = `(${results.positions[index].lineNumber}:${results.positions[index].column})`;
-                    if (res) {
-                        const rangeStr = `(${res.range?.startLineNumber}:${res.range?.startColumn} -> ${res.range?.endLineNumber}:${res.range?.endColumn})`;
-                        return (
-                            <div key={index}>
-                                <h4
-                                    style={{
-                                        margin: '0 0 5px 0',
-                                        fontSize: '14px',
-                                        color: '#333',
-                                        fontWeight: 'bolder'
-                                    }}
-                                >Hover Result {index + 1}
-                                    &nbsp;
-                                    pos: {positionStr}
-                                    &nbsp;
-                                    range: {rangeStr}
-                                </h4>
-                                <pre
-                                    style={{
-                                        wordWrap: 'break-word',
-                                        whiteSpace: 'pre-wrap',
-                                    }}
-                                >
-                                    {res.contents.map(content => content.value).join('\n')}
-                                </pre>
-                            </div>
-                        );
-                    }
+                    const defRes = results.definitionResults[index];
+                    
                     return (
                         <div key={index}>
-                            <h4
-                                style={{
-                                    margin: '0 0 5px 0',
-                                    fontSize: '14px',
-                                    color: '#333',
-                                    fontWeight: 'bolder'
-                                }}
-                            >Hover Result {index + 1} - No result</h4>
-                            <p>Position: {positionStr}</p>
+                            {/* Hover Results */}
+                            {res ? (
+                                <div>
+                                    <h4
+                                        style={{
+                                            margin: '0 0 5px 0',
+                                            fontSize: '14px',
+                                            color: '#333',
+                                            fontWeight: 'bolder'
+                                        }}
+                                    >Hover Result {index + 1}
+                                        &nbsp;
+                                        pos: {positionStr}
+                                        &nbsp;
+                                        range: {`(${res.range?.startLineNumber}:${res.range?.startColumn} -> ${res.range?.endLineNumber}:${res.range?.endColumn})`}
+                                    </h4>
+                                    <pre
+                                        style={{
+                                            wordWrap: 'break-word',
+                                            whiteSpace: 'pre-wrap',
+                                        }}
+                                    >
+                                        {res.contents.map(content => content.value).join('\n')}
+                                    </pre>
+                                </div>
+                            ) : (
+                                <div>
+                                    <h4
+                                        style={{
+                                            margin: '0 0 5px 0',
+                                            fontSize: '14px',
+                                            color: '#333',
+                                            fontWeight: 'bolder'
+                                        }}
+                                    >Hover Result {index + 1} - No result</h4>
+                                    <p>Position: {positionStr}</p>
+                                </div>
+                            )}
+                            
+                            {/* Definition Results */}
+                            {defRes ? (
+                                <div style={{ marginTop: '10px' }}>
+                                    <h4
+                                        style={{
+                                            margin: '0 0 5px 0',
+                                            fontSize: '14px',
+                                            color: '#666',
+                                            fontWeight: 'bolder'
+                                        }}
+                                    >Definition Result {index + 1}
+                                        &nbsp;
+                                        pos: {positionStr}
+                                    </h4>
+                                    {Array.isArray(defRes) ? (
+                                        defRes.map((def, defIndex) => (
+                                            <div key={defIndex} style={{ marginBottom: '5px' }}>
+                                                <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                                                    URI: {def.uri.toString()}
+                                                </p>
+                                                <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                                                    Range: ({def.range.startLineNumber}:{def.range.startColumn} {'->'} {def.range.endLineNumber}:{def.range.endColumn})
+                                                </p>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div>
+                                            <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                                                URI: {defRes.uri.toString()}
+                                            </p>
+                                            <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
+                                                Range: ({defRes.range.startLineNumber}:{defRes.range.startColumn} {'->'} {defRes.range.endLineNumber}:{defRes.range.endColumn})
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div style={{ marginTop: '10px' }}>
+                                    <h4
+                                        style={{
+                                            margin: '0 0 5px 0',
+                                            fontSize: '14px',
+                                            color: '#666',
+                                            fontWeight: 'bolder'
+                                        }}
+                                    >Definition Result {index + 1} - No result</h4>
+                                    <p>Position: {positionStr}</p>
+                                </div>
+                            )}
                         </div>
                     );
                 })}
