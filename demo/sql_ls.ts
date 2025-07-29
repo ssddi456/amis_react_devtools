@@ -11,7 +11,8 @@ import type {
     AtomjoinSourceContext,
     JoinSourcePartContext,
     TableSourceContext,
-    VirtualTableSourceContext
+    VirtualTableSourceContext,
+    QueryStatementExpressionContext
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ParserRuleContext, ParseTree, RuleContext, TerminalNode } from "antlr4ng";
 import tableData from './data/example'
@@ -767,7 +768,7 @@ export const createHiveLs = (model: {
 
         const isInFromClause = matchSubTree(foundNode, ['*', 'fromClause', '*', 'atomSelectStatement']) === selectStmt;
         if (isInFromClause) {
-            extTableInfo = matchSubTree(foundNode, ['*', 'queryStatementExpression']) as QueryStatementContext
+            extTableInfo = matchSubTree(foundNode, ['*', 'queryStatementExpression']) as QueryStatementExpressionContext;
         }
 
         console.log('do hover syntaxSuggestions', printNode(parent), position, syntaxSuggestions, currentEntities);
