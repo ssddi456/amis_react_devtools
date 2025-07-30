@@ -1,7 +1,7 @@
 
 import { ParserRuleContext, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
-import { FromSourceContext, JoinSourceContext, ProgramContext, QueryStatementExpressionContext, SelectStatementWithCTEContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ExpressionContext, FromSourceContext, JoinSourceContext, ProgramContext, QueryStatementExpressionContext, SelectStatementWithCTEContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
 import { posInRange } from "./ls_helper";
 
@@ -150,6 +150,18 @@ class ContextManager {
                     }
                 }
             }
+
+            enterExpression = (ctx: ExpressionContext) => {
+                if (ctx.parent instanceof JoinSourceContext) {
+                    enterRule(ctx);
+                }
+            };
+
+            exitExpression = (ctx: ExpressionContext) => {
+                if (ctx.parent instanceof JoinSourceContext) {
+                    exitRule();
+                }
+            };
         };
 
         ParseTreeWalker.DEFAULT.walk(listener, tree);
@@ -161,9 +173,10 @@ class ContextManager {
         }
         let checkNodes: IdentifierScope[] = [this.currentContext];
         while (true) {
+            let foundNode = false;
             for (const child of checkNodes) {
                 if (child.containsPosition(position)) {
-
+                    foundNode = true;
                     if (!child.children.length) {
                         return child;
                     }
@@ -171,7 +184,12 @@ class ContextManager {
                     break;
                 }
             }
+            if (!foundNode) {
+                break;
+            }
         }
+
+        return null;
     }
 }
 

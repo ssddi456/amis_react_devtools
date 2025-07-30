@@ -16,7 +16,7 @@ import type {
     QueryStatementExpressionContext} from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ParserRuleContext, ParseTree, RuleContext, TerminalNode } from "antlr4ng";
 import tableData from './data/example'
-import { createContextManager } from "./createContextManager";
+import { createContextManager } from "./context_manager";
 import { printNode, rangeFromNode, printChildren, wordToRange, sliceToRange, findTokenAtPosition, printNodeTree } from "./sql_ls_helper";
 
 function tableInfoFromTableSource(
@@ -863,7 +863,7 @@ export const createHiveLs = (model: {
             )) {
                 return;
             }
-            console.log(context?.getAllIdentifiers());
+            console.log("getAllIdentifiers", context?.getAllIdentifiers());
 
             const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, position, isTest);
             if (!hoverInfo) {
@@ -903,7 +903,7 @@ export const createHiveLs = (model: {
             }
 
             const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, position, isTest);
-            console.log(context?.getAllIdentifiers());
+            console.log("getAllIdentifiers", context?.getAllIdentifiers());
 
             if (!hoverInfo) {
                 return;

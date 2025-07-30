@@ -176,7 +176,7 @@ export function findTokenAtPosition(
         visitChildren(node: any): any {
             if (isPosInParserRuleContext(position, node)) {
                 foundNode = node;
-                console.log('visitChildren +', JSON.stringify(position), printNode(foundNode));
+                // console.log('visitChildren +', JSON.stringify(position), printNode(foundNode));
             }
             return super.visitChildren(node);
         }
@@ -184,7 +184,7 @@ export function findTokenAtPosition(
         visitTerminal(node: any): any {
             if (isPosInParserRuleContext(position, node)) {
                 foundNode = node;
-                console.log('visitTerminal +', JSON.stringify(position), printNode(foundNode));
+                // console.log('visitTerminal +', JSON.stringify(position), printNode(foundNode));
             } else {
                 // console.log('visitTerminal -', JSON.stringify(position), printNode(node));
             }
