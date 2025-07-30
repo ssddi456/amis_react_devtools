@@ -1,21 +1,22 @@
-import { type IRange, languages, type IMarkdownString,  type Position, Uri } from "monaco-editor";
+import { type IRange, languages, type IMarkdownString, type Position, Uri } from "monaco-editor";
 import { TextDocument } from 'vscode-json-languageservice';
-import { EntityContext, EntityContextType, HiveSQL, HiveSqlParserVisitor, HiveSqlParser } from 'dt-sql-parser';
+import { EntityContext, EntityContextType, HiveSQL, HiveSqlParserVisitor, } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
 import { posInRange } from "./ls_helper";
-import { TextSlice, WordPosition, WordRange } from "dt-sql-parser/dist/parser/common/textAndWord";
+import { TextSlice, WordPosition } from "dt-sql-parser/dist/parser/common/textAndWord";
+import { HiveSqlParser } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import type {
-    ProgramContext, 
-    FromClauseContext, 
+    ProgramContext,
+    FromClauseContext,
     JoinSourceContext,
     AtomjoinSourceContext,
     JoinSourcePartContext,
     TableSourceContext,
     VirtualTableSourceContext,
-    QueryStatementExpressionContext
-} from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+    QueryStatementExpressionContext} from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ParserRuleContext, ParseTree, RuleContext, TerminalNode } from "antlr4ng";
 import tableData from './data/example'
+import { createContextManager } from "./createContextManager";
 
 function sliceToRange(slice: {
     readonly startLine: number;
@@ -49,7 +50,7 @@ function wordToRange(slice?: WordPosition): IRange | undefined {
 function isPosInParserRuleContext(position: Position, context: ParserRuleContext | TerminalNode): boolean {
     const lineNumber = position.lineNumber;
     const column = position.column - 1;
-    
+
     if (context instanceof TerminalNode) {
         if (context.symbol.type === HiveSqlParser.Identifier) {
             return false;
@@ -265,7 +266,7 @@ function tableInfoFromSubQuerySource(
         collection.push(ret);
     }
     return ret;
-    
+
 }
 
 function tableInfoFromVirtualTableSource(
@@ -292,7 +293,7 @@ function tableInfoFromVirtualTableSource(
 }
 
 
-function collectTableInfo(node: ParserRuleContext | null): TableInfo[] | null {
+function collectTableInfoFromSelect(node: ParserRuleContext | null): TableInfo[] | null {
     if (!node) {
         return null;
     }
@@ -315,7 +316,7 @@ function collectTableInfo(node: ParserRuleContext | null): TableInfo[] | null {
 
                 this.visitJoinSource(joinSource);
             }
-            
+
             visitJoinSource = (ctx: JoinSourceContext) => {
 
                 console.log('collectTableInfo visitJoinSource +', printChildren(ctx as any));
@@ -367,6 +368,25 @@ function collectTableInfo(node: ParserRuleContext | null): TableInfo[] | null {
                 }
             }
         }
+        visitor.visit(node);
+        if (result.length > 0) {
+            return result;
+        }
+    }
+    return null;
+}
+
+function collectTableInfoFromWithClause(node: ParserRuleContext | null): TableInfo[] | null {
+    if (!node) {
+        return null;
+    }
+    if (matchType(node, 'withClause')) {
+        const result: TableInfo[] = [];
+        const visitor = new class extends HiveSqlParserVisitor<any> {
+            visitTableSource = (ctx: TableSourceContext) => {
+                tableInfoFromTableSource(ctx, result);
+            }
+        };
         visitor.visit(node);
         if (result.length > 0) {
             return result;
@@ -596,14 +616,14 @@ function matchType(node: ParseTree, ruleIndex: number | string): boolean {
     if (node instanceof TerminalNode) {
         if (typeof ruleIndex === 'string') {
             return node.symbol.type === HiveSqlParser[`KW_${ruleIndex.toUpperCase()}` as keyof typeof HiveSqlParser]
-            || node.symbol.type === HiveSqlParser[ruleIndex as keyof typeof HiveSqlParser];
+                || node.symbol.type === HiveSqlParser[ruleIndex as keyof typeof HiveSqlParser];
         }
         return node.symbol.type === ruleIndex;
     }
     ruleIndex = (typeof ruleIndex === 'string'
         ? (HiveSqlParser[`RULE_${ruleIndex}` as keyof typeof HiveSqlParser] || -1)
         : ruleIndex) as number;
-    
+
     if (node instanceof RuleContext) {
         return node.ruleIndex === ruleIndex;
     }
@@ -714,7 +734,6 @@ const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): languages.Definit
     return;
 };
 
-
 // 这里列一下表
 // hive is from
 // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4
@@ -740,7 +759,12 @@ export const createHiveLs = (model: {
                 const ctx = hiveSqlParse.createParser(document.getText());
                 const tree = ctx.program();
                 const foundNode = findTokenAtPosition(position, tree);
-                return foundNode;
+                const contextManaer = createContextManager(tree);
+
+                return {
+                    foundNode,
+                    contextManaer,
+                };
             }
         }
         return null;
@@ -755,23 +779,24 @@ export const createHiveLs = (model: {
         const ext: string[] = [];
         const pushExt = isTest ? (content: string) => {
             ext.push(content);
-        } : () => {};
+        } : () => { };
         pushExt((position as any).text);
         pushExt(printNodeTree(foundNode));
-        const syntaxSuggestions = hiveSqlParse.getSuggestionAtCaretPosition(document.getText(), position)?.syntax;
+
         const entities = hiveSqlParse.getAllEntities(document.getText(), position) || [];
         const currentEntities = entities.filter(e => e.belongStmt.isContainCaret);
         const currentTableEntities = currentEntities.filter(e => e.entityContextType === EntityContextType.TABLE);
 
         const selectStmt = matchSubTree(foundNode, ['id_', '*', 'atomSelectStatement']);
-        let extTableInfo = collectTableInfo(selectStmt);
+        let extTableInfo = collectTableInfoFromSelect(selectStmt);
 
         const isInFromClause = matchSubTree(foundNode, ['*', 'fromClause', '*', 'atomSelectStatement']) === selectStmt;
         if (isInFromClause) {
-            extTableInfo = matchSubTree(foundNode, ['*', 'queryStatementExpression']) as QueryStatementExpressionContext;
+            const currentFromClause = matchSubTree(foundNode, ['*', 'queryStatementExpression']) as QueryStatementExpressionContext;
+            extTableInfo = collectTableInfoFromWithClause(currentFromClause.withClause()) || [];
         }
 
-        console.log('do hover syntaxSuggestions', printNode(parent), position, syntaxSuggestions, currentEntities);
+        console.log('do hover entities', printNode(parent), position, currentEntities);
 
         if (parent.ruleIndex === HiveSqlParser.RULE_tableSource) {
             const tableIdExp = parent.children![0].getText();
@@ -785,7 +810,7 @@ export const createHiveLs = (model: {
                 ext
             };
         }
-        
+
         if (
             matchSubTree(foundNode, ['id_', 'tableName'])
             || matchSubTree(foundNode, ['DOT', 'tableName'])
@@ -796,7 +821,7 @@ export const createHiveLs = (model: {
             const tableInfo = getTableInfoByName(tableName, dbName, currentTableEntities, extTableInfo);
             pushExt(`do hover tableName ${printNode(parent)}, 'tableIdExp', ${tableName}, 'tableInfo', ${JSON.stringify(tableInfo)}`);
             const range = rangeFromNode(foundNode);
-            
+
             if (!tableInfo) {
                 if (
                     matchSubTree(foundNode, ['id_', 'tableName', 'tableOrView', 'tableSource'])
@@ -833,7 +858,7 @@ export const createHiveLs = (model: {
                     ext
                 };
             }
-            
+
             return {
                 type: 'table',
                 tableInfo,
@@ -841,7 +866,7 @@ export const createHiveLs = (model: {
                 ext
             };
         }
-        
+
         if (parent.ruleIndex === HiveSqlParser.RULE_viewName) {
             return {
                 type: 'unknown',
@@ -1032,7 +1057,7 @@ export const createHiveLs = (model: {
             position: Position,
             isTest?: boolean
         ): languages.Hover | undefined => {
-            const foundNode = getCtxFromPos(position);
+            const { foundNode, contextManager } = getCtxFromPos(position) || {};
             if (!foundNode || (
                 !matchType(foundNode, 'id_')
                 && !matchType(foundNode, 'DOT')
@@ -1069,7 +1094,7 @@ export const createHiveLs = (model: {
             isTest?: boolean
         ): languages.Definition | undefined => {
             // TODO: implement definition functionality
-            const foundNode = getCtxFromPos(position);
+            const { foundNode, contextManager } = getCtxFromPos(position) || {};
             if (!foundNode || (
                 !matchType(foundNode, 'id_')
                 && !matchType(foundNode, 'DOT')
