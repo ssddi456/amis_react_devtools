@@ -2,6 +2,8 @@
 import { ParserRuleContext, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
 import { FromSourceContext, JoinSourceContext, ProgramContext, QueryStatementExpressionContext, SelectStatementWithCTEContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { Position } from "monaco-editor";
+import { posInRange } from "./ls_helper";
 
 function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -13,6 +15,7 @@ function uuidv4() {
 class IdentifierScope {
     uuid = uuidv4();
     indentifierMap: Map<string, ParserRuleContext> = new Map();
+    children: IdentifierScope[] = [];
 
     constructor(
         public context: ParserRuleContext,
@@ -26,10 +29,10 @@ class IdentifierScope {
         }
 
         return {
-            startLineNumber: this.context.start?.line,
-            startColumn: this.context.start?.column,
-            endLineNumber: this.context.stop?.line,
-            endColumn: this.context.stop?.column
+            startLineNumber: this.context.start!.line,
+            startColumn: this.context.start!.column,
+            endLineNumber: this.context.stop!.line,
+            endColumn: this.context.stop!.column
         };
     }
 
@@ -51,36 +54,60 @@ class IdentifierScope {
         }
         return identifiers;
     }
+    
+    enterScope(context: ParserRuleContext) {
+        const newScope = new IdentifierScope(context, this);
+        this.children.push(newScope);
+        return newScope;
+    }
+
+    exitScope() {
+        if (this.parent) {
+            return this.parent;
+        }
+    }
+
+    containsPosition(position: Position): boolean {
+        if (!this.range) {
+            return false;
+        }
+        return posInRange(position, this.range);
+    }
 }
 
 class ContextManager {
     identifierMap: Map<string, IdentifierScope> = new Map();
+    rootContext: IdentifierScope | null = null;
     currentContext: IdentifierScope | null = null;
 
     constructor(public tree: ProgramContext) {
         const manager = this;
+        this.rootContext = new IdentifierScope(tree);
+        this.currentContext = this.rootContext;
+
+        function enterRule(ctx: ParserRuleContext) {
+            const newContext = manager.currentContext!.enterScope(ctx);
+            manager.identifierMap.set(newContext.uuid, newContext);
+            manager.currentContext = newContext;
+        }
+
+        function exitRule() {
+            if (manager.currentContext) {
+                manager.currentContext = manager.currentContext.exitScope()!;
+            }
+        }
         const listener = new class extends HiveSqlParserListener {
             enterQueryStatementExpression = (ctx: QueryStatementExpressionContext) => {
-                const currentContext = new IdentifierScope(ctx, manager.currentContext);
-
-                manager.identifierMap.set(currentContext.uuid, currentContext);
-                manager.currentContext = currentContext;
+                enterRule(ctx);
             };
             exitQueryStatementExpression = (ctx: QueryStatementExpressionContext) => {
-                if (manager.currentContext) {
-                    manager.currentContext = manager.currentContext.parent;
-                }
+                exitRule();
             };
             enterSelectStatementWithCTE = (ctx: SelectStatementWithCTEContext) => {
-                const currentContext = new IdentifierScope(ctx, manager.currentContext);
-
-                manager.identifierMap.set(currentContext.uuid, currentContext);
-                manager.currentContext = currentContext;
+                enterRule(ctx);
             };
             exitSelectStatementWithCTE = (ctx: SelectStatementWithCTEContext) => {
-                if (manager.currentContext) {
-                    manager.currentContext = manager.currentContext.parent;
-                }
+                exitRule();
             };
             enterWithClause = (ctx: WithClauseContext) => {
                 const ctes = ctx.cteStatement();
@@ -105,14 +132,47 @@ class ContextManager {
                         manager.currentContext,
                         atomjoinSource.virtualTableSource()
                     );
+
+                    const joinSourceParts = ctx.joinSourcePart();
+                    for (const part of joinSourceParts) {
+                        tableInfoFromTableSource(
+                            manager.currentContext,
+                            part.tableSource()
+                        );
+                        tableInfoFromSubQuerySource(
+                            manager.currentContext,
+                            part.subQuerySource()
+                        );
+                        tableInfoFromVirtualTableSource(
+                            manager.currentContext,
+                            part.virtualTableSource()
+                        );
+                    }
                 }
             }
-
         };
 
         ParseTreeWalker.DEFAULT.walk(listener, tree);
     }
 
+    getContextByPosition(position: Position): IdentifierScope | null {
+        if (!this.currentContext) {
+            return null;
+        }
+        let checkNodes: IdentifierScope[] = [this.currentContext];
+        while (true) {
+            for (const child of checkNodes) {
+                if (child.containsPosition(position)) {
+
+                    if (!child.children.length) {
+                        return child;
+                    }
+                    checkNodes = child.children;
+                    break;
+                }
+            }
+        }
+    }
 }
 
 
