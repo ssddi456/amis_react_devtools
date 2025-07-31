@@ -1,7 +1,7 @@
 
 import { ParserRuleContext, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
-import { ExpressionContext, FromSourceContext, JoinSourceContext, ProgramContext, QueryStatementExpressionContext, SelectStatementWithCTEContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ExpressionContext, FromSourceContext, JoinSourceContext, ProgramContext, QueryStatementExpressionContext, SelectStatementContext, SelectStatementWithCTEContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
 import { posInRange } from "./ls_helper";
 
@@ -12,9 +12,10 @@ function uuidv4() {
     });
 }
 
-class IdentifierScope {
+export class IdentifierScope {
     uuid = uuidv4();
     indentifierMap: Map<string, ParserRuleContext> = new Map();
+    defaultIdentifier: ParserRuleContext | null = null;
     children: IdentifierScope[] = [];
 
     constructor(
@@ -36,9 +37,16 @@ class IdentifierScope {
         };
     }
 
+    setDefaultIdentifier(identifier: ParserRuleContext) {
+        this.defaultIdentifier = identifier;
+    }
+
     addIdentifier(name: string, alias: string | undefined, identifier: ParserRuleContext) {
-        if (identifier && identifier.start && identifier.stop) {
-            this.indentifierMap.set(identifier.getText(), identifier);
+        if (identifier) {
+            this.indentifierMap.set(name, identifier);
+            if (alias) {
+                this.indentifierMap.set(alias, identifier);
+            }
         }
     }
 
@@ -55,6 +63,16 @@ class IdentifierScope {
         return identifiers;
     }
     
+    getDefaultIdentifier(): ParserRuleContext | null {
+        if (this.defaultIdentifier) {
+            return this.defaultIdentifier;
+        }
+        if (this.parent) {
+            return this.parent.getDefaultIdentifier();
+        }
+        return null;
+    }
+
     enterScope(context: ParserRuleContext) {
         const newScope = new IdentifierScope(context, this);
         this.children.push(newScope);
@@ -109,6 +127,12 @@ class ContextManager {
             exitSelectStatementWithCTE = (ctx: SelectStatementWithCTEContext) => {
                 exitRule();
             };
+            enterSelectStatement = (ctx: SelectStatementContext) => {
+                enterRule(ctx);
+            };
+            exitSelectStatement = (ctx: SelectStatementContext) => {
+                exitRule();
+            };
             enterWithClause = (ctx: WithClauseContext) => {
                 const ctes = ctx.cteStatement();
                 ctes.forEach((cte) => {
@@ -120,18 +144,24 @@ class ContextManager {
             enterJoinSource = (ctx: JoinSourceContext) => {
                 if (ctx.parent instanceof FromSourceContext) {
                     const atomjoinSource = ctx.atomjoinSource();
-                    tableInfoFromTableSource(
-                        manager.currentContext,
-                        atomjoinSource.tableSource()
-                    );
-                    tableInfoFromSubQuerySource(
-                        manager.currentContext,
-                        atomjoinSource.subQuerySource()
-                    );
-                    tableInfoFromVirtualTableSource(
-                        manager.currentContext,
-                        atomjoinSource.virtualTableSource()
-                    );
+                    const defaultTableInfo = [
+                        tableInfoFromTableSource(
+                            manager.currentContext,
+                            atomjoinSource.tableSource()
+                        ),
+                        tableInfoFromSubQuerySource(
+                            manager.currentContext,
+                            atomjoinSource.subQuerySource()
+                        ),
+                        tableInfoFromVirtualTableSource(
+                            manager.currentContext,
+                            atomjoinSource.virtualTableSource()
+                        ),
+                    ].find((x) => x !== null);
+
+                    if (defaultTableInfo) {
+                        manager.currentContext?.setDefaultIdentifier(defaultTableInfo);
+                    }
 
                     const joinSourceParts = ctx.joinSourcePart();
                     for (const part of joinSourceParts) {
@@ -202,15 +232,16 @@ export const createContextManager = (tree: ProgramContext) => {
 function tableInfoFromTableSource(
     currentContext: IdentifierScope | null,
     context: TableSourceContext | null,
-): void {
+): TableSourceContext | null {
     if (!currentContext || !context) {
-        return;
+        return null;
     }
     currentContext.addIdentifier(
         context.tableOrView().tableName()?.getText() || '',
         context.id_()?.getText() || '',
         context
     );
+    return context;
 }
 
 const localDbId = 'local db';
@@ -218,21 +249,23 @@ const localDbId = 'local db';
 function tableInfoFromSubQuerySource(
     currentContext: IdentifierScope | null,
     subQuerySource: SubQuerySourceContext | null,
-): void {
+): SubQuerySourceContext | null {
     if (!currentContext || !subQuerySource) {
-        return;
+        return null;
     }
     const name = subQuerySource.id_()?.getText();
     currentContext.addIdentifier(name || '', undefined, subQuerySource);
+    return subQuerySource;
 }
 
 function tableInfoFromVirtualTableSource(
     currentContext: IdentifierScope | null,
     virtualTableSource: VirtualTableSourceContext | null,
-): void {
+): VirtualTableSourceContext | null {
     if (!currentContext || !virtualTableSource) {
-        return;
+        return null;
     }
     const alias = virtualTableSource.tableAlias()?.getText();
     currentContext.addIdentifier(alias || '', undefined, virtualTableSource);
+    return virtualTableSource;
 }

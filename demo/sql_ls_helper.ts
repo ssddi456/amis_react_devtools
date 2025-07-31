@@ -4,6 +4,7 @@ import { HiveSqlParserVisitor } from "dt-sql-parser";
 import { HiveSqlParser, ProgramContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { WordPosition } from "dt-sql-parser/dist/parser/common/textAndWord";
 import { IRange } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
+import { matchSubPath } from "./sql_tree_query";
 
 export function sliceToRange(slice: {
     readonly startLine: number;
@@ -40,6 +41,9 @@ export function isPosInParserRuleContext(position: Position, context: ParserRule
 
     if (context instanceof TerminalNode) {
         if (context.symbol.type === HiveSqlParser.Identifier) {
+            return false;
+        }
+        if (matchSubPath(context, ['*', 'id_'])) {
             return false;
         }
         if (context.symbol.line === lineNumber) {
@@ -126,7 +130,7 @@ export function printChildren(node: ParserRuleContext | null): string {
     return `Children: \n${(children as any[]).map(printNode).join(', \n')}`;
 }
 
-export function printNodeTree(node: ParserRuleContext | null): string {
+export function printNodeTree(node: ParserRuleContext | null, separator = '\n'): string {
     if (!node) {
         return 'null';
     }
@@ -143,7 +147,7 @@ export function printNodeTree(node: ParserRuleContext | null): string {
             return x;
         }
         return `  ->${x}`;
-    }).join('\n');
+    }).join(separator);
 }
 
 export function rangeFromNode(node: ParserRuleContext) {

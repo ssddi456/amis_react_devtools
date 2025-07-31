@@ -65,6 +65,15 @@ export default {
                 return ret;
             }
         });
+        
+        const onHoverSyntaxDisposable = monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
+            provideHover: (model, position) => {
+                const context = createHiveLs(model);
+                const ret = context.doSyntaxHover(position);
+                console.log('hover syntax result', stringFromPos(position), ret);
+                return ret;
+            }
+        });
 
         const onDefinitionDisposable = monaco.languages.registerDefinitionProvider(LanguageIdEnum.HIVE, {
             provideDefinition: (model, position) => {
@@ -80,6 +89,7 @@ export default {
                 onChangeDisposable.dispose();
                 onCompeletionDisposable.dispose();
                 onHoverDisposable.dispose();
+                onHoverSyntaxDisposable.dispose();
                 onDefinitionDisposable.dispose();
             }
         }

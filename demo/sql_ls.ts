@@ -4,20 +4,18 @@ import { EntityContext, EntityContextType, HiveSQL, HiveSqlParserVisitor, } from
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
 import { posInRange } from "./ls_helper";
 import { TextSlice } from "dt-sql-parser/dist/parser/common/textAndWord";
-import { HiveSqlParser } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import type {
-    ProgramContext,
-    FromClauseContext,
-    JoinSourceContext,
-    AtomjoinSourceContext,
-    JoinSourcePartContext,
+import { HiveSqlParser, SubQuerySourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import {
     TableSourceContext,
     VirtualTableSourceContext,
-    QueryStatementExpressionContext} from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { ParserRuleContext, ParseTree, RuleContext, TerminalNode } from "antlr4ng";
+    QueryStatementExpressionContext,
+} from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import tableData from './data/example'
-import { createContextManager } from "./context_manager";
+import { createContextManager, IdentifierScope } from "./context_manager";
 import { printNode, rangeFromNode, printChildren, wordToRange, sliceToRange, findTokenAtPosition, printNodeTree } from "./sql_ls_helper";
+import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, unknownRes } from "./sql_hover_res";
+import { matchSubPath, matchSubPathOneOf, matchType } from "./sql_tree_query";
 
 function tableInfoFromTableSource(
     tableSource: TableSourceContext | null,
@@ -107,110 +105,27 @@ function tableInfoFromVirtualTableSource(
     return ret;
 }
 
-
-function collectTableInfoFromSelect(node: ParserRuleContext | null): TableInfo[] | null {
+function tableInfoFromNode(
+    node: ParserRuleContext | null,
+): TableInfo | null {
     if (!node) {
         return null;
     }
-    if (matchType(node, 'atomSelectStatement')) {
-        const result: TableInfo[] = [];
-        let foundTopLevelFrom = false;
-
-        const visitor = new class extends HiveSqlParserVisitor<any> {
-            visitFromClause = (ctx: FromClauseContext) => {
-                if (foundTopLevelFrom) {
-                    return;
-                }
-                foundTopLevelFrom = true;
-
-                const joinSource = ctx.fromSource().joinSource()
-                if (!joinSource) {
-                    console.warn('Unexpected token, expected JOIN source:', printNode(joinSource as any));
-                    return;
-                }
-
-                this.visitJoinSource(joinSource);
-            }
-
-            visitJoinSource = (ctx: JoinSourceContext) => {
-
-                console.log('collectTableInfo visitJoinSource +', printChildren(ctx as any));
-                this.visitAtomjoinSource(ctx.atomjoinSource());
-                const parts = ctx.joinSourcePart();
-                for (let i = 0; i < parts.length; i++) {
-                    this.visitJoinSourcePart(parts[i]);
-                }
-            }
-
-            visitAtomjoinSource = (ctx: AtomjoinSourceContext) => {
-                if (ctx.tableSource()) {
-                    tableInfoFromTableSource(ctx.tableSource(), result);
-                    return;
-                }
-
-                if (ctx.subQuerySource()) {
-                    const subQuerySource = ctx.subQuerySource()!;
-                    tableInfoFromSubQuerySource(subQuerySource, result);
-                    return;
-                }
-
-                if (ctx.virtualTableSource()) {
-                    tableInfoFromVirtualTableSource(ctx.virtualTableSource(), result);
-                    return;
-                }
-
-                if (ctx.joinSource()) {
-                    const joinSource = ctx.joinSource()!;
-                    this.visitJoinSource(joinSource);
-                    return;
-                }
-            }
-
-            visitJoinSourcePart = (ctx: JoinSourcePartContext) => {
-                if (ctx.tableSource()) {
-                    tableInfoFromTableSource(ctx.tableSource(), result);
-                    return;
-                }
-
-                if (ctx.subQuerySource()) {
-                    tableInfoFromSubQuerySource(ctx.subQuerySource(), result);
-                    return;
-                }
-
-                if (ctx.virtualTableSource()) {
-                    tableInfoFromVirtualTableSource(ctx.virtualTableSource(), result);
-                    return;
-                }
-            }
-        }
-        visitor.visit(node);
-        if (result.length > 0) {
-            return result;
-        }
+    const collection: TableInfo[] = [];
+    if (node instanceof TableSourceContext) {
+        return tableInfoFromTableSource(node, collection);
+    } else if (node instanceof SubQuerySourceContext) {
+        return tableInfoFromSubQuerySource(node, collection);
+    } else if (node instanceof VirtualTableSourceContext) {
+        return tableInfoFromVirtualTableSource(node, collection);
+    } else {
+        console.log('tableInfoFromNode unknown node type', printNode(node));
     }
-    return null;
+    return collection[0];
 }
 
-function collectTableInfoFromWithClause(node: ParserRuleContext | null): TableInfo[] | null {
-    if (!node) {
-        return null;
-    }
-    if (matchType(node, 'withClause')) {
-        const result: TableInfo[] = [];
-        const visitor = new class extends HiveSqlParserVisitor<any> {
-            visitTableSource = (ctx: TableSourceContext) => {
-                tableInfoFromTableSource(ctx, result);
-            }
-        };
-        visitor.visit(node);
-        if (result.length > 0) {
-            return result;
-        }
-    }
-    return null;
-}
 
-interface TableInfo {
+export interface TableInfo {
     db_name: string;
     table_name: string;
     alias?: string;
@@ -225,7 +140,7 @@ interface TableInfo {
     }
 }
 
-interface ColumnInfo {
+export interface ColumnInfo {
     column_name: string;
     data_type_string: string;
     description: string;
@@ -335,159 +250,6 @@ function isKeyWord(node: ParseTree, key: string): boolean {
 }
 
 
-const noTableInfoRes = (text: string, range: IRange, ext?: string[]) => ({
-    contents: [
-        {
-            value: [`table not found: ${text}`, ...(ext || [])].filter(Boolean).join('\n')
-        },
-    ],
-    range,
-});
-const noColumnInfoRes = (table: TableInfo, columnName: string, range: IRange, ext?: string[]) => ({
-    contents: [
-        {
-            value: [
-                `column: ${columnName} not found in table ${table.table_name}`,
-                ...(ext || [])].filter(Boolean).join('\n')
-        },
-    ],
-    range,
-});
-const tableAndColumn = (table: TableInfo, column: ColumnInfo, range: IRange, ext?: string[]) => ({
-    contents: [
-        {
-            value: [
-                `**Table:** ${table.table_name}`,
-                table.description,
-                `**Column:** ${column.column_name} [${column.data_type_string}]`,
-                column.description,
-                ...(ext || [])
-            ].filter(Boolean).join('\n\n'),
-        },
-    ],
-    range,
-});
-const tableRes = (table: TableInfo, range: IRange, ext?: string[]) => ({
-    contents: [
-        {
-            value: [
-                `**Table:** ${table.table_name}`,
-                table.description,
-                ...(ext || [])
-            ].filter(Boolean).join('\n\n')
-        },
-    ],
-    range,
-});
-
-const unknownRes = (text: string, range: IRange, ext?: string[]) => ({
-    contents: [
-        {
-            value: [
-                `unknown: ${text}`,
-                ...(ext || [])
-            ].filter(Boolean).join('\n')
-        },
-    ],
-    range,
-});
-
-const createColumnRes = (node: ParseTree, range: IRange, ext?: string[]) => ({
-    contents: [
-        {
-            value: [
-                `**create Column:** ${node.getText()}`,
-                ...(ext || [])
-            ].filter(Boolean).join('\n\n')
-        },
-    ],
-    range,
-});
-
-function matchType(node: ParseTree, ruleIndex: number | string): boolean {
-    if (ruleIndex === '*') {
-        return true;
-    }
-    if (node instanceof TerminalNode) {
-        if (typeof ruleIndex === 'string') {
-            return node.symbol.type === HiveSqlParser[`KW_${ruleIndex.toUpperCase()}` as keyof typeof HiveSqlParser]
-                || node.symbol.type === HiveSqlParser[ruleIndex as keyof typeof HiveSqlParser];
-        }
-        return node.symbol.type === ruleIndex;
-    }
-    ruleIndex = (typeof ruleIndex === 'string'
-        ? (HiveSqlParser[`RULE_${ruleIndex}` as keyof typeof HiveSqlParser] || -1)
-        : ruleIndex) as number;
-
-    if (node instanceof RuleContext) {
-        return node.ruleIndex === ruleIndex;
-    }
-    return false;
-}
-
-// from buttom to top
-function matchSubTree(node: ParserRuleContext, ruleIndex: number[] | string[]): ParserRuleContext | null {
-    const checkedRuleIndex = ruleIndex.slice(0);
-    let parent = node.parent;
-
-    if (checkedRuleIndex[0] === '*') {
-        const nextRule = checkedRuleIndex[1];
-        if (nextRule === '*' || nextRule === '?') {
-            throw new Error(`'*' or '?' should not be used after '*' in ruleIndex: ${ruleIndex}`);
-        }
-        while (parent) {
-            if (matchType(parent, nextRule)) {
-                break;
-            }
-            parent = parent.parent;
-        }
-        if (!parent) {
-            return null;
-        }
-        checkedRuleIndex.shift();
-    } else if (!matchType(node, checkedRuleIndex[0])) {
-        return null;
-    }
-    checkedRuleIndex.shift();
-    while (checkedRuleIndex.length > 0 && parent) {
-        if (checkedRuleIndex[0] === '?') {
-            const nextRule = checkedRuleIndex[1];
-            if (!nextRule) {
-                return parent;
-            }
-            parent = parent?.parent || null;
-            checkedRuleIndex.shift();
-            continue;
-        }
-        if (checkedRuleIndex[0] === '*') {
-            const nextRule = checkedRuleIndex[1];
-            if (nextRule === '*' || nextRule === '?') {
-                throw new Error(`'*' or '?' should not be used after '*' in ruleIndex: ${ruleIndex}`);
-            }
-            while (parent) {
-                if (matchType(parent, nextRule)) {
-                    break;
-                }
-                parent = parent.parent;
-            }
-            if (!parent) {
-                return null;
-            }
-            checkedRuleIndex.shift();
-        }
-        if (!matchType(parent, checkedRuleIndex[0])) {
-            return null;
-        }
-        const nextRule = checkedRuleIndex[1];
-        if (!nextRule) {
-            break;
-        }
-        parent = parent.parent;
-        checkedRuleIndex.shift();
-    }
-    return parent;
-}
-
 interface EntityInfo {
     type: 'table' | 'column' | 'unknown' | 'noTable' | 'noColumn' | 'createColumn';
     tableInfo?: TableInfo | null;
@@ -568,9 +330,9 @@ export const createHiveLs = (model: {
     const getTableAndColumnInfoAtPosition = (
         foundNode: ParserRuleContext,
         position: Position,
+        context: IdentifierScope,
         isTest?: boolean
     ): EntityInfo | null => {
-        const parent = foundNode.parent!;
         const ext: string[] = [];
         const pushExt = isTest ? (content: string) => {
             ext.push(content);
@@ -578,24 +340,16 @@ export const createHiveLs = (model: {
         pushExt((position as any).text);
         pushExt(printNodeTree(foundNode));
 
-        const entities = hiveSqlParse.getAllEntities(document.getText(), position) || [];
-        const currentEntities = entities.filter(e => e.belongStmt.isContainCaret);
-        const currentTableEntities = currentEntities.filter(e => e.entityContextType === EntityContextType.TABLE);
+        const allIdentifiers = context.getAllIdentifiers() || {};
 
-        const selectStmt = matchSubTree(foundNode, ['id_', '*', 'atomSelectStatement']);
-        let extTableInfo = collectTableInfoFromSelect(selectStmt);
-
-        const isInFromClause = matchSubTree(foundNode, ['*', 'fromClause', '*', 'atomSelectStatement']) === selectStmt;
-        if (isInFromClause) {
-            const currentFromClause = matchSubTree(foundNode, ['*', 'queryStatementExpression']) as QueryStatementExpressionContext;
-            extTableInfo = collectTableInfoFromWithClause(currentFromClause.withClause()) || [];
-        }
-
-        console.log('do hover entities', printNode(parent), position, currentEntities);
+        const parent = foundNode.parent!;
+        console.log('do hover entities', printNode(parent), position, allIdentifiers.keys());
 
         if (parent.ruleIndex === HiveSqlParser.RULE_tableSource) {
             const tableIdExp = parent.children![0].getText();
-            const tableInfo = getTableInfoByName(tableIdExp, undefined, currentTableEntities, extTableInfo);
+            const item = allIdentifiers.get(tableIdExp);
+            const tableInfo = item && tableInfoFromNode(item);
+
             const range = rangeFromNode(foundNode);
             return {
                 type: tableInfo ? 'table' : 'noTable',
@@ -607,45 +361,19 @@ export const createHiveLs = (model: {
         }
 
         if (
-            matchSubTree(foundNode, ['id_', 'tableName'])
-            || matchSubTree(foundNode, ['DOT', 'tableName'])
+            matchSubPathOneOf(foundNode, [
+                ['id_', 'tableName'],
+                ['DOT', 'tableName']
+            ])
         ) {
-            const dbName = parent.children?.length === 3 ? parent.children![0].getText() : undefined;
-            const tableName = parent.children?.length === 3 ? parent.children![2].getText() : parent.children![0].getText();
+            const tableName = parent.getText();
+            const item = allIdentifiers.get(tableName);
+            const tableInfo = item && tableInfoFromNode(item);
 
-            const tableInfo = getTableInfoByName(tableName, dbName, currentTableEntities, extTableInfo);
             pushExt(`do hover tableName ${printNode(parent)}, 'tableIdExp', ${tableName}, 'tableInfo', ${JSON.stringify(tableInfo)}`);
             const range = rangeFromNode(foundNode);
 
             if (!tableInfo) {
-                if (
-                    matchSubTree(foundNode, ['id_', 'tableName', 'tableOrView', 'tableSource'])
-                    || matchSubTree(foundNode, ['DOT', 'tableName', 'tableOrView', 'tableSource'])
-                ) {
-                    // to found cte source
-                    const cteTables = entities.filter(e => e.entityContextType === EntityContextType.TABLE);
-                    const cteTable = cteTables.find(e => e.text === tableName);
-                    if (cteTable) {
-                        return {
-                            type: 'table',
-                            tableInfo: {
-                                db_name: '',
-                                table_name: cteTable.text,
-                                table_id: 0,
-                                description: 'cte table',
-                                column_list: [] // 这咋整
-                            },
-                            range,
-                            ext
-                        };
-                    }
-                    return {
-                        type: 'unknown',
-                        text: tableName,
-                        range,
-                        ext
-                    };
-                }
                 return {
                     type: 'noTable',
                     text: tableName,
@@ -674,9 +402,11 @@ export const createHiveLs = (model: {
         // columnName -> poolPath -> id_(from default table name)
         // columnName -> poolPath -> id_(table name or alias), ., _id
         if (
-            matchSubTree(foundNode, ['id_', 'poolPath', 'columnName'])
-            || matchSubTree(foundNode, ['id_', 'poolPath', 'columnNamePath'])
-            || matchSubTree(foundNode, ['DOT', 'poolPath', 'columnNamePath'])
+            matchSubPathOneOf(foundNode, [
+                ['id_', 'poolPath', 'columnName'],
+                ['id_', 'poolPath', 'columnNamePath'],
+                ['DOT', 'poolPath', 'columnNamePath']
+            ])
         ) {
             // 只支持 table_name.column_name or column_name for now
             const tableIdExp = parent.children?.length === 1 ? undefined : parent.children![0].getText();
@@ -686,11 +416,12 @@ export const createHiveLs = (model: {
 
             // column_name only
             if (!tableIdExp) {
-                const tableInfo = getTableInfoByName(currentEntities[0].text, undefined, currentTableEntities, extTableInfo);
+                const item = context.getDefaultIdentifier();
+                const tableInfo = item && tableInfoFromNode(item);
                 if (!tableInfo) {
                     return {
                         type: 'noTable',
-                        text: currentEntities[0].text,
+                        text: printNode(parent),
                         range,
                         ext
                     };
@@ -713,12 +444,9 @@ export const createHiveLs = (model: {
                     ext
                 };
             }
+            const item = allIdentifiers.get(tableIdExp);
+            const tableInfo = item && tableInfoFromNode(item);
 
-
-            // pushExt(`do hover selectStmt ${printNode(selectStmt)}`);
-            // pushExt(`do hover extTableInfo ${JSON.stringify(extTableInfo, null, 2)}`);
-
-            const tableInfo = getTableInfoByName(tableIdExp, undefined, currentTableEntities, extTableInfo);
             if (!tableInfo) {
                 return {
                     type: 'noTable',
@@ -746,7 +474,7 @@ export const createHiveLs = (model: {
             };
         }
 
-        if (matchSubTree(foundNode, ['id_', 'selectItem'])) {
+        if (matchSubPath(foundNode, ['id_', 'selectItem'])) {
             if (foundNode === parent.children?.[2]
                 && isKeyWord(parent.children[1]!, 'as')
             ) {
@@ -765,7 +493,7 @@ export const createHiveLs = (model: {
             };
         }
 
-        if (matchSubTree(foundNode, ['id_', 'subQuerySource'])) {
+        if (matchSubPath(foundNode, ['id_', 'subQuerySource'])) {
             // pushExt(`entities ${JSON.stringify(entities, null, 2)}`)
             // pushExt(`currentEntities${JSON.stringify(currentEntities, null, 2)}`);
             return {
@@ -853,7 +581,7 @@ export const createHiveLs = (model: {
             isTest?: boolean
         ): languages.Hover | undefined => {
             const { foundNode, context } = getCtxFromPos(position) || {};
-            if (!foundNode || (
+            if (!foundNode || !context || (
                 !matchType(foundNode, 'id_')
                 && !matchType(foundNode, 'DOT')
                 && !matchType(foundNode, 'columnNamePath')
@@ -863,15 +591,31 @@ export const createHiveLs = (model: {
             )) {
                 return;
             }
-            console.log("getAllIdentifiers", context?.getAllIdentifiers());
 
-            const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, position, isTest);
+            const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, position, context, isTest);
             if (!hoverInfo) {
                 return;
             }
 
             return formatHoverRes(hoverInfo);
         },
+
+        doSyntaxHover: (
+            position: Position,
+        ): languages.Hover | undefined => {
+            const { foundNode, context } = getCtxFromPos(position) || {};
+            if (!foundNode) {
+                return;
+            }
+            const text = printNodeTree(foundNode, '\n\n');
+            const range = rangeFromNode(foundNode);
+
+            return {
+                contents: [{ value: text }],
+                range
+            };
+        },
+
         doValidation() {
             const errors = hiveSqlParse.validate(document.getText());
             if (errors.length === 0) {
@@ -891,7 +635,7 @@ export const createHiveLs = (model: {
         ): languages.Definition | undefined => {
             // TODO: implement definition functionality
             const { foundNode, context } = getCtxFromPos(position) || {};
-            if (!foundNode || (
+            if (!foundNode || !context || (
                 !matchType(foundNode, 'id_')
                 && !matchType(foundNode, 'DOT')
                 && !matchType(foundNode, 'columnNamePath')
@@ -902,9 +646,7 @@ export const createHiveLs = (model: {
                 return;
             }
 
-            const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, position, isTest);
-            console.log("getAllIdentifiers", context?.getAllIdentifiers());
-
+            const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, position, context, isTest);
             if (!hoverInfo) {
                 return;
             }
