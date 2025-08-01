@@ -1,9 +1,10 @@
 
 import { ParserRuleContext, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
-import { ExpressionContext, FromSourceContext, JoinSourceContext, ProgramContext, QueryStatementExpressionContext, SelectStatementContext, SelectStatementWithCTEContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectStatementContext, SelectStatementWithCTEContext, SubQueryExpressionContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
 import { posInRange } from "./ls_helper";
+import { printNode } from "./sql_ls_helper";
 
 function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -91,6 +92,19 @@ export class IdentifierScope {
         }
         return posInRange(position, this.range);
     }
+
+    toString(depth: number = 0, result: string[] = []) {
+        const indent = ' '.repeat(depth * 2);
+        result.push(`${indent}(${printNode(this.context)})`);
+        const identifiers = this.indentifierMap.entries();
+        Array.from(identifiers).forEach(([name, identifier]) => {
+            result.push(`${indent}  ${name} -> ${printNode(identifier)}`);
+        });
+        this.children.forEach(child => {
+            child.toString(depth + 1, result);
+        });
+        return result.join('\n');
+    } 
 }
 
 class ContextManager {
@@ -192,6 +206,44 @@ class ContextManager {
                     exitRule();
                 }
             };
+
+
+            enterSelectClause = (ctx: SelectClauseContext) => {
+                enterRule(ctx);
+            };
+            exitSelectClause = (ctx: SelectClauseContext) => {
+                exitRule();
+            };
+            enterWhereClause = (ctx: WhereClauseContext) => {
+                enterRule(ctx);
+            };
+            exitWhereClause = (ctx: WhereClauseContext) => {
+                exitRule();
+            };
+            enterGroupByClause = (ctx: GroupByClauseContext) => {
+                enterRule(ctx);
+            };
+            exitGroupByClause = (ctx: GroupByClauseContext) => {
+                exitRule();
+            };
+            enterHavingClause = (ctx: HavingClauseContext) => {
+                enterRule(ctx);
+            };
+            exitHavingClause = (ctx: HavingClauseContext) => {
+                exitRule();
+            };
+            enterWindow_clause = (ctx: Window_clauseContext) => {
+                enterRule(ctx);
+            };
+            exitWindow_clause = (ctx: Window_clauseContext) => {
+                exitRule();
+            };
+            enterQualifyClause = (ctx: QualifyClauseContext) => {
+                enterRule(ctx);
+            };
+            exitQualifyClause = (ctx: QualifyClauseContext) => {
+                exitRule();
+            };
         };
 
         ParseTreeWalker.DEFAULT.walk(listener, tree);
@@ -220,6 +272,14 @@ class ContextManager {
         }
 
         return null;
+    }
+
+    toString() {
+        if (!this.rootContext) {
+            return 'No context';
+        }
+
+        return this.rootContext.toString();
     }
 }
 

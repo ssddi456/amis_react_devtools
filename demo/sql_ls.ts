@@ -317,6 +317,7 @@ export const createHiveLs = (model: {
                 const tree = ctx.program();
                 const foundNode = findTokenAtPosition(position, tree);
                 const contextManaer = createContextManager(tree);
+                console.log('getCtxFromPos foundNode', contextManaer.toString());
                 const context = contextManaer.getContextByPosition(position);
                 return {
                     foundNode,
