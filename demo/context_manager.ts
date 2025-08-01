@@ -4,7 +4,8 @@ import { HiveSqlParserListener } from "dt-sql-parser";
 import { ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectStatementContext, SelectStatementWithCTEContext, SubQueryExpressionContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
 import { posInRange } from "./ls_helper";
-import { printNode } from "./sql_ls_helper";
+import { findTokenAtPosition, printNode } from "./sql_ls_helper";
+import { TableInfo } from "./sql_ls";
 
 function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -42,12 +43,9 @@ export class IdentifierScope {
         this.defaultIdentifier = identifier;
     }
 
-    addIdentifier(name: string, alias: string | undefined, identifier: ParserRuleContext) {
+    addIdentifier(name: string, identifier: ParserRuleContext) {
         if (identifier) {
             this.indentifierMap.set(name, identifier);
-            if (alias) {
-                this.indentifierMap.set(alias, identifier);
-            }
         }
     }
 
@@ -65,11 +63,16 @@ export class IdentifierScope {
     }
     
     getDefaultIdentifier(): ParserRuleContext | null {
-        if (this.defaultIdentifier) {
-            return this.defaultIdentifier;
-        }
-        if (this.parent) {
-            return this.parent.getDefaultIdentifier();
+        const defaultIdentifier = this.parent?.defaultIdentifier;
+        if (defaultIdentifier) {
+            if (defaultIdentifier instanceof TableSourceContext) {
+                const tableName = defaultIdentifier.tableOrView().getText();
+                const parentRes = this.parent?.lookupDefinition(tableName);
+                if (parentRes) {
+                    return parentRes;
+                }
+            }
+            return defaultIdentifier;
         }
         return null;
     }
@@ -86,15 +89,20 @@ export class IdentifierScope {
         }
     }
 
-    lookupDefinition(item: ParserRuleContext, fn: (item: ParserRuleContext) => any): any {
-        if (!item) {
-            return null;
+    lookupDefinition(name: string): ParserRuleContext | null {
+        const identifier = this.indentifierMap.get(name);
+        if (!identifier) {
+            return this.parent ? this.parent.lookupDefinition(name) : null;
         }
-        const definition = fn(item);
-        if (definition) {
-            return definition;
+        if (identifier instanceof TableSourceContext) {
+            const name = identifier.tableOrView().getText();
+            const parentRes = this.parent?.lookupDefinition(name)
+            if (parentRes) {
+                return parentRes;
+            }
+            return identifier;
         }
-        return this.parent ? this.parent.lookupDefinition(item, fn) : null;
+        return identifier;
     }
 
     containsPosition(position: Position): boolean {
@@ -162,7 +170,7 @@ class ContextManager {
                 const ctes = ctx.cteStatement();
                 ctes.forEach((cte) => {
                     const cteName = cte.id_().getText();
-                    manager.currentContext?.addIdentifier(cteName, undefined, cte);
+                    manager.currentContext?.addIdentifier(cteName, cte);
                 });
             };
 
@@ -311,15 +319,20 @@ function tableInfoFromTableSource(
     if (!currentContext || !context) {
         return null;
     }
-    currentContext.addIdentifier(
-        context.tableOrView().tableName()?.getText() || '',
-        context.id_()?.getText() || '',
-        context
-    );
+
+    const alias = context.id_()?.getText();
+    if (alias) {
+        currentContext.addIdentifier(
+            context.id_()?.getText() || '',
+            context
+        );
+    }
+    const tableName = context.tableOrView()?.getText();
+    if (tableName) {
+        currentContext.addIdentifier(tableName, context);
+    }
     return context;
 }
-
-const localDbId = 'local db';
 
 function tableInfoFromSubQuerySource(
     currentContext: IdentifierScope | null,
@@ -329,7 +342,7 @@ function tableInfoFromSubQuerySource(
         return null;
     }
     const name = subQuerySource.id_()?.getText();
-    currentContext.addIdentifier(name || '', undefined, subQuerySource);
+    currentContext.addIdentifier(name || '', subQuerySource);
     return subQuerySource;
 }
 
@@ -340,7 +353,7 @@ function tableInfoFromVirtualTableSource(
     if (!currentContext || !virtualTableSource) {
         return null;
     }
-    const alias = virtualTableSource.tableAlias()?.getText();
-    currentContext.addIdentifier(alias || '', undefined, virtualTableSource);
+    const name = virtualTableSource.tableAlias()?.getText();
+    currentContext.addIdentifier(name || '', virtualTableSource);
     return virtualTableSource;
 }

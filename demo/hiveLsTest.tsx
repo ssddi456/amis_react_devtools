@@ -14,15 +14,23 @@ select * from data.data_test_news_record_di where data.pt = 1;
 select * from data.data_test_news_record_di where data.pt = 1;
                   ^                                   ^  
 `,
-    // simple with alias
-    // simple with alias
-    `select
+  // simple with alias
+  // simple with alias
+  `select
   field_2, t.test
     ^      ^ ^
 from data_test_news_record_da t
       ^
 where pt = 2;
       ^
+`,
+  // simple with alias
+  // simple with alias
+  `select
+  field_2, t.test
+    ^
+from data_test_news_record_da t
+where pt = 2;
 `,
 
     `select
@@ -107,9 +115,21 @@ with t1 as (
   where t1.pt = 2
 )
 select
-  t.house_code, t.resblock_id, t.quota_date
-from t1 t
+  t1.house_code, t1.resblock_id, t1.quota_date
+from t1
      ^
+;
+`, `
+with t1 as (
+  select
+    t1.house_code, t1.resblock_id, t1.resblock_name, t2.quota_date
+  from data.data_test_news_record_di t1
+  where t1.pt = 2
+)
+select
+  t.house_code, t.resblock_id, t.quota_date
+  ^
+from t1 t
 ;
 `,
     `

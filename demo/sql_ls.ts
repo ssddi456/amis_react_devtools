@@ -4,7 +4,7 @@ import { EntityContext, EntityContextType, HiveSQL, } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
 import { posInRange } from "./ls_helper";
 import { TextSlice } from "dt-sql-parser/dist/parser/common/textAndWord";
-import { HiveSqlParser, SubQuerySourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { CteStatementContext, HiveSqlParser, SubQuerySourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import {
     TableSourceContext,
     VirtualTableSourceContext,
@@ -104,6 +104,30 @@ function tableInfoFromVirtualTableSource(
     return ret;
 }
 
+function tableInfoFromCteStatement(
+    cteStatement: CteStatementContext | null,
+    collection?: TableInfo[]
+): TableInfo | null {
+    if (!cteStatement) {
+        return null;
+    }
+    const alias = cteStatement.id_()?.getText();
+    console.log('collectTableInfo visitCteStatement', printNode(cteStatement), 'alias:', alias);
+    const ret = {
+        db_name: localDbId,
+        table_name: alias,
+        alias: alias,
+        table_id: -1,
+        description: '',
+        column_list: [],
+        range: rangeFromNode(cteStatement)
+    };
+    if (collection) {
+        collection.push(ret);
+    }
+    return ret;
+}
+
 function tableInfoFromNode(
     node: ParserRuleContext | null,
 ): TableInfo | null {
@@ -117,6 +141,8 @@ function tableInfoFromNode(
         return tableInfoFromSubQuerySource(node, collection);
     } else if (node instanceof VirtualTableSourceContext) {
         return tableInfoFromVirtualTableSource(node, collection);
+    } else if (node instanceof CteStatementContext) {
+        return tableInfoFromCteStatement(node, collection);
     } else {
         console.log('tableInfoFromNode unknown node type', printNode(node));
     }
@@ -370,27 +396,12 @@ export const createHiveLs = (model: {
             ])
         ) {
             const tableName = parent.getText();
-            const item = allIdentifiers.get(tableName);
+            const item = context.lookupDefinition(tableName);
             const tableInfo = item && tableInfoFromNode(item);
 
             pushExt(`do hover tableName ${printNode(parent)}, 'tableIdExp', ${tableName}, 'tableInfo', ${JSON.stringify(tableInfo)}`);
 
             if (!tableInfo) {
-                if (item instanceof TableSourceContext) {
-                    // loopup
-                    const tableInfo = context.lookupDefinition(item, (definition: ParserRuleContext) => {
-                        return tableInfoFromNode(definition);
-                    });
-
-                    if (tableInfo) {
-                        return {
-                            type: 'table',
-                            tableInfo,
-                            ...commonFields,
-                        };
-                    }
-                }
-
                 return {
                     type: 'noTable',
                     text: tableName,
