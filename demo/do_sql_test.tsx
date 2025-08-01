@@ -38,7 +38,7 @@ export function createHighlightedText(text: string, positions: Array<{ lineNumbe
 }
 
 
-export function DoSqlTest({ case: testCase }: { case: LsTestCase; }) {
+export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; showDebug?: boolean }) {
     // 从 localStorage 获取初始 tab 状态，默认为 'hover'
     const [activeTab, setActiveTab] = useState<'hover' | 'definition'>(() => {
         const saved = localStorage.getItem('doSqlTest_activeTab');
@@ -50,20 +50,27 @@ export function DoSqlTest({ case: testCase }: { case: LsTestCase; }) {
         localStorage.setItem('doSqlTest_activeTab', activeTab);
     }, [activeTab]);
 
-    const [results, _] = useState(() => {
+    const [results, setResult] = useState<{
+        model: LsTestCase['model'];
+        positions: LsTestCase['positions'];
+        hoverResults: (languages.Hover | undefined)[];
+        definitionResults: (languages.Definition | undefined)[];
+    } | null>(null);
+
+    useEffect(() => {
         const model = testCase.model;
         const positions = testCase.positions;
         const hiveLs = createHiveLs(model);
         const hoverResults = positions.map(pos => {
-            const resInfo = hiveLs.doHover(pos, true);
+            const resInfo = hiveLs.doHover(pos, showDebug);
             return resInfo;
         });
         const definitionResults = positions.map(pos => {
-            const resInfo = hiveLs.doDefinition(pos, true);
+            const resInfo = hiveLs.doDefinition(pos, showDebug);
             return resInfo;
         });
-        return { model, positions, hoverResults, definitionResults };
-    });
+        setResult({ model, positions, hoverResults, definitionResults });
+    }, [testCase, showDebug]);
 
     const highlightedText = createHighlightedText(testCase.model.getValue(), testCase.positions);
 
@@ -80,6 +87,14 @@ export function DoSqlTest({ case: testCase }: { case: LsTestCase; }) {
         borderRadius: '4px 4px 0 0',
         outline: 'none'
     });
+
+    if (!results) {
+        return (
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+                <p>Loading results...</p>
+            </div>
+        );
+    }
 
     return (
         <div

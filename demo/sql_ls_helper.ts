@@ -155,7 +155,7 @@ export function rangeFromNode(node: ParserRuleContext) {
         startLineNumber: (node.start?.line || -1),
         startColumn: (node.start?.column || -1) + 1,
         endLineNumber: (node.stop?.line || -1),
-        endColumn: (node.stop?.column || -1) + 1,
+        endColumn: (node.stop?.column !== undefined ? (node.stop?.column + (node.stop?.text?.length || 0)) : -1) + 1,
     };
     if (node.ruleIndex === HiveSqlParser.RULE_id_) {
         ret.endColumn = ret.startColumn + (node.getText ? node.getText().length : 0);

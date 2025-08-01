@@ -34,7 +34,7 @@ export class IdentifierScope {
             startLineNumber: this.context.start!.line,
             startColumn: this.context.start!.column,
             endLineNumber: this.context.stop!.line,
-            endColumn: this.context.stop!.column
+            endColumn: this.context.stop!.column + (this.context.stop!.text || '').length
         };
     }
 
@@ -84,6 +84,17 @@ export class IdentifierScope {
         if (this.parent) {
             return this.parent;
         }
+    }
+
+    lookupDefinition(item: ParserRuleContext, fn: (item: ParserRuleContext) => any): any {
+        if (!item) {
+            return null;
+        }
+        const definition = fn(item);
+        if (definition) {
+            return definition;
+        }
+        return this.parent ? this.parent.lookupDefinition(item, fn) : null;
     }
 
     containsPosition(position: Position): boolean {
@@ -250,20 +261,24 @@ class ContextManager {
     }
 
     getContextByPosition(position: Position): IdentifierScope | null {
-        if (!this.currentContext) {
+        if (!this.rootContext) {
             return null;
         }
-        let checkNodes: IdentifierScope[] = [this.currentContext];
+        let checkNodes: IdentifierScope[] = [this.rootContext];
+        let lastContext: IdentifierScope | null = null;
         while (true) {
             let foundNode = false;
             for (const child of checkNodes) {
                 if (child.containsPosition(position)) {
                     foundNode = true;
+                    lastContext = child;
                     if (!child.children.length) {
                         return child;
                     }
                     checkNodes = child.children;
                     break;
+                } else {
+                    console.log('Not in range', position, child.range);
                 }
             }
             if (!foundNode) {
@@ -271,7 +286,7 @@ class ContextManager {
             }
         }
 
-        return null;
+        return lastContext;
     }
 
     toString() {

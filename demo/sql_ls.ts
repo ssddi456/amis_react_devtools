@@ -1,6 +1,6 @@
 import { type IRange, languages, type IMarkdownString, type Position, Uri } from "monaco-editor";
 import { TextDocument } from 'vscode-json-languageservice';
-import { EntityContext, EntityContextType, HiveSQL, HiveSqlParserVisitor, } from 'dt-sql-parser';
+import { EntityContext, EntityContextType, HiveSQL, } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
 import { posInRange } from "./ls_helper";
 import { TextSlice } from "dt-sql-parser/dist/parser/common/textAndWord";
@@ -8,12 +8,11 @@ import { HiveSqlParser, SubQuerySourceContext } from "dt-sql-parser/dist/lib/hiv
 import {
     TableSourceContext,
     VirtualTableSourceContext,
-    QueryStatementExpressionContext,
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import tableData from './data/example'
 import { createContextManager, IdentifierScope } from "./context_manager";
-import { printNode, rangeFromNode, printChildren, wordToRange, sliceToRange, findTokenAtPosition, printNodeTree } from "./sql_ls_helper";
+import { printNode, rangeFromNode, wordToRange, sliceToRange, findTokenAtPosition, printNodeTree } from "./sql_ls_helper";
 import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, unknownRes } from "./sql_hover_res";
 import { matchSubPath, matchSubPathOneOf, matchType } from "./sql_tree_query";
 
@@ -346,18 +345,21 @@ export const createHiveLs = (model: {
         const parent = foundNode.parent!;
         console.log('do hover entities', printNode(parent), position, allIdentifiers.keys());
 
+        const commonFields = {
+            range: rangeFromNode(foundNode),
+            ext,
+        };
+
         if (parent.ruleIndex === HiveSqlParser.RULE_tableSource) {
             const tableIdExp = parent.children![0].getText();
             const item = allIdentifiers.get(tableIdExp);
             const tableInfo = item && tableInfoFromNode(item);
 
-            const range = rangeFromNode(foundNode);
             return {
                 type: tableInfo ? 'table' : 'noTable',
                 tableInfo,
                 text: tableIdExp,
-                range,
-                ext
+                ...commonFields,
             };
         }
 
@@ -372,22 +374,56 @@ export const createHiveLs = (model: {
             const tableInfo = item && tableInfoFromNode(item);
 
             pushExt(`do hover tableName ${printNode(parent)}, 'tableIdExp', ${tableName}, 'tableInfo', ${JSON.stringify(tableInfo)}`);
-            const range = rangeFromNode(foundNode);
 
             if (!tableInfo) {
+                if (item instanceof TableSourceContext) {
+                    // loopup
+                    const tableInfo = context.lookupDefinition(item, (definition: ParserRuleContext) => {
+                        return tableInfoFromNode(definition);
+                    });
+
+                    if (tableInfo) {
+                        return {
+                            type: 'table',
+                            tableInfo,
+                            ...commonFields,
+                        };
+                    }
+                }
+
                 return {
                     type: 'noTable',
                     text: tableName,
-                    range,
-                    ext
+                    ...commonFields,
                 };
             }
 
             return {
                 type: 'table',
                 tableInfo,
-                range,
-                ext
+                ...commonFields,
+            };
+        }
+
+        if (
+            matchSubPathOneOf(foundNode, [
+                ['id_', 'subQuerySource'],
+            ])
+        ) {
+            const item = allIdentifiers.get(foundNode.getText());
+            const tableInfo = item && tableInfoFromNode(item);
+            if (!tableInfo) {
+                return {
+                    type: 'unknown',
+                    text: foundNode.getText(),
+                    ...commonFields,
+                };
+            }
+
+            return {
+                type: 'table',
+                tableInfo,
+                ...commonFields,
             };
         }
 
@@ -395,8 +431,7 @@ export const createHiveLs = (model: {
             return {
                 type: 'unknown',
                 text: foundNode.getText(),
-                range: rangeFromNode(foundNode),
-                ext
+                ...commonFields,
             };
         }
 
@@ -413,8 +448,6 @@ export const createHiveLs = (model: {
             const tableIdExp = parent.children?.length === 1 ? undefined : parent.children![0].getText();
             const columnName = parent.children?.length === 1 ? parent.children![0].getText() : parent.children![2].getText();
 
-            const range = rangeFromNode(foundNode);
-
             // column_name only
             if (!tableIdExp) {
                 const item = context.getDefaultIdentifier();
@@ -423,8 +456,7 @@ export const createHiveLs = (model: {
                     return {
                         type: 'noTable',
                         text: printNode(parent),
-                        range,
-                        ext
+                        ...commonFields,
                     };
                 }
                 const columnInfo = getColumnInfoByName(tableInfo, columnName);
@@ -433,16 +465,14 @@ export const createHiveLs = (model: {
                         type: 'noColumn',
                         tableInfo,
                         text: columnName,
-                        range,
-                        ext
+                        ...commonFields,
                     };
                 }
                 return {
                     type: 'column',
                     tableInfo,
                     columnInfo,
-                    range,
-                    ext
+                    ...commonFields,
                 };
             }
             const item = allIdentifiers.get(tableIdExp);
@@ -452,8 +482,7 @@ export const createHiveLs = (model: {
                 return {
                     type: 'noTable',
                     text: tableIdExp,
-                    range,
-                    ext
+                    ...commonFields,
                 };
             }
             const columnInfo = getColumnInfoByName(tableInfo, columnName);
@@ -462,16 +491,14 @@ export const createHiveLs = (model: {
                     type: 'noColumn',
                     tableInfo,
                     text: columnName,
-                    range,
-                    ext
+                    ...commonFields,
                 };
             }
             return {
                 type: 'column',
                 tableInfo,
                 columnInfo,
-                range,
-                ext
+                ...commonFields,
             };
         }
 
@@ -482,15 +509,13 @@ export const createHiveLs = (model: {
                 return {
                     type: 'createColumn',
                     text: foundNode.getText(),
-                    range: rangeFromNode(foundNode),
-                    ext
+                    ...commonFields,
                 };
             }
             return {
                 type: 'unknown',
                 text: foundNode.getText(),
-                range: rangeFromNode(foundNode),
-                ext
+                ...commonFields,
             };
         }
 
@@ -500,16 +525,14 @@ export const createHiveLs = (model: {
             return {
                 type: 'unknown',
                 text: foundNode.getText(),
-                range: rangeFromNode(foundNode),
-                ext
+                ...commonFields,
             };
         }
 
         return {
             type: 'unknown',
             text: foundNode.getText(),
-            range: rangeFromNode(foundNode),
-            ext
+            ...commonFields,
         };
     };
 

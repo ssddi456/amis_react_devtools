@@ -104,16 +104,52 @@ const AppComponent = amisRender(
   })
 );
 
-const localStorageKey = 'amis_react_devtools_demo_index';
+const localStorageKey = 'amis_react_devtools_demo_settings';
+
+interface AppSettings {
+  caseIndex: number;
+  showDebug: boolean;
+}
+
+const getStorageSettings = (): AppSettings => {
+  try {
+    const stored = localStorage.getItem(localStorageKey);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return {
+        caseIndex: parsed.caseIndex || 0,
+        showDebug: parsed.showDebug || false
+      };
+    }
+  } catch (error) {
+    console.warn('Failed to parse localStorage settings:', error);
+  }
+  return { caseIndex: 0, showDebug: false };
+};
+
+const saveStorageSettings = (settings: AppSettings) => {
+  try {
+    localStorage.setItem(localStorageKey, JSON.stringify(settings));
+  } catch (error) {
+    console.warn('Failed to save localStorage settings:', error);
+  }
+};
+
 const App = () => {
-  const [caseIndex, setCaseIndex] = React.useState(
-    localStorage.getItem(localStorageKey) ? parseInt(localStorage.getItem(localStorageKey)!) : 0
-  );
+  const initialSettings = getStorageSettings();
+  const [caseIndex, setCaseIndex] = React.useState(initialSettings.caseIndex);
+  const [showDebug, setShowDebug] = React.useState(initialSettings.showDebug);
 
   const maxIndex = sqlTest.length - 1;
   const changeCase = (index: number) => {
-    setCaseIndex(Math.max(0, Math.min(maxIndex, index)));
-    localStorage.setItem(localStorageKey, String(index));
+    const newIndex = Math.max(0, Math.min(maxIndex, index));
+    setCaseIndex(newIndex);
+    saveStorageSettings({ caseIndex: newIndex, showDebug });
+  };
+
+  const toggleShowDebug = (checked: boolean) => {
+    setShowDebug(checked);
+    saveStorageSettings({ caseIndex, showDebug: checked });
   };
 
   return (
@@ -137,9 +173,17 @@ const App = () => {
           >
             Next
           </button>
+          <label style={{ marginLeft: '20px' }}>
+            <input
+              type="checkbox"
+              checked={showDebug}
+              onChange={(e) => toggleShowDebug(e.target.checked)}
+            />
+            <span style={{ marginLeft: '5px' }}>Show Debug</span>
+          </label>
           <a href='https://dtstack.github.io/monaco-sql-languages/' target='_blank' rel='noopener noreferrer'>ast parser</a>
         </div>
-        <DoSqlTest case={sqlTest[caseIndex]} key={caseIndex} />
+        <DoSqlTest case={sqlTest[caseIndex]} key={caseIndex} showDebug={showDebug}/>
       </div>
     </div>
   );
