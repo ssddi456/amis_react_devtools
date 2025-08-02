@@ -68,6 +68,7 @@ export default {
         
         const onHoverSyntaxDisposable = monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
             provideHover: (model, position) => {
+                return;
                 const context = createHiveLs(model);
                 const ret = context.doSyntaxHover(position);
                 console.log('hover syntax result', stringFromPos(position), ret);
