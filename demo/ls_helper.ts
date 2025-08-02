@@ -1,4 +1,4 @@
-import type { Position } from 'monaco-editor';
+import type { IDisposable, Position } from 'monaco-editor';
 
 export function posToPosition(position: {
     lineNumber: number;
@@ -137,3 +137,15 @@ export type WithSource<T> = T & {
         columnNumber: number;
     };
 };
+
+export class DisposableChain {
+    private disposables: IDisposable[] = [];
+
+    add(disposable: IDisposable) {
+        this.disposables.push(disposable);
+    }
+
+    dispose() {
+        this.disposables.forEach(d => d.dispose());
+    }
+}

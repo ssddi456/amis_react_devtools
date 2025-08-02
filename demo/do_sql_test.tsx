@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ReactElement } from "react";
 import { LsTestCase, WithSource } from "./ls_helper";
 import { languages } from 'monaco-editor';
 import { createHiveLs } from "./sql_ls";
-import { HoverResults, DefinitionResults } from "./results_components";
+import { HoverResults, DefinitionResults, ReferencesResults } from "./results_components";
 
 
 // 创建高亮文本的辅助函数
@@ -11,38 +11,55 @@ export function createHighlightedText(text: string, positions: Array<{ lineNumbe
     const highlightedLines = lines.map((line, lineIndex) => {
         const lineNumber = lineIndex + 1;
         const linePositions = positions.filter(pos => pos.lineNumber === lineNumber);
-
+        const key = `line-${lineNumber}-${line}`;
         if (linePositions.length === 0) {
-            return line;
+            return <div key={key}>{line}</div>;
         }
-
+        const lineLength = line.length;
         // 按列位置排序，从后向前处理以避免索引偏移
-        const sortedPositions = linePositions.sort((a, b) => b.column - a.column);
-        let result = line;
+        const sortedPositions = linePositions.sort((a, b) => a.column - b.column)
 
-        sortedPositions.forEach(pos => {
+        let result: ReactElement[] = [];
+
+        sortedPositions.forEach((pos, i) => {
             const index = pos.column - 1; // 转换为0索引
-            if (index >= 0 && index < result.length) {
-                const char = result[index];
-                const positionIndex = positions.indexOf(pos);
-                result = result.slice(0, index) +
-                    `<span style="background-color: yellow; font-weight: bold; color: red; position: relative;">${char}<sup style="color: blue; font-size: 10px; font-weight: bold;">${positionIndex + 1}</sup></span>` +
-                    result.slice(index + 1);
+            const prevPosition = i > 0 ? sortedPositions[i - 1].column : 0;
+            const posIndex = positions.indexOf(pos);
+            if (index >= 0 && index < line.length) {
+                const char = line[index];
+                const prevContent = index > 0 ? line.slice(prevPosition, index) : '';
+                if (prevContent) {
+                    result.push(<span key={`prev-${i}`} style={{ color: 'gray' }}>{prevContent}</span>);
+                }
+                result.push(
+                    <span key={i} style={{ backgroundColor: 'yellow', fontWeight: 'bold', color: 'red', position: 'relative' }}>
+                        {char}
+                        <sup style={{ color: 'blue', fontSize: '10px', fontWeight: 'bold', userSelect: 'none' }}>
+                            {posIndex + 1}
+                        </sup>
+                    </span>
+                );
+            }
+            if (i == sortedPositions.length - 1) {
+                const nextContent = line.slice(index + 1, lineLength);
+                if (nextContent) {
+                    result.push(<span key={`space-${i}`}>{nextContent}</span>);
+                }
             }
         });
 
-        return result;
+        return <div key={key}>{result}</div>;
     });
 
-    return highlightedLines.join('\n');
+    return highlightedLines;
 }
 
 
 export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; showDebug?: boolean }) {
     // 从 localStorage 获取初始 tab 状态，默认为 'hover'
-    const [activeTab, setActiveTab] = useState<'hover' | 'definition'>(() => {
+    const [activeTab, setActiveTab] = useState<'hover' | 'definition' | 'references'>(() => {
         const saved = localStorage.getItem('doSqlTest_activeTab');
-        return (saved === 'hover' || saved === 'definition') ? saved : 'hover';
+        return (saved === 'hover' || saved === 'definition' || saved === 'references') ? saved : 'hover';
     });
 
     // 保存 tab 状态到 localStorage
@@ -55,6 +72,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
         positions: LsTestCase['positions'];
         hoverResults: (WithSource<languages.Hover> | undefined)[];
         definitionResults: (WithSource<languages.Definition> | undefined)[];
+        referencesResults: (WithSource<languages.Location[]> | undefined)[];
     } | null>(null);
 
     useEffect(() => {
@@ -69,7 +87,11 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
             const resInfo = hiveLs.doDefinition(pos, showDebug);
             return resInfo;
         });
-        setResult({ model, positions, hoverResults, definitionResults });
+        const referencesResults = positions.map(pos => {
+            const resInfo = hiveLs.doReferences(pos, showDebug);
+            return resInfo;
+        });
+        setResult({ model, positions, hoverResults, definitionResults, referencesResults });
     }, [testCase, showDebug]);
 
     const highlightedText = createHighlightedText(testCase.model.getValue(), testCase.positions);
@@ -118,7 +140,9 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                     top: 0,
                     fontFamily: 'monospace',
                 }}
-                dangerouslySetInnerHTML={{ __html: highlightedText }} />
+            >
+                {highlightedText}
+            </div>
             <div
                 style={{
                     flex: 1,
@@ -126,7 +150,14 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                 }}
             >
                 {/* Tab 切换按钮 */}
-                <div style={{ marginBottom: '10px', borderBottom: '1px solid #ddd' }}>
+                <div 
+                    style={{
+                        marginBottom: '10px',
+                        borderBottom: '1px solid #ddd',
+                        position: 'sticky',
+                        top: 0,
+                    }}
+                >
                     <button
                         style={tabButtonStyle(activeTab === 'hover')}
                         onClick={() => setActiveTab('hover')}
@@ -138,6 +169,12 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                         onClick={() => setActiveTab('definition')}
                     >
                         Definition Results
+                    </button>
+                    <button
+                        style={tabButtonStyle(activeTab === 'references')}
+                        onClick={() => setActiveTab('references')}
+                    >
+                        References Results
                     </button>
                 </div>
 
@@ -152,6 +189,13 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                 {activeTab === 'definition' && (
                     <DefinitionResults 
                         definitionResults={results.definitionResults} 
+                        positions={results.positions} 
+                    />
+                )}
+
+                {activeTab === 'references' && (
+                    <ReferencesResults 
+                        referencesResults={results.referencesResults} 
                         positions={results.positions} 
                     />
                 )}

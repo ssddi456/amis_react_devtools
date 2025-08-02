@@ -1,4 +1,4 @@
-import { type IRange, languages, type IMarkdownString, type Position, Uri } from "monaco-editor";
+import { type IRange, languages, type Position, Uri } from "monaco-editor";
 import { TextDocument } from 'vscode-json-languageservice';
 import { EntityContext, EntityContextType, HiveSQL, } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
@@ -322,6 +322,249 @@ const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): WithSource<langua
     return;
 };
 
+
+const getTableAndColumnInfoAtPosition = (
+    foundNode: ParserRuleContext,
+    position: Position,
+    context: IdentifierScope,
+    isTest?: boolean
+): EntityInfo | null => {
+    const ext: string[] = [];
+    const pushExt = isTest ? (content: string) => {
+        ext.push(content);
+    } : () => { };
+    pushExt((position as any).text);
+    pushExt(printNodeTree(foundNode));
+
+    const allIdentifiers = context.getAllIdentifiers() || {};
+
+    const parent = foundNode.parent!;
+    console.log('do hover entities', printNode(parent), position, allIdentifiers.keys());
+
+    const commonFields = {
+        range: rangeFromNode(foundNode),
+        ext,
+    };
+    // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1392
+    if (matchSubPathOneOf(foundNode, [
+        ['id_', 'tableSource'],
+    ])) {
+        const tableName = (parent as TableSourceContext).tableOrView().tableName()?.getText();
+        if (tableName) {
+            const item = context.lookupDefinition(tableName);
+            const tableInfo = item && tableInfoFromNode(item);
+            if (tableInfo) {
+                return {
+                    type: 'table',
+                    tableInfo,
+                    ...commonFields,
+                };
+            }
+        }
+        return {
+            type: 'noTable',
+            text: foundNode.getText(),
+            ...commonFields,
+        };
+    }
+    // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1418
+    if (
+        matchSubPathOneOf(foundNode, [
+            ['id_', 'tableName'],
+            ['DOT', 'tableName']
+        ])
+    ) {
+        const tableName = parent.getText();
+        const item = context.lookupDefinition(tableName);
+        const tableInfo = item && tableInfoFromNode(item);
+
+        pushExt(`do hover tableName ${printNode(parent)}, 'tableIdExp', ${tableName}, 'tableInfo', ${JSON.stringify(tableInfo)}`);
+
+        if (!tableInfo) {
+            return {
+                type: 'noTable',
+                text: tableName,
+                ...commonFields,
+            };
+        }
+
+        return {
+            type: 'table',
+            tableInfo,
+            ...commonFields,
+        };
+    }
+
+    // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1436
+    if (
+        matchSubPathOneOf(foundNode, [
+            ['id_', 'subQuerySource'],
+        ])
+    ) {
+        const item = allIdentifiers.get(foundNode.getText());
+        const tableInfo = item && tableInfoFromNode(item);
+        if (!tableInfo) {
+            return {
+                type: 'unknown',
+                text: foundNode.getText(),
+                ...commonFields,
+            };
+        }
+
+        return {
+            type: 'table',
+            tableInfo,
+            ...commonFields,
+        };
+    }
+
+    if (parent.ruleIndex === HiveSqlParser.RULE_viewName) {
+        return {
+            type: 'unknown',
+            text: foundNode.getText(),
+            ...commonFields,
+        };
+    }
+
+    // columnName -> poolPath -> id_(from default table name)
+    // columnName -> poolPath -> id_(table name or alias), ., _id
+    if (
+        matchSubPathOneOf(foundNode, [
+            ['id_', 'poolPath', 'columnName'],
+            ['id_', 'poolPath', 'columnNamePath'],
+            ['DOT', 'poolPath', 'columnNamePath']
+        ])
+    ) {
+        // 只支持 table_name.column_name or column_name for now
+        const tableIdExp = parent.children?.length === 1 ? undefined : parent.children![0].getText();
+        const columnName = parent.children?.length === 1 ? parent.children![0].getText() : parent.children![2].getText();
+
+        // column_name only
+        if (!tableIdExp) {
+            const item = context.getDefaultIdentifier();
+            const tableInfo = item && tableInfoFromNode(item);
+            if (!tableInfo) {
+                return {
+                    type: 'noTable',
+                    text: printNode(parent),
+                    ...commonFields,
+                };
+            }
+            const columnInfo = getColumnInfoByName(tableInfo, columnName);
+            if (!columnInfo) {
+                return {
+                    type: 'noColumn',
+                    tableInfo,
+                    text: columnName,
+                    ...commonFields,
+                };
+            }
+            return {
+                type: 'column',
+                tableInfo,
+                columnInfo,
+                ...commonFields,
+            };
+        }
+
+        const item = context.lookupDefinition(tableIdExp);
+        const tableInfo = item && tableInfoFromNode(item);
+
+        if (!tableInfo) {
+            console.log('No table info found for:', printNode(item));
+            return {
+                type: 'noTable',
+                text: tableIdExp,
+                ...commonFields,
+            };
+        }
+        const columnInfo = getColumnInfoByName(tableInfo, columnName);
+        if (!columnInfo) {
+            return {
+                type: 'noColumn',
+                tableInfo,
+                text: columnName,
+                ...commonFields,
+            };
+        }
+        return {
+            type: 'column',
+            tableInfo,
+            columnInfo,
+            ...commonFields,
+        };
+    }
+
+    // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1514
+    if (matchSubPath(foundNode, ['id_', 'selectItem'])) {
+        const parent = foundNode.parent! as SelectItemContext;
+        // 往前查找 (columnName | expression)
+        return {
+            type: 'unknown',
+            text: foundNode.getText(),
+            ...commonFields,
+        };
+    }
+
+    return {
+        type: 'unknown',
+        text: foundNode.getText(),
+        ...commonFields,
+    };
+};
+
+const getIdentifierReferences = (
+    foundNode: ParserRuleContext,
+    context: IdentifierScope,
+): ParserRuleContext[] | undefined => {
+    const foundTableSource = matchSubPathOneOf(foundNode, [
+        ['id_','tableSource'],
+        ['DOT', 'tableSource'],
+    ]) as TableSourceContext | null;
+    if (foundTableSource) {
+        if (foundTableSource.id_()) {
+            const alias = foundTableSource.id_()?.getText();
+            if (!alias) {
+                return;
+            }
+            const isDeclared = context.identifierMap.has(alias);
+            if (isDeclared) {
+                return context.getReferencesByName(alias);
+            }
+        }
+        return;
+    }
+
+    const foundSubQuerySource = matchSubPath(foundNode, ['id_', 'subQuerySource']) as SubQuerySourceContext | null;
+    if (foundSubQuerySource) {
+        const alias = foundSubQuerySource.id_()?.getText();
+        if (!alias) {
+            return;
+        }
+        const isDeclared = context.identifierMap.has(alias);
+        console.log('foundSubQuerySource', printNode(foundSubQuerySource), 'alias:', alias, 'isDeclared:', isDeclared);
+        if (isDeclared) {
+            return context.getReferencesByName(alias);
+        }
+        return;
+    }
+
+    const foundVirtualTableSource = matchSubPath(foundNode, ['id_', 'virtualTableSource']) as VirtualTableSourceContext | null;
+    if (foundVirtualTableSource) {
+        const alias = foundVirtualTableSource.tableAlias()?.getText();
+        if (!alias) {
+            return;
+        }
+        const isDeclared = context.identifierMap.has(alias);
+        if (isDeclared) {
+            return context.getReferencesByName(alias);
+        }
+        return;
+    }
+
+    return;
+}
+
 // 这里列一下表
 // hive is from
 // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4
@@ -359,259 +602,11 @@ export const createHiveLs = (model: {
         return null;
     };
 
-    const getTableAndColumnInfoAtPosition = (
-        foundNode: ParserRuleContext,
-        position: Position,
-        context: IdentifierScope,
-        isTest?: boolean
-    ): EntityInfo | null => {
-        const ext: string[] = [];
-        const pushExt = isTest ? (content: string) => {
-            ext.push(content);
-        } : () => { };
-        pushExt((position as any).text);
-        pushExt(printNodeTree(foundNode));
-
-        const allIdentifiers = context.getAllIdentifiers() || {};
-
-        const parent = foundNode.parent!;
-        console.log('do hover entities', printNode(parent), position, allIdentifiers.keys());
-
-        const commonFields = {
-            range: rangeFromNode(foundNode),
-            ext,
-        };
-        // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1392
-        if (matchSubPathOneOf(foundNode, [
-            ['id_', 'tableSource'],
-        ])) {
-            const tableName = (parent as TableSourceContext).tableOrView().tableName()?.getText();
-            if (tableName) {
-                const item = context.lookupDefinition(tableName);
-                const tableInfo = item && tableInfoFromNode(item);
-                if (tableInfo) {
-                    return {
-                        type: 'table',
-                        tableInfo,
-                        ...commonFields,
-                    };
-                }
-            }
-            return {
-                type: 'noTable',
-                text: foundNode.getText(),
-                ...commonFields,
-            };
-        }
-        // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1418
-        if (
-            matchSubPathOneOf(foundNode, [
-                ['id_', 'tableName'],
-                ['DOT', 'tableName']
-            ])
-        ) {
-            const tableName = parent.getText();
-            const item = context.lookupDefinition(tableName);
-            const tableInfo = item && tableInfoFromNode(item);
-
-            pushExt(`do hover tableName ${printNode(parent)}, 'tableIdExp', ${tableName}, 'tableInfo', ${JSON.stringify(tableInfo)}`);
-
-            if (!tableInfo) {
-                return {
-                    type: 'noTable',
-                    text: tableName,
-                    ...commonFields,
-                };
-            }
-
-            return {
-                type: 'table',
-                tableInfo,
-                ...commonFields,
-            };
-        }
-
-        // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1436
-        if (
-            matchSubPathOneOf(foundNode, [
-                ['id_', 'subQuerySource'],
-            ])
-        ) {
-            const item = allIdentifiers.get(foundNode.getText());
-            const tableInfo = item && tableInfoFromNode(item);
-            if (!tableInfo) {
-                return {
-                    type: 'unknown',
-                    text: foundNode.getText(),
-                    ...commonFields,
-                };
-            }
-
-            return {
-                type: 'table',
-                tableInfo,
-                ...commonFields,
-            };
-        }
-
-        if (parent.ruleIndex === HiveSqlParser.RULE_viewName) {
-            return {
-                type: 'unknown',
-                text: foundNode.getText(),
-                ...commonFields,
-            };
-        }
-
-        // columnName -> poolPath -> id_(from default table name)
-        // columnName -> poolPath -> id_(table name or alias), ., _id
-        if (
-            matchSubPathOneOf(foundNode, [
-                ['id_', 'poolPath', 'columnName'],
-                ['id_', 'poolPath', 'columnNamePath'],
-                ['DOT', 'poolPath', 'columnNamePath']
-            ])
-        ) {
-            // 只支持 table_name.column_name or column_name for now
-            const tableIdExp = parent.children?.length === 1 ? undefined : parent.children![0].getText();
-            const columnName = parent.children?.length === 1 ? parent.children![0].getText() : parent.children![2].getText();
-
-            // column_name only
-            if (!tableIdExp) {
-                const item = context.getDefaultIdentifier();
-                const tableInfo = item && tableInfoFromNode(item);
-                if (!tableInfo) {
-                    return {
-                        type: 'noTable',
-                        text: printNode(parent),
-                        ...commonFields,
-                    };
-                }
-                const columnInfo = getColumnInfoByName(tableInfo, columnName);
-                if (!columnInfo) {
-                    return {
-                        type: 'noColumn',
-                        tableInfo,
-                        text: columnName,
-                        ...commonFields,
-                    };
-                }
-                return {
-                    type: 'column',
-                    tableInfo,
-                    columnInfo,
-                    ...commonFields,
-                };
-            }
-
-            const item = context.lookupDefinition(tableIdExp);
-            const tableInfo = item && tableInfoFromNode(item);
-            
-            if (!tableInfo) {
-                console.log('No table info found for:', printNode(item));
-                return {
-                    type: 'noTable',
-                    text: tableIdExp,
-                    ...commonFields,
-                };
-            }
-            const columnInfo = getColumnInfoByName(tableInfo, columnName);
-            if (!columnInfo) {
-                return {
-                    type: 'noColumn',
-                    tableInfo,
-                    text: columnName,
-                    ...commonFields,
-                };
-            }
-            return {
-                type: 'column',
-                tableInfo,
-                columnInfo,
-                ...commonFields,
-            };
-        }
-
-        // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1514
-        if (matchSubPath(foundNode, ['id_', 'selectItem'])) {
-            const parent = foundNode.parent! as SelectItemContext;
-            // 往前查找 (columnName | expression)
-            return {
-                type: 'unknown',
-                text: foundNode.getText(),
-                ...commonFields,
-            };
-        }
-
-        return {
-            type: 'unknown',
-            text: foundNode.getText(),
-            ...commonFields,
-        };
-    };
-
     return {
         doComplete: (position: Position) => {
-            getCtxFromPos(position);
-            const syntaxSuggestions = hiveSqlParse.getSuggestionAtCaretPosition(document.getText(), position)?.syntax;
+            const { foundNode, context } = getCtxFromPos(position) || {};
 
-            console.log('do completes syntaxSuggestions', syntaxSuggestions);
-            if (!syntaxSuggestions) {
-                return;
-            }
-
-            const table = syntaxSuggestions.find(s => s.syntaxContextType === EntityContextType.TABLE);
-            if (table) {
-                // 这里搞一下找表名
-            }
-            const column = syntaxSuggestions.find(s => s.syntaxContextType === EntityContextType.COLUMN);
-            if (column) {
-                const entities = hiveSqlParse.getAllEntities(document.getText(), position) || [];
-                const currentEntities = entities.filter(e => e.belongStmt.isContainCaret);
-                console.log("do completes currentEntities", currentEntities);
-                if (currentEntities.length > 0
-                    && currentEntities[0].entityContextType === EntityContextType.TABLE
-                ) {
-                    const cursorRange = {
-                        startLineNumber: position.lineNumber,
-                        startColumn: position.column,
-                        endLineNumber: position.lineNumber,
-                        endColumn: position.column
-                    };
-                    let range = wordToRange(column.wordRanges[0]) || cursorRange;
-                    // check if is table_name.column_name
-                    if (column.wordRanges[1]?.text === '.') {
-                        if (column.wordRanges[2]) {
-                            range = wordToRange(column.wordRanges[2])!;
-                        } else {
-                            range = {
-                                startLineNumber: position.lineNumber,
-                                startColumn: position.column + 1,
-                                endLineNumber: position.lineNumber,
-                                endColumn: position.column + 1
-                            };
-                        }
-                    }
-                    console.log("do completes range", range);
-                    return {
-                        suggestions: [
-                            {
-                                label: `column test`,
-                                sortText: '$$test',
-                                kind: languages.CompletionItemKind.Field,
-                                insertText: 'test',
-                                range,
-                                documentation: {
-                                    value: [
-                                        `**Table:** ${currentEntities[0].text}`,
-                                        `**Column:** test`
-                                    ].join('\n\n'),
-                                    isTrusted: true
-                                } as IMarkdownString
-                            }
-                        ]
-                    };
-                }
-            }
+            // how?
         },
         doHover: (
             position: Position,
@@ -624,7 +619,6 @@ export const createHiveLs = (model: {
                 && !matchType(foundNode, 'columnNamePath')
                 && !matchType(foundNode, 'poolPath')
                 && !matchType(foundNode, 'constant')
-                && !matchType(foundNode, 'select')
             )) {
                 return;
             }
@@ -678,7 +672,6 @@ export const createHiveLs = (model: {
                 && !matchType(foundNode, 'columnNamePath')
                 && !matchType(foundNode, 'poolPath')
                 && !matchType(foundNode, 'constant')
-                && !matchType(foundNode, 'select')
             )) {
                 return;
             }
@@ -689,6 +682,29 @@ export const createHiveLs = (model: {
             }
 
             return formatDefinitionRes(model.uri as Uri, hoverInfo);
+        },
+
+        doReferences(
+            position: Position,
+            isTest?: boolean
+        ): WithSource<languages.Location[]> | undefined {
+            const { foundNode, context } = getCtxFromPos(position) || {};
+            if (!foundNode || !context || (
+                !matchType(foundNode, 'id_')
+                && !matchType(foundNode, 'DOT')
+            )) {
+                return;
+            }
+
+            const references = getIdentifierReferences(foundNode, context);
+            if (!references || references.length === 0) {
+                return;
+            }
+
+            return references.map(ref => ({
+                uri: model.uri as Uri,
+                range: rangeFromNode(ref),
+            }));
         }
     };
 }

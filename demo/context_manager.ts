@@ -1,11 +1,10 @@
 
 import { ParserRuleContext, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
-import { ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectStatementContext, SelectStatementWithCTEContext, SubQueryExpressionContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ColumnNameContext, ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectStatementContext, SelectStatementWithCTEContext, SubQueryExpressionContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
 import { posInRange } from "./ls_helper";
-import { findTokenAtPosition, printNode } from "./sql_ls_helper";
-import { TableInfo } from "./sql_ls";
+import { printNode } from "./sql_ls_helper";
 
 function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -16,8 +15,13 @@ function uuidv4() {
 
 export class IdentifierScope {
     uuid = uuidv4();
-    indentifierMap: Map<string, ParserRuleContext> = new Map();
+
+    identifierMap: Map<string, ParserRuleContext> = new Map();
+
+    referenceMap: Map<string, ParserRuleContext[]> = new Map();
+
     defaultIdentifier: ParserRuleContext | null = null;
+
     children: IdentifierScope[] = [];
 
     constructor(
@@ -45,12 +49,12 @@ export class IdentifierScope {
 
     addIdentifier(name: string, identifier: ParserRuleContext) {
         if (identifier) {
-            this.indentifierMap.set(name, identifier);
+            this.identifierMap.set(name, identifier);
         }
     }
 
     getAllIdentifiers() {
-        const identifiers = new Map<string, ParserRuleContext>(this.indentifierMap);
+        const identifiers = new Map<string, ParserRuleContext>(this.identifierMap);
         if (this.parent) {
             const parentIdentifiers = this.parent.getAllIdentifiers();
             parentIdentifiers.forEach((value, key) => {
@@ -90,7 +94,7 @@ export class IdentifierScope {
     }
 
     lookupDefinition(name: string): ParserRuleContext | null {
-        const identifier = this.indentifierMap.get(name);
+        const identifier = this.identifierMap.get(name);
         if (!identifier) {
             return this.parent ? this.parent.lookupDefinition(name) : null;
         }
@@ -115,7 +119,7 @@ export class IdentifierScope {
     toString(depth: number = 0, result: string[] = []) {
         const indent = ' '.repeat(depth * 2);
         result.push(`${indent}(${printNode(this.context)})`);
-        const identifiers = this.indentifierMap.entries();
+        const identifiers = this.identifierMap.entries();
         Array.from(identifiers).forEach(([name, identifier]) => {
             result.push(`${indent}  ${name} -> ${printNode(identifier)}`);
         });
@@ -123,7 +127,32 @@ export class IdentifierScope {
             child.toString(depth + 1, result);
         });
         return result.join('\n');
-    } 
+    }
+
+    addReference(name: string, reference: ParserRuleContext) {
+        if (!this.referenceMap.has(name)) {
+            this.referenceMap.set(name, []);
+        }
+        this.referenceMap.get(name)!.push(reference);
+    }
+
+    getScopeByIdentifier(name: string): IdentifierScope | null {
+        if (this.identifierMap.has(name)) {
+            return this;
+        }
+        if (this.parent) {
+            return this.parent.getScopeByIdentifier(name);
+        }
+        return null;
+    }
+
+    getReferencesByName(name: string): ParserRuleContext[] {
+        const references = this.referenceMap.get(name);
+        if (references) {
+            return references;
+        }
+        return [];
+    }
 }
 
 class ContextManager {
@@ -262,6 +291,45 @@ class ContextManager {
             };
             exitQualifyClause = (ctx: QualifyClauseContext) => {
                 exitRule();
+            };
+
+            enterTableSource = (ctx: TableSourceContext) => {
+                const tableName = ctx.tableOrView().tableName()?.getText();
+                if (tableName) {
+                    const scope = manager.currentContext?.getScopeByIdentifier(tableName);
+                    scope?.addReference(tableName, ctx);
+                }
+            };
+
+            enterColumnName = (ctx: ColumnNameContext) => {
+                const ids = ctx.poolPath()?.id_();
+                if (ids?.length == 1) {
+                    // Single identifier, likely a column name
+                    // do nothing
+                } else if (ids?.length == 2) {
+                    // Two identifiers, likely a table.column name
+                    const tableName = ids[0].getText();
+                    // TODO: 需要先记下来，在exit scope时清理引用
+                    const scope = manager.currentContext?.getScopeByIdentifier(tableName);
+                    if (scope) {
+                        scope.addReference(tableName, ctx);
+                    }
+                }
+            };
+
+            enterColumnNamePath = (ctx: ColumnNameContext) => {
+                const ids = ctx.poolPath()?.id_();
+                if (ids?.length == 1) {
+                    // Single identifier, likely a column name
+                    // do nothing
+                } else if (ids?.length == 2) {
+                    // Two identifiers, likely a table.column name
+                    const tableName = ids[0].getText();
+                    const scope = manager.currentContext?.getScopeByIdentifier(tableName);
+                    if (scope) {
+                        scope.addReference(tableName, ctx);
+                    }
+                }
             };
         };
 

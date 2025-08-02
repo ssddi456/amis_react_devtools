@@ -156,8 +156,10 @@ const App = () => {
     <div className="container">
       {/* <ClickToComponent /> */}
       {AppComponent}
-      <div style={{ margin: '10px 0' }}>
-        <div>
+      <div style={{ margin: '10px 0', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <div
+          style={{ flex: 0 }}
+        >
           <button
             onClick={() => changeCase(caseIndex - 1)}
             disabled={caseIndex <= 0}
@@ -183,7 +185,15 @@ const App = () => {
           </label>
           <a href='https://dtstack.github.io/monaco-sql-languages/' target='_blank' rel='noopener noreferrer'>ast parser</a>
         </div>
-        <DoSqlTest case={sqlTest[caseIndex]} key={caseIndex} showDebug={showDebug}/>
+        <div 
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            backgroundColor: '#f5f5f5',
+          }}
+        >
+          <DoSqlTest case={sqlTest[caseIndex]} key={caseIndex} showDebug={showDebug}/>
+        </div>
       </div>
     </div>
   );

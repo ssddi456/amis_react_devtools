@@ -2,7 +2,7 @@ import { editor, Position } from 'monaco-editor';
 import { LanguageIdEnum, setupLanguageFeatures, vsPlusTheme } from 'monaco-sql-languages';
 import 'monaco-sql-languages/esm/languages/hive/hive.contribution';
 import { createHiveLs } from './sql_ls';
-import { posFromString, stringFromPos } from './ls_helper';
+import { DisposableChain, posFromString, stringFromPos } from './ls_helper';
 
 // Customize the various tokens style
 editor.defineTheme('sql-dark', vsPlusTheme.darkThemeData);
@@ -40,33 +40,34 @@ export default {
             }
         }
 
-        const onChangeDisposable = editorInstance.onDidChangeModelContent((e) => {
+        const disposables = new DisposableChain();
+
+        disposables.add(editorInstance.onDidChangeModelContent((e) => {
             doValidate();
 
-        });
-        
+        }));
+
         doValidate();
 
-        const onCompeletionDisposable = monaco.languages.registerCompletionItemProvider(LanguageIdEnum.HIVE, {
+        disposables.add(monaco.languages.registerCompletionItemProvider(LanguageIdEnum.HIVE, {
             triggerCharacters: ['.', '"', ' '],
             provideCompletionItems: (model, position) => {
                 const context = createHiveLs(model);
-                const ret = context.doComplete(position);
-                console.log('hover result', stringFromPos(position), ret);
+                const ret = context.doComplete(position) as undefined;
                 return ret;
             }
-        });
+        }));
 
-        const onHoverDisposable = monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
+        disposables.add(monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
             provideHover: (model, position) => {
                 const context = createHiveLs(model);
                 const ret = context.doHover(position);
                 console.log('hover result', stringFromPos(position), ret);
                 return ret;
             }
-        });
-        
-        const onHoverSyntaxDisposable = monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
+        }));
+
+        disposables.add(monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
             provideHover: (model, position) => {
                 return;
                 const context = createHiveLs(model);
@@ -74,25 +75,26 @@ export default {
                 console.log('hover syntax result', stringFromPos(position), ret);
                 return ret;
             }
-        });
+        }));
 
-        const onDefinitionDisposable = monaco.languages.registerDefinitionProvider(LanguageIdEnum.HIVE, {
+        disposables.add(monaco.languages.registerDefinitionProvider(LanguageIdEnum.HIVE, {
             provideDefinition: (model, position) => {
                 const context = createHiveLs(model);
                 const ret = context.doDefinition(position);
                 console.log('definition result', stringFromPos(position), model.uri, ret);
                 return ret;
             }
-        });
-
-        return {
-            dispose: () => {
-                onChangeDisposable.dispose();
-                onCompeletionDisposable.dispose();
-                onHoverDisposable.dispose();
-                onHoverSyntaxDisposable.dispose();
-                onDefinitionDisposable.dispose();
+        }));
+        
+        disposables.add(monaco.languages.registerReferenceProvider(LanguageIdEnum.HIVE, {
+            provideReferences: (model, position) => {
+                const context = createHiveLs(model);
+                const ret = context.doReferences(position);
+                console.log('references result', stringFromPos(position), model.uri, ret);
+                return ret;
             }
-        }
+        }));
+
+        return disposables;
     },
 }
