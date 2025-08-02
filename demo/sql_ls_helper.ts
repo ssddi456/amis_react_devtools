@@ -108,7 +108,7 @@ function ruleIndexToDisplayName(node: ParserRuleContext | TerminalNode): string 
     return node.getText();
 }
 
-export function printNode(node: ParserRuleContext | TerminalNode | null): string {
+export function printNode(node: ParserRuleContext | TerminalNode | null | undefined): string {
     if (!node) {
         return 'null';
     }

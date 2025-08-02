@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LsTestCase } from "./ls_helper";
+import { LsTestCase, WithSource } from "./ls_helper";
 import { languages } from 'monaco-editor';
 import { createHiveLs } from "./sql_ls";
 import { HoverResults, DefinitionResults } from "./results_components";
@@ -53,8 +53,8 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
     const [results, setResult] = useState<{
         model: LsTestCase['model'];
         positions: LsTestCase['positions'];
-        hoverResults: (languages.Hover | undefined)[];
-        definitionResults: (languages.Definition | undefined)[];
+        hoverResults: (WithSource<languages.Hover> | undefined)[];
+        definitionResults: (WithSource<languages.Definition> | undefined)[];
     } | null>(null);
 
     useEffect(() => {

@@ -129,3 +129,11 @@ export function createModel(text: string) {
         getValue: () => text,
     };
 }
+
+export type WithSource<T> = T & {
+    __source?: {
+        fileName: string;
+        lineNumber: number;
+        columnNumber: number;
+    };
+};

@@ -1,8 +1,10 @@
 import React from 'react';
 import { languages } from 'monaco-editor';
+import { WithSource } from './ls_helper';
+import { SourceLink } from './source_link';
 
 interface DefinitionResultsProps {
-    definitionResults: Array<languages.Definition | undefined>;
+    definitionResults: Array<WithSource<languages.Definition> | undefined>;
     positions: Array<{ lineNumber: number; column: number }>;
 }
 
@@ -26,6 +28,8 @@ export function DefinitionResults({ definitionResults, positions }: DefinitionRe
                                 >Definition Result {index + 1}
                                     &nbsp;
                                     pos: {positionStr}
+                                    &nbsp;
+                                    <SourceLink source={defRes.__source} />
                                 </h4>
                                 {Array.isArray(defRes) ? (
                                     defRes.map((def, defIndex) => (

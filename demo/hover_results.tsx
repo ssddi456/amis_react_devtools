@@ -1,8 +1,10 @@
 import React from 'react';
 import { languages } from 'monaco-editor';
+import { WithSource } from './ls_helper';
+import { SourceLink } from './source_link';
 
 interface HoverResultsProps {
-    hoverResults: Array<languages.Hover | undefined>;
+    hoverResults: Array<WithSource<languages.Hover> | undefined>;
     positions: Array<{ lineNumber: number; column: number }>;
 }
 
@@ -28,6 +30,8 @@ export function HoverResults({ hoverResults, positions }: HoverResultsProps) {
                                     pos: {positionStr}
                                     &nbsp;
                                     range: {`(${res.range?.startLineNumber}:${res.range?.startColumn} -> ${res.range?.endLineNumber}:${res.range?.endColumn})`}
+                                    &nbsp;
+                                    <SourceLink source={res.__source} />
                                 </h4>
                                 <pre
                                     style={{

@@ -2,9 +2,9 @@ import { type IRange, languages, type IMarkdownString, type Position, Uri } from
 import { TextDocument } from 'vscode-json-languageservice';
 import { EntityContext, EntityContextType, HiveSQL, } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
-import { posInRange } from "./ls_helper";
+import { posInRange, WithSource } from "./ls_helper";
 import { TextSlice } from "dt-sql-parser/dist/parser/common/textAndWord";
-import { CteStatementContext, HiveSqlParser, SubQuerySourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { CteStatementContext, HiveSqlParser, SelectItemContext, SubQuerySourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import {
     TableSourceContext,
     VirtualTableSourceContext,
@@ -282,27 +282,32 @@ interface EntityInfo {
     text?: string;
     range: IRange;
     ext?: string[];
+    __source?: {
+        fileName: string,
+        lineNumber: number,
+        columnNumber: number
+    }
 }
 
-const formatHoverRes = (hoverInfo: EntityInfo): languages.Hover => {
+const formatHoverRes = (hoverInfo: EntityInfo): WithSource<languages.Hover> => {
     switch (hoverInfo.type) {
         case 'table':
-            return tableRes(hoverInfo.tableInfo!, hoverInfo.range, hoverInfo.ext);
+            return { ...tableRes(hoverInfo.tableInfo!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
         case 'column':
-            return tableAndColumn(hoverInfo.tableInfo!, hoverInfo.columnInfo!, hoverInfo.range, hoverInfo.ext);
+            return { ...tableAndColumn(hoverInfo.tableInfo!, hoverInfo.columnInfo!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
         case 'noTable':
-            return noTableInfoRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext);
+            return { ...noTableInfoRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
         case 'noColumn':
-            return noColumnInfoRes(hoverInfo.tableInfo!, hoverInfo.text!, hoverInfo.range, hoverInfo.ext);
+            return { ...noColumnInfoRes(hoverInfo.tableInfo!, hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
         case 'createColumn':
-            return createColumnRes({ getText: () => hoverInfo.text! } as ParseTree, hoverInfo.range, hoverInfo.ext);
+            return { ...createColumnRes({ getText: () => hoverInfo.text! } as ParseTree, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
         case 'unknown':
         default:
-            return unknownRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext);
+            return { ...unknownRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
     }
 };
 
-const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): languages.Definition | undefined => {
+const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): WithSource<languages.Definition> | undefined => {
     console.log('formatDefinitionRes', uri, hoverInfo);
     if (
         (hoverInfo.type === 'table' || hoverInfo.type === 'column')
@@ -310,7 +315,8 @@ const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): languages.Definit
     ) {
         return {
             uri,
-            range: hoverInfo.tableInfo.range
+            range: hoverInfo.tableInfo.range,
+            __source: hoverInfo.__source
         };
     }
     return;
@@ -375,20 +381,29 @@ export const createHiveLs = (model: {
             range: rangeFromNode(foundNode),
             ext,
         };
-
-        if (parent.ruleIndex === HiveSqlParser.RULE_tableSource) {
-            const tableIdExp = parent.children![0].getText();
-            const item = allIdentifiers.get(tableIdExp);
-            const tableInfo = item && tableInfoFromNode(item);
-
+        // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1392
+        if (matchSubPathOneOf(foundNode, [
+            ['id_', 'tableSource'],
+        ])) {
+            const tableName = (parent as TableSourceContext).tableOrView().tableName()?.getText();
+            if (tableName) {
+                const item = context.lookupDefinition(tableName);
+                const tableInfo = item && tableInfoFromNode(item);
+                if (tableInfo) {
+                    return {
+                        type: 'table',
+                        tableInfo,
+                        ...commonFields,
+                    };
+                }
+            }
             return {
-                type: tableInfo ? 'table' : 'noTable',
-                tableInfo,
-                text: tableIdExp,
+                type: 'noTable',
+                text: foundNode.getText(),
                 ...commonFields,
             };
         }
-
+        // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1418
         if (
             matchSubPathOneOf(foundNode, [
                 ['id_', 'tableName'],
@@ -416,6 +431,7 @@ export const createHiveLs = (model: {
             };
         }
 
+        // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1436
         if (
             matchSubPathOneOf(foundNode, [
                 ['id_', 'subQuerySource'],
@@ -486,10 +502,12 @@ export const createHiveLs = (model: {
                     ...commonFields,
                 };
             }
-            const item = allIdentifiers.get(tableIdExp);
-            const tableInfo = item && tableInfoFromNode(item);
 
+            const item = context.lookupDefinition(tableIdExp);
+            const tableInfo = item && tableInfoFromNode(item);
+            
             if (!tableInfo) {
+                console.log('No table info found for:', printNode(item));
                 return {
                     type: 'noTable',
                     text: tableIdExp,
@@ -513,26 +531,10 @@ export const createHiveLs = (model: {
             };
         }
 
+        // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1514
         if (matchSubPath(foundNode, ['id_', 'selectItem'])) {
-            if (foundNode === parent.children?.[2]
-                && isKeyWord(parent.children[1]!, 'as')
-            ) {
-                return {
-                    type: 'createColumn',
-                    text: foundNode.getText(),
-                    ...commonFields,
-                };
-            }
-            return {
-                type: 'unknown',
-                text: foundNode.getText(),
-                ...commonFields,
-            };
-        }
-
-        if (matchSubPath(foundNode, ['id_', 'subQuerySource'])) {
-            // pushExt(`entities ${JSON.stringify(entities, null, 2)}`)
-            // pushExt(`currentEntities${JSON.stringify(currentEntities, null, 2)}`);
+            const parent = foundNode.parent! as SelectItemContext;
+            // 往前查找 (columnName | expression)
             return {
                 type: 'unknown',
                 text: foundNode.getText(),
@@ -614,7 +616,7 @@ export const createHiveLs = (model: {
         doHover: (
             position: Position,
             isTest?: boolean
-        ): languages.Hover | undefined => {
+        ) => {
             const { foundNode, context } = getCtxFromPos(position) || {};
             if (!foundNode || !context || (
                 !matchType(foundNode, 'id_')
@@ -667,7 +669,7 @@ export const createHiveLs = (model: {
         doDefinition: (
             position: Position,
             isTest?: boolean
-        ): languages.Definition | undefined => {
+        ) => {
             // TODO: implement definition functionality
             const { foundNode, context } = getCtxFromPos(position) || {};
             if (!foundNode || !context || (
