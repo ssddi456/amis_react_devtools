@@ -20,6 +20,8 @@ export class IdentifierScope {
 
     referenceMap: Map<string, ParserRuleContext[]> = new Map();
 
+    referenceNotFound: Map<string, ParserRuleContext[]> = new Map();
+
     defaultIdentifier: ParserRuleContext | null = null;
 
     children: IdentifierScope[] = [];
@@ -89,8 +91,33 @@ export class IdentifierScope {
 
     exitScope() {
         if (this.parent) {
+            const parent = this.parent;
+            // 清理references
+            this.referenceMap.forEach((refs, name) => {
+                if (!this.identifierMap.has(name)) {
+                    console.log('reference shift', name);
+                    this.referenceMap.delete(name);
+                    refs.forEach(ref => {
+                        parent.addReference(name, ref);
+                    });
+                } else {
+                    const identifier = this.identifierMap.get(name);
+                    this.referenceMap.set(name, refs.filter(ref => ref !== identifier));
+                }
+            });
+
             return this.parent;
         }
+
+        this.referenceMap.forEach((refs, name) => {
+            if (!this.identifierMap.has(name)) {
+                this.referenceNotFound.set(name, refs);
+                this.referenceMap.delete(name);
+            } else {
+                const identifier = this.identifierMap.get(name);
+                this.referenceMap.set(name, refs.filter(ref => ref !== identifier));
+            }
+        });
     }
 
     lookupDefinition(name: string): ParserRuleContext | null {
@@ -173,6 +200,7 @@ class ContextManager {
 
         function exitRule() {
             if (manager.currentContext) {
+                
                 manager.currentContext = manager.currentContext.exitScope()!;
             }
         }
@@ -296,8 +324,7 @@ class ContextManager {
             enterTableSource = (ctx: TableSourceContext) => {
                 const tableName = ctx.tableOrView().tableName()?.getText();
                 if (tableName) {
-                    const scope = manager.currentContext?.getScopeByIdentifier(tableName);
-                    scope?.addReference(tableName, ctx);
+                    manager.currentContext?.addReference(tableName, ctx);
                 }
             };
 
@@ -310,10 +337,7 @@ class ContextManager {
                     // Two identifiers, likely a table.column name
                     const tableName = ids[0].getText();
                     // TODO: 需要先记下来，在exit scope时清理引用
-                    const scope = manager.currentContext?.getScopeByIdentifier(tableName);
-                    if (scope) {
-                        scope.addReference(tableName, ctx);
-                    }
+                    manager.currentContext?.addReference(tableName, ctx);
                 }
             };
 
@@ -325,10 +349,7 @@ class ContextManager {
                 } else if (ids?.length == 2) {
                     // Two identifiers, likely a table.column name
                     const tableName = ids[0].getText();
-                    const scope = manager.currentContext?.getScopeByIdentifier(tableName);
-                    if (scope) {
-                        scope.addReference(tableName, ctx);
-                    }
+                    manager.currentContext?.addReference(tableName, ctx);
                 }
             };
         };

@@ -4,7 +4,7 @@ import { EntityContext, EntityContextType, HiveSQL, } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
 import { posInRange, WithSource } from "./ls_helper";
 import { TextSlice } from "dt-sql-parser/dist/parser/common/textAndWord";
-import { CteStatementContext, HiveSqlParser, SelectItemContext, SubQuerySourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { CteStatementContext, HiveSqlParser, SelectItemContext, SubQuerySourceContext, TableNameContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import {
     TableSourceContext,
     VirtualTableSourceContext,
@@ -534,6 +534,19 @@ const getIdentifierReferences = (
         }
         return;
     }
+
+    const foundTableName = matchSubPathOneOf(foundNode, [
+        ['id_', 'tableName'],
+    ]) as TableNameContext | null;
+    if (foundTableName) {
+        const tableName = foundTableName.getText();
+        const isDeclared = context.identifierMap.has(tableName);
+        if (isDeclared) {
+            return context.getReferencesByName(tableName);
+        }
+        return;
+    }
+
 
     const foundSubQuerySource = matchSubPath(foundNode, ['id_', 'subQuerySource']) as SubQuerySourceContext | null;
     if (foundSubQuerySource) {
