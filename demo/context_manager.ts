@@ -1,7 +1,7 @@
 
 import { ParserRuleContext, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
-import { ColumnNameContext, ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectStatementContext, SelectStatementWithCTEContext, SubQueryExpressionContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ColumnNameContext, CteStatementContext, ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
 import { posInRange } from "./ls_helper";
 import { printNode } from "./sql_ls_helper";
@@ -16,7 +16,9 @@ function uuidv4() {
 export class IdentifierScope {
     uuid = uuidv4();
 
-    identifierMap: Map<string, ParserRuleContext> = new Map();
+    tableIdentifierMap: Map<string, ParserRuleContext> = new Map();
+
+    tableColumnIdentifierMap: Map<string, Map<string, ParserRuleContext>> = new Map();
 
     referenceMap: Map<string, ParserRuleContext[]> = new Map();
 
@@ -49,14 +51,17 @@ export class IdentifierScope {
         this.defaultIdentifier = identifier;
     }
 
-    addIdentifier(name: string, identifier: ParserRuleContext) {
+    addIdentifier(name: string, identifier: ParserRuleContext, isTempTable = false) {
         if (identifier) {
-            this.identifierMap.set(name, identifier);
+            this.tableIdentifierMap.set(name, identifier);
+            if (isTempTable) {
+                this.tableColumnIdentifierMap.set(name, new Map());
+            }
         }
     }
 
     getAllIdentifiers() {
-        const identifiers = new Map<string, ParserRuleContext>(this.identifierMap);
+        const identifiers = new Map<string, ParserRuleContext>(this.tableIdentifierMap);
         if (this.parent) {
             const parentIdentifiers = this.parent.getAllIdentifiers();
             parentIdentifiers.forEach((value, key) => {
@@ -94,14 +99,14 @@ export class IdentifierScope {
             const parent = this.parent;
             // 清理references
             this.referenceMap.forEach((refs, name) => {
-                if (!this.identifierMap.has(name)) {
+                if (!this.tableIdentifierMap.has(name)) {
                     console.log('reference shift', name);
                     this.referenceMap.delete(name);
                     refs.forEach(ref => {
                         parent.addReference(name, ref);
                     });
                 } else {
-                    const identifier = this.identifierMap.get(name);
+                    const identifier = this.tableIdentifierMap.get(name);
                     this.referenceMap.set(name, refs.filter(ref => ref !== identifier));
                 }
             });
@@ -110,18 +115,18 @@ export class IdentifierScope {
         }
 
         this.referenceMap.forEach((refs, name) => {
-            if (!this.identifierMap.has(name)) {
+            if (!this.tableIdentifierMap.has(name)) {
                 this.referenceNotFound.set(name, refs);
                 this.referenceMap.delete(name);
             } else {
-                const identifier = this.identifierMap.get(name);
+                const identifier = this.tableIdentifierMap.get(name);
                 this.referenceMap.set(name, refs.filter(ref => ref !== identifier));
             }
         });
     }
 
     lookupDefinition(name: string): ParserRuleContext | null {
-        const identifier = this.identifierMap.get(name);
+        const identifier = this.tableIdentifierMap.get(name);
         if (!identifier) {
             return this.parent ? this.parent.lookupDefinition(name) : null;
         }
@@ -146,7 +151,7 @@ export class IdentifierScope {
     toString(depth: number = 0, result: string[] = []) {
         const indent = ' '.repeat(depth * 2);
         result.push(`${indent}(${printNode(this.context)})`);
-        const identifiers = this.identifierMap.entries();
+        const identifiers = this.tableIdentifierMap.entries();
         Array.from(identifiers).forEach(([name, identifier]) => {
             result.push(`${indent}  ${name} -> ${printNode(identifier)}`);
         });
@@ -164,7 +169,7 @@ export class IdentifierScope {
     }
 
     getScopeByIdentifier(name: string): IdentifierScope | null {
-        if (this.identifierMap.has(name)) {
+        if (this.tableIdentifierMap.has(name)) {
             return this;
         }
         if (this.parent) {
@@ -180,9 +185,10 @@ export class IdentifierScope {
         }
         return [];
     }
+    
 }
 
-class ContextManager {
+export class ContextManager {
     identifierMap: Map<string, IdentifierScope> = new Map();
     rootContext: IdentifierScope | null = null;
     currentContext: IdentifierScope | null = null;
@@ -226,8 +232,7 @@ class ContextManager {
             enterWithClause = (ctx: WithClauseContext) => {
                 const ctes = ctx.cteStatement();
                 ctes.forEach((cte) => {
-                    const cteName = cte.id_().getText();
-                    manager.currentContext?.addIdentifier(cteName, cte);
+                    tableInfoFromCteStatement(manager.currentContext, cte);
                 });
             };
 
@@ -352,6 +357,7 @@ class ContextManager {
                     manager.currentContext?.addReference(tableName, ctx);
                 }
             };
+
         };
 
         ParseTreeWalker.DEFAULT.walk(listener, tree);
@@ -431,7 +437,18 @@ function tableInfoFromSubQuerySource(
         return null;
     }
     const name = subQuerySource.id_()?.getText();
-    currentContext.addIdentifier(name || '', subQuerySource);
+    currentContext.addIdentifier(name || '', subQuerySource, true);
+
+    const selectItems = (subQuerySource.queryStatementExpression()
+        .queryStatementExpressionBody()
+        .regularBody() as SelectStmtContext)
+        .selectStatement?.()
+        .atomSelectStatement()
+        .selectClause()?.selectItem();
+    if (selectItems) {
+        const columns = columnsMapFromSelectItems(selectItems);
+        currentContext.tableColumnIdentifierMap.set(name || '', columns);
+    }
     return subQuerySource;
 }
 
@@ -443,6 +460,56 @@ function tableInfoFromVirtualTableSource(
         return null;
     }
     const name = virtualTableSource.tableAlias()?.getText();
-    currentContext.addIdentifier(name || '', virtualTableSource);
+    currentContext.addIdentifier(name || '', virtualTableSource, true);
+    const colunms = virtualTableSource.id_();
+    for (const column of colunms) {
+        currentContext.tableColumnIdentifierMap.get(name)?.set(column.getText(), column);
+    }
     return virtualTableSource;
+}
+
+function tableInfoFromCteStatement(
+    currentContext: IdentifierScope | null,
+    cteStatement: CteStatementContext | null,
+): CteStatementContext | null {
+    if (!currentContext || !cteStatement) {
+        return null;
+    }
+    const name = cteStatement.id_()?.getText();
+    currentContext.addIdentifier(name || '', cteStatement, true);
+
+    const selectItems = (cteStatement.queryStatementExpression()
+        .queryStatementExpressionBody()
+        .regularBody() as SelectStmtContext)
+        .selectStatement?.()
+        .atomSelectStatement()
+        .selectClause()?.selectItem();
+    if (selectItems) {
+        const columns = columnsMapFromSelectItems(selectItems);
+        currentContext.tableColumnIdentifierMap.set(name || '', columns);
+    }
+    return cteStatement;
+}
+
+function columnsMapFromSelectItems(selectItems: SelectItemContext[]): Map<string, ParserRuleContext> {
+    const columns = new Map<string, ParserRuleContext>();
+    for (const item of selectItems) {
+        if (item instanceof SelectItemContext) {
+            const columnName = item.id_();
+            if (columnName.length) {
+                for (const column of columnName) {
+                    columns.set(column.getText(), column);
+                }
+            } else {
+                const columnName = item.columnName();
+                if (columnName) {
+                    const ids = columnName.poolPath()?.id_();
+                    if (ids && ids.length > 0) {
+                        columns.set(ids[ids.length - 1].getText(), columnName);
+                    }
+                }
+            }
+        }
+    }
+    return columns;
 }

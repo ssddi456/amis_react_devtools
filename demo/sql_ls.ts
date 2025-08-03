@@ -1,4 +1,4 @@
-import { type IRange, languages, type Position, Uri } from "monaco-editor";
+import { editor, type IRange, languages, type Position, Uri, MarkerSeverity } from "monaco-editor";
 import { TextDocument } from 'vscode-json-languageservice';
 import { EntityContext, EntityContextType, HiveSQL, } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
@@ -11,13 +11,14 @@ import {
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import tableData from './data/example'
-import { createContextManager, IdentifierScope } from "./context_manager";
+import { ContextManager, createContextManager, IdentifierScope } from "./context_manager";
 import { printNode, rangeFromNode, wordToRange, sliceToRange, findTokenAtPosition, printNodeTree } from "./sql_ls_helper";
 import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, unknownRes } from "./sql_hover_res";
 import { matchSubPath, matchSubPathOneOf, matchType } from "./sql_tree_query";
 
 function tableInfoFromTableSource(
     tableSource: TableSourceContext | null,
+    context: IdentifierScope,
     collection?: TableInfo[]
 ): TableInfo | null {
     if (!tableSource) {
@@ -53,6 +54,7 @@ const localDbId = 'local db';
 
 function tableInfoFromSubQuerySource(
     subQuerySource: any,
+    context: IdentifierScope,
     collection?: TableInfo[]
 ): TableInfo | null {
     if (!subQuerySource) {
@@ -65,13 +67,20 @@ function tableInfoFromSubQuerySource(
         console.warn('No table name found in sub query source:', printNode(subQuerySource));
         return null;
     }
+    const columns = context.tableColumnIdentifierMap.get(alias);
     const ret: TableInfo = {
         db_name: localDbId,
         table_name: '[subquery]',
         alias: alias,
         table_id: -1,
         description: '',
-        column_list: [],
+        column_list: Array.from(columns?.keys() || []).map((name) => {
+            return {
+                column_name: name,
+                data_type_string: '<unknown>',
+                description: ''
+            };
+        }) || [],
         range: rangeFromNode(subQuerySource)
     };
     if (collection) {
@@ -83,6 +92,7 @@ function tableInfoFromSubQuerySource(
 
 function tableInfoFromVirtualTableSource(
     virtualTableSource: VirtualTableSourceContext | null,
+    context: IdentifierScope,
     collection?: TableInfo[]
 ): TableInfo | null {
     if (!virtualTableSource) {
@@ -90,13 +100,22 @@ function tableInfoFromVirtualTableSource(
     }
     const alias = virtualTableSource.tableAlias()?.getText();
     console.log('collectTableInfo visitVirtualTableSource', printNode(virtualTableSource), 'alias:', alias);
+    const columns = context.tableColumnIdentifierMap.get(alias);
+
     const ret = {
         db_name: localDbId,
         table_name: alias,
         alias: alias,
         table_id: -1,
         description: '',
-        column_list: []
+        column_list: Array.from(columns?.keys() || []).map((name) => {
+            return {
+                column_name: name,
+                data_type_string: '<unknown>',
+                description: ''
+            };
+        }) || [],
+        range: rangeFromNode(virtualTableSource)
     };
     if (collection) {
         collection.push(ret);
@@ -106,6 +125,7 @@ function tableInfoFromVirtualTableSource(
 
 function tableInfoFromCteStatement(
     cteStatement: CteStatementContext | null,
+    context: IdentifierScope,
     collection?: TableInfo[]
 ): TableInfo | null {
     if (!cteStatement) {
@@ -113,13 +133,21 @@ function tableInfoFromCteStatement(
     }
     const alias = cteStatement.id_()?.getText();
     console.log('collectTableInfo visitCteStatement', printNode(cteStatement), 'alias:', alias);
+    const columns = context.tableColumnIdentifierMap.get(alias);
+
     const ret = {
         db_name: localDbId,
         table_name: alias,
         alias: alias,
         table_id: -1,
         description: '',
-        column_list: [],
+        column_list: Array.from(columns?.keys() || []).map((name) => {
+            return {
+                column_name: name,
+                data_type_string: '<unknown>',
+                description: ''
+            };
+        }) || [],
         range: rangeFromNode(cteStatement)
     };
     if (collection) {
@@ -130,19 +158,20 @@ function tableInfoFromCteStatement(
 
 function tableInfoFromNode(
     node: ParserRuleContext | null,
+    context: IdentifierScope
 ): TableInfo | null {
     if (!node) {
         return null;
     }
     const collection: TableInfo[] = [];
     if (node instanceof TableSourceContext) {
-        return tableInfoFromTableSource(node, collection);
+        return tableInfoFromTableSource(node, context, collection);
     } else if (node instanceof SubQuerySourceContext) {
-        return tableInfoFromSubQuerySource(node, collection);
+        return tableInfoFromSubQuerySource(node, context, collection);
     } else if (node instanceof VirtualTableSourceContext) {
-        return tableInfoFromVirtualTableSource(node, collection);
+        return tableInfoFromVirtualTableSource(node, context, collection);
     } else if (node instanceof CteStatementContext) {
-        return tableInfoFromCteStatement(node, collection);
+        return tableInfoFromCteStatement(node, context, collection);
     } else {
         console.log('tableInfoFromNode unknown node type', printNode(node));
     }
@@ -335,11 +364,11 @@ const getTableAndColumnInfoAtPosition = (
     } : () => { };
     pushExt((position as any).text);
     pushExt(printNodeTree(foundNode));
-
+    const logger = isTest ? console.log : () => { };
     const allIdentifiers = context.getAllIdentifiers() || {};
 
     const parent = foundNode.parent!;
-    console.log('do hover entities', printNode(parent), position, allIdentifiers.keys());
+    logger('do hover entities', printNode(parent), position, allIdentifiers.keys());
 
     const commonFields = {
         range: rangeFromNode(foundNode),
@@ -352,7 +381,7 @@ const getTableAndColumnInfoAtPosition = (
         const tableName = (parent as TableSourceContext).tableOrView().tableName()?.getText();
         if (tableName) {
             const item = context.lookupDefinition(tableName);
-            const tableInfo = item && tableInfoFromNode(item);
+            const tableInfo = item && tableInfoFromNode(item, context);
             if (tableInfo) {
                 return {
                     type: 'table',
@@ -376,7 +405,7 @@ const getTableAndColumnInfoAtPosition = (
     ) {
         const tableName = parent.getText();
         const item = context.lookupDefinition(tableName);
-        const tableInfo = item && tableInfoFromNode(item);
+        const tableInfo = item && tableInfoFromNode(item, context);
 
         pushExt(`do hover tableName ${printNode(parent)}, 'tableIdExp', ${tableName}, 'tableInfo', ${JSON.stringify(tableInfo)}`);
 
@@ -402,7 +431,7 @@ const getTableAndColumnInfoAtPosition = (
         ])
     ) {
         const item = allIdentifiers.get(foundNode.getText());
-        const tableInfo = item && tableInfoFromNode(item);
+        const tableInfo = item && tableInfoFromNode(item, context);
         if (!tableInfo) {
             return {
                 type: 'unknown',
@@ -442,7 +471,7 @@ const getTableAndColumnInfoAtPosition = (
         // column_name only
         if (!tableIdExp) {
             const item = context.getDefaultIdentifier();
-            const tableInfo = item && tableInfoFromNode(item);
+            const tableInfo = item && tableInfoFromNode(item, context);
             if (!tableInfo) {
                 return {
                     type: 'noTable',
@@ -468,7 +497,7 @@ const getTableAndColumnInfoAtPosition = (
         }
 
         const item = context.lookupDefinition(tableIdExp);
-        const tableInfo = item && tableInfoFromNode(item);
+        const tableInfo = item && tableInfoFromNode(item, context);
 
         if (!tableInfo) {
             console.log('No table info found for:', printNode(item));
@@ -527,7 +556,7 @@ const getIdentifierReferences = (
             if (!alias) {
                 return;
             }
-            const isDeclared = context.identifierMap.has(alias);
+            const isDeclared = context.tableIdentifierMap.has(alias);
             if (isDeclared) {
                 return context.getReferencesByName(alias);
             }
@@ -540,7 +569,7 @@ const getIdentifierReferences = (
     ]) as TableNameContext | null;
     if (foundTableName) {
         const tableName = foundTableName.getText();
-        const isDeclared = context.identifierMap.has(tableName);
+        const isDeclared = context.tableIdentifierMap.has(tableName);
         if (isDeclared) {
             return context.getReferencesByName(tableName);
         }
@@ -554,7 +583,7 @@ const getIdentifierReferences = (
         if (!alias) {
             return;
         }
-        const isDeclared = context.identifierMap.has(alias);
+        const isDeclared = context.tableIdentifierMap.has(alias);
         console.log('foundSubQuerySource', printNode(foundSubQuerySource), 'alias:', alias, 'isDeclared:', isDeclared);
         if (isDeclared) {
             return context.getReferencesByName(alias);
@@ -568,7 +597,7 @@ const getIdentifierReferences = (
         if (!alias) {
             return;
         }
-        const isDeclared = context.identifierMap.has(alias);
+        const isDeclared = context.tableIdentifierMap.has(alias);
         if (isDeclared) {
             return context.getReferencesByName(alias);
         }
@@ -585,11 +614,16 @@ const getIdentifierReferences = (
 export const createHiveLs = (model: {
     uri: { toString: () => string; };
     getValue: () => string;
-}) => {
+}, isTest?: boolean) => {
 
     const document = TextDocument.create(model.uri.toString(), 'hivesql', 0, model.getValue());
     const hiveSqlParse = new HiveSQL();
     const sqlSlices = hiveSqlParse.splitSQLByStatement(document.getText());
+    const ctx = hiveSqlParse.createParser(document.getText());
+    const tree = ctx.program();
+    const contextManaer = createContextManager(tree);
+    const logger = isTest ? console.log : () => { };
+    logger('getCtxFromPos foundNode', contextManaer.toString());
 
     const getCtxFromPos = (position: Position) => {
         if (!sqlSlices || sqlSlices.length === 0) {
@@ -599,12 +633,8 @@ export const createHiveLs = (model: {
             const slice = sqlSlices[i];
             if (posInRange(position, sliceToRange(slice))) {
                 const text = paddingSliceText(slice, document.getText());
-                console.log('getCtxFromPos text', '-->' + text + '<--');
-                const ctx = hiveSqlParse.createParser(document.getText());
-                const tree = ctx.program();
+                logger('getCtxFromPos text', '-->' + text + '<--');
                 const foundNode = findTokenAtPosition(position, tree);
-                const contextManaer = createContextManager(tree);
-                console.log('getCtxFromPos foundNode', contextManaer.toString());
                 const context = contextManaer.getContextByPosition(position);
                 return {
                     foundNode,
@@ -660,17 +690,29 @@ export const createHiveLs = (model: {
             };
         },
 
-        doValidation() {
+        doValidation(): editor.IMarkerData[] {
+            const validations: editor.IMarkerData[] = [];
+            
             const errors = hiveSqlParse.validate(document.getText());
-            if (errors.length === 0) {
-                return [];
-            }
-            return errors.map(err => {
-                return {
-                    message: err.message,
-                    range: sliceToRange(err)
-                };
+            errors.forEach(err => {
+                validations.push({
+                    severity: MarkerSeverity.Error,
+                    ...sliceToRange(err),
+                    message: err.message
+                })
             });
+
+            contextManaer.rootContext?.referenceNotFound.forEach(refs => {
+                refs.forEach(ref => {
+                    validations.push({
+                        severity: MarkerSeverity.Error,
+                        ...rangeFromNode(ref),
+                        message: `Reference not found: ${ref.getText()}`
+                    })
+                })
+            });
+
+            return validations;
         },
 
         doDefinition: (
