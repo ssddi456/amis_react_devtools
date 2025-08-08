@@ -12,6 +12,7 @@ editor.defineTheme('sql-hc', vsPlusTheme.hcBlackThemeData);
 setupLanguageFeatures(LanguageIdEnum.HIVE, {
     completionItems: true,
     references: true,
+    diagnostics: false,
 });
 
 export default {
@@ -27,13 +28,14 @@ export default {
             if (model) {
                 const context = createHiveLs(model);
                 const errors = context.doValidation();
+                console.log('validation errors', errors);
                 monaco.editor.setModelMarkers(model, LanguageIdEnum.HIVE, errors.map(err => {
                     return {
                         severity: monaco.MarkerSeverity.Error,
-                        startLineNumber: err.range.startLineNumber,
-                        startColumn: err.range.startColumn,
-                        endLineNumber: err.range.endLineNumber,
-                        endColumn: err.range.endColumn,
+                        startLineNumber: err.startLineNumber,
+                        startColumn: err.startColumn,
+                        endLineNumber: err.endLineNumber,
+                        endColumn: err.endColumn,
                         message: err.message
                     };
                 }));
@@ -44,11 +46,32 @@ export default {
 
         disposables.add(editorInstance.onDidChangeModelContent((e) => {
             doValidate();
-
         }));
 
-        doValidate();
+        disposables.add(editorInstance.onDidChangeModelLanguage((e) => {
+            doValidate();
+        }));
+        disposables.add(editorInstance.onDidChangeModelLanguageConfiguration((e) => {
+            doValidate();
+        }));
+        disposables.add(editorInstance.onDidChangeModelOptions((e) => {
+            doValidate();
+        }));
+        disposables.add(editorInstance.onDidChangeConfiguration((e) => {
+            doValidate();
+        }));
+        disposables.add(editorInstance.onDidChangeModel((e) => {
+            doValidate();
+        }));
 
+        disposables.add(editor.onDidChangeMarkers((e) => {
+            const markers = monaco.editor.getModelMarkers({ owner: LanguageIdEnum.HIVE });
+            if (markers.length === 0) {
+                debugger;
+            }
+            console.log('markers changed', e, editorInstance.getModel());
+            console.log('markers changed', markers);
+        }))
         disposables.add(monaco.languages.registerCompletionItemProvider(LanguageIdEnum.HIVE, {
             triggerCharacters: ['.', '"', ' '],
             provideCompletionItems: (model, position) => {

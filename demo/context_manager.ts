@@ -100,7 +100,6 @@ export class IdentifierScope {
             // 清理references
             this.referenceMap.forEach((refs, name) => {
                 if (!this.tableIdentifierMap.has(name)) {
-                    console.log('reference shift', name);
                     this.referenceMap.delete(name);
                     refs.forEach(ref => {
                         parent.addReference(name, ref);
@@ -361,6 +360,8 @@ export class ContextManager {
         };
 
         ParseTreeWalker.DEFAULT.walk(listener, tree);
+        console.assert(this.currentContext === this.rootContext, 'Context manager did not exit all scopes correctly');
+        this.rootContext.exitScope();
     }
 
     getContextByPosition(position: Position): IdentifierScope | null {

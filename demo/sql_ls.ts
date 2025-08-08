@@ -621,9 +621,9 @@ export const createHiveLs = (model: {
     const sqlSlices = hiveSqlParse.splitSQLByStatement(document.getText());
     const ctx = hiveSqlParse.createParser(document.getText());
     const tree = ctx.program();
-    const contextManaer = createContextManager(tree);
+    const contextManager = createContextManager(tree);
     const logger = isTest ? console.log : () => { };
-    logger('getCtxFromPos foundNode', contextManaer.toString());
+    logger('getCtxFromPos foundNode', contextManager.toString());
 
     const getCtxFromPos = (position: Position) => {
         if (!sqlSlices || sqlSlices.length === 0) {
@@ -635,7 +635,7 @@ export const createHiveLs = (model: {
                 const text = paddingSliceText(slice, document.getText());
                 logger('getCtxFromPos text', '-->' + text + '<--');
                 const foundNode = findTokenAtPosition(position, tree);
-                const context = contextManaer.getContextByPosition(position);
+                const context = contextManager.getContextByPosition(position);
                 return {
                     foundNode,
                     context,
@@ -690,7 +690,7 @@ export const createHiveLs = (model: {
             };
         },
 
-        doValidation(): editor.IMarkerData[] {
+        doValidation(): WithSource<editor.IMarkerData>[] {
             const validations: editor.IMarkerData[] = [];
             
             const errors = hiveSqlParse.validate(document.getText());
@@ -702,7 +702,7 @@ export const createHiveLs = (model: {
                 })
             });
 
-            contextManaer.rootContext?.referenceNotFound.forEach(refs => {
+            contextManager.rootContext?.referenceNotFound.forEach(refs => {
                 refs.forEach(ref => {
                     validations.push({
                         severity: MarkerSeverity.Error,

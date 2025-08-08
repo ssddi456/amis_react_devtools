@@ -1,8 +1,8 @@
 import { useState, useEffect, ReactElement } from "react";
 import { LsTestCase, WithSource } from "./ls_helper";
-import { languages } from 'monaco-editor';
+import { languages, editor } from 'monaco-editor';
 import { createHiveLs } from "./sql_ls";
-import { HoverResults, DefinitionResults, ReferencesResults } from "./results_components";
+import { HoverResults, DefinitionResults, ReferencesResults, ValidationResults } from "./results_components";
 
 
 // 创建高亮文本的辅助函数
@@ -57,9 +57,9 @@ export function createHighlightedText(text: string, positions: Array<{ lineNumbe
 
 export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; showDebug?: boolean }) {
     // 从 localStorage 获取初始 tab 状态，默认为 'hover'
-    const [activeTab, setActiveTab] = useState<'hover' | 'definition' | 'references'>(() => {
+    const [activeTab, setActiveTab] = useState<'hover' | 'definition' | 'references' | 'validation'>(() => {
         const saved = localStorage.getItem('doSqlTest_activeTab');
-        return (saved === 'hover' || saved === 'definition' || saved === 'references') ? saved : 'hover';
+        return (saved === 'hover' || saved === 'definition' || saved === 'references' || saved === 'validation') ? saved : 'hover';
     });
 
     // 保存 tab 状态到 localStorage
@@ -73,6 +73,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
         hoverResults: (WithSource<languages.Hover> | undefined)[];
         definitionResults: (WithSource<languages.Definition> | undefined)[];
         referencesResults: (WithSource<languages.Location[]> | undefined)[];
+        validationResults: WithSource<editor.IMarkerData>[] | undefined;
     } | null>(null);
 
     useEffect(() => {
@@ -91,7 +92,8 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
             const resInfo = hiveLs.doReferences(pos, showDebug);
             return resInfo;
         });
-        setResult({ model, positions, hoverResults, definitionResults, referencesResults });
+        const validationResults = hiveLs.doValidation();
+        setResult({ model, positions, hoverResults, definitionResults, referencesResults, validationResults });
     }, [testCase, showDebug]);
 
     const highlightedText = createHighlightedText(testCase.model.getValue(), testCase.positions);
@@ -176,6 +178,12 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                     >
                         References Results
                     </button>
+                    <button
+                        style={tabButtonStyle(activeTab === 'validation')}
+                        onClick={() => setActiveTab('validation')}
+                    >
+                        Validation Results
+                    </button>
                 </div>
 
                 {/* Tab 内容 */}
@@ -197,6 +205,12 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                     <ReferencesResults 
                         referencesResults={results.referencesResults} 
                         positions={results.positions} 
+                    />
+                )}
+
+                {activeTab === 'validation' && (
+                    <ValidationResults 
+                        validationResults={results.validationResults} 
                     />
                 )}
             </div>
