@@ -1,8 +1,8 @@
-import { editor, Position } from 'monaco-editor';
+import { editor } from 'monaco-editor';
 import { LanguageIdEnum, setupLanguageFeatures, vsPlusTheme } from 'monaco-sql-languages';
 import 'monaco-sql-languages/esm/languages/hive/hive.contribution';
 import { createHiveLs } from './sql_ls';
-import { DisposableChain, posFromString, stringFromPos } from './ls_helper';
+import { DisposableChain, stringFromPos } from './ls_helper';
 
 // Customize the various tokens style
 editor.defineTheme('sql-dark', vsPlusTheme.darkThemeData);
@@ -64,6 +64,7 @@ export default {
             doValidate();
         }));
 
+
         disposables.add(editor.onDidChangeMarkers((e) => {
             const markers = monaco.editor.getModelMarkers({ owner: LanguageIdEnum.HIVE });
             if (markers.length === 0) {
@@ -115,6 +116,20 @@ export default {
                 const ret = context.doReferences(position);
                 console.log('references result', stringFromPos(position), model.uri, ret);
                 return ret;
+            }
+        }));
+
+        disposables.add(monaco.languages.registerDocumentFormattingEditProvider(LanguageIdEnum.HIVE, {
+            provideDocumentFormattingEdits: (model, options) => {
+                const context = createHiveLs(model);
+                const formatted = context.formatHiveSQL(model.getValue());
+                console.log('document formatting result',                                                                                           model.uri, formatted);
+                return [
+                    {
+                        range: model.getFullModelRange(),
+                        text: formatted,
+                    }
+                ];
             }
         }));
 

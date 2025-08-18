@@ -1,6 +1,6 @@
 import { editor, type IRange, languages, type Position, Uri, MarkerSeverity } from "monaco-editor";
 import { TextDocument } from 'vscode-json-languageservice';
-import { EntityContext, EntityContextType, HiveSQL, } from 'dt-sql-parser';
+import { EntityContext, HiveSQL, } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
 import { posInRange, WithSource } from "./ls_helper";
 import { TextSlice } from "dt-sql-parser/dist/parser/common/textAndWord";
@@ -11,10 +11,11 @@ import {
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import tableData from './data/example'
-import { ContextManager, createContextManager, IdentifierScope } from "./context_manager";
+import { createContextManager, IdentifierScope } from "./context_manager";
 import { printNode, rangeFromNode, wordToRange, sliceToRange, findTokenAtPosition, printNodeTree } from "./sql_ls_helper";
 import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, unknownRes } from "./sql_hover_res";
 import { matchSubPath, matchSubPathOneOf, matchType } from "./sql_tree_query";
+import { formatHiveSQL } from './formatter';
 
 function tableInfoFromTableSource(
     tableSource: TableSourceContext | null,
@@ -760,6 +761,10 @@ export const createHiveLs = (model: {
                 uri: model.uri as Uri,
                 range: rangeFromNode(ref),
             }));
+        },
+        formatHiveSQL(sql: string): string{
+            const formatted = formatHiveSQL(sql);
+            return formatted;
         }
     };
 }
