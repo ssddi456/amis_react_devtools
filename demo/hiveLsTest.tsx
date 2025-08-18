@@ -190,7 +190,13 @@ select * from (
     from data.data_test_news_record_da
 ) t2
   ^
+;`,
+`
+select count(*), count(distinct resblock_id)
+        ^         ^     ^         ^
+from data.data_test_news_record_da
 ;`
+
 ].map(x => caseFromString(x));
 
 console.log('sql test cases', sqlTest);

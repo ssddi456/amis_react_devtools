@@ -4,7 +4,7 @@ import { EntityContext, HiveSQL, } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
 import { posInRange, WithSource } from "./ls_helper";
 import { TextSlice } from "dt-sql-parser/dist/parser/common/textAndWord";
-import { CteStatementContext, HiveSqlParser, SelectItemContext, SubQuerySourceContext, TableNameContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { CteStatementContext, FunctionIdentifierContext, HiveSqlParser, SelectItemContext, SubQuerySourceContext, TableNameContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import {
     TableSourceContext,
     VirtualTableSourceContext,
@@ -13,7 +13,7 @@ import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import tableData from './data/example'
 import { createContextManager, IdentifierScope } from "./context_manager";
 import { printNode, rangeFromNode, wordToRange, sliceToRange, findTokenAtPosition, printNodeTree } from "./sql_ls_helper";
-import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, unknownRes } from "./sql_hover_res";
+import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, unknownRes, functionRes } from "./sql_hover_res";
 import { matchSubPath, matchSubPathOneOf, matchType } from "./sql_tree_query";
 import { formatHiveSQL } from './formatter';
 
@@ -306,7 +306,7 @@ function isKeyWord(node: ParseTree, key: string): boolean {
 
 
 interface EntityInfo {
-    type: 'table' | 'column' | 'unknown' | 'noTable' | 'noColumn' | 'createColumn';
+    type: 'table' | 'column' | 'unknown' | 'noTable' | 'noColumn' | 'createColumn' | 'function';
     tableInfo?: TableInfo | null;
     columnInfo?: ColumnInfo | null;
     text?: string;
@@ -331,6 +331,8 @@ const formatHoverRes = (hoverInfo: EntityInfo): WithSource<languages.Hover> => {
             return { ...noColumnInfoRes(hoverInfo.tableInfo!, hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
         case 'createColumn':
             return { ...createColumnRes({ getText: () => hoverInfo.text! } as ParseTree, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
+        case 'function':
+            return { ...functionRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };   
         case 'unknown':
         default:
             return { ...unknownRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
@@ -531,6 +533,15 @@ const getTableAndColumnInfoAtPosition = (
         // 往前查找 (columnName | expression)
         return {
             type: 'unknown',
+            text: foundNode.getText(),
+            ...commonFields,
+        };
+    }
+
+    if (matchSubPath(foundNode, ['id_', 'functionIdentifier'])) {
+        const parent = foundNode.parent! as FunctionIdentifierContext;
+        return {
+            type: 'function',
             text: foundNode.getText(),
             ...commonFields,
         };

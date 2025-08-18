@@ -63,6 +63,21 @@ export const tableRes = (table: TableInfo, range: IRange, ext?: string[]) => {
     console.log('tableRes result:', result);
     return result;
 };
+export const functionRes = (text: string, range: IRange, ext?: string[]) => {
+    const result = {
+        contents: [
+            {
+                value: [
+                    `**Function:** ${text}`,
+                    ...(ext || [])
+                ].filter(Boolean).join('\n\n')
+            },
+        ],
+        range,
+    };
+    console.log('functionRes result:', result);
+    return result;
+};
 export const unknownRes = (text: string, range: IRange, ext?: string[]) => {
     const result = {
         contents: [
