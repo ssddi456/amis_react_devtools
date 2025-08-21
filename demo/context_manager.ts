@@ -422,10 +422,11 @@ function tableInfoFromTableSource(
             context.id_()?.getText() || '',
             context
         );
-    }
-    const tableName = context.tableOrView()?.getText();
-    if (tableName) {
-        currentContext.addIdentifier(tableName, context);
+    } else {
+        const tableName = context.tableOrView()?.getText();
+        if (tableName) {
+            currentContext.addIdentifier(tableName, context);
+        }
     }
     return context;
 }

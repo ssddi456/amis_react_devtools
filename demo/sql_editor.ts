@@ -15,9 +15,9 @@ setupLanguageFeatures(LanguageIdEnum.HIVE, {
     diagnostics: false,
 });
 
-export default {
+const createSqlEditor = (name: string) => ({
     "type": "editor",
-    "name": "hive_sql",
+    "name": name,
     "label": "编辑器",
     "language": LanguageIdEnum.HIVE,
     allowFullscreen: true,
@@ -135,4 +135,6 @@ export default {
 
         return disposables;
     },
-}
+})
+
+export default createSqlEditor;

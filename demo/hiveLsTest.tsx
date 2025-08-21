@@ -201,3 +201,27 @@ from data.data_test_news_record_da
 
 console.log('sql test cases', sqlTest);
 
+export const sqlTestDag = `
+with t1 as (
+  select
+    house_code, resblock_id, resblock_name
+  from data.data_test_news_record_di
+        ^     ^
+  where pt = 2
+),
+t2 as (
+  select
+    house_code, resblock_id, quota_date
+  from data.data_test_quota_similar_house_region_da
+)
+select
+  t1.house_code, t1.resblock_id, t2.quota_date
+  ^   ^                           ^  ^
+from t1
+     ^
+  left join t2
+            ^
+  on t1.house_code = t2.house_code
+  and t1.resblock_id = t2.resblock_id
+;
+`;

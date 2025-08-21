@@ -776,6 +776,9 @@ export const createHiveLs = (model: {
         formatHiveSQL(sql: string): string{
             const formatted = formatHiveSQL(sql);
             return formatted;
-        }
+        },
+        getContextManager: () => {
+            return contextManager
+        },
     };
 }
