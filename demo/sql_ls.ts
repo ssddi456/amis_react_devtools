@@ -296,15 +296,6 @@ function paddingSliceText(slice: TextSlice, full: string): string {
     return text
 }
 
-
-function isKeyWord(node: ParseTree, key: string): boolean {
-    if (node instanceof TerminalNode) {
-        return node.symbol.type === HiveSqlParser[`KW_${key.toUpperCase()}` as keyof typeof HiveSqlParser];
-    }
-    return false;
-}
-
-
 interface EntityInfo {
     type: 'table' | 'column' | 'unknown' | 'noTable' | 'noColumn' | 'createColumn' | 'function';
     tableInfo?: TableInfo | null;

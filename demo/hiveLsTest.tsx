@@ -224,9 +224,13 @@ select
   ^   ^                           ^  ^
 from t1
      ^
+  left join t2
+            ^
+    on t1.house_code = t2.house_code
+    and t1.resblock_id = t2.resblock_id
   left join t3
             ^
-  on t1.house_code = t2.house_code
-  and t1.resblock_id = t3.resblock_id
+    using (house_code, resblock_id)
+
 ;
 `;

@@ -2,6 +2,7 @@ import React from 'react';
 import { caseFromString, LsTestCase } from './ls_helper';
 import { createHiveLs } from './sql_ls';
 import { IdentifierScope } from './context_manager';
+import { printNode } from './sql_ls_helper';
 
 interface DisplayContextManagerProps {
     context: IdentifierScope
@@ -24,7 +25,7 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
                         marginTop: 12
                     }}
                 >
-                    {/* <h5>{context.uuid}</h5> */}
+                    <h5>{printNode(context.context)} {context.uuid}</h5>
                     {tableCount ? <div>table declare</div> : null}
                     {
                         tableIdentifierMap.map((table) => {
@@ -32,7 +33,12 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
                             const columnsCount = columns ? columns.size : 0;
                             console.log('table', table, columns);
                             return (
-                                <div key={table}>
+                                <div
+                                    key={table}
+                                    style={{
+                                        paddingLeft: 12,
+                                    }}
+                                >
                                     <h4>{table}</h4>
                                     {
                                         columnsCount
@@ -146,8 +152,20 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
         const context = this.getCurrentCaseContextManager();
         console.log(context);
         return (
-            <div>
-                <h3>SQL Test DAG</h3>
+            <div
+                style={{
+                    maxHeight: '100vh',
+                    overflowY: 'auto',
+                    position: 'relative',
+                }}
+            >
+                <h3
+                    style={{
+                        position: 'sticky',
+                        top: 0,
+                        background: 'white'
+                    }}
+                >SQL Test DAG</h3>
                 <div
                     style={{
                         display: 'flex'

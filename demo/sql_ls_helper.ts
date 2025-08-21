@@ -1,5 +1,5 @@
 import { Position } from "monaco-editor";
-import { ParserRuleContext, TerminalNode } from "antlr4ng";
+import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import { HiveSqlParserVisitor } from "dt-sql-parser";
 import { HiveSqlParser, ProgramContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { WordPosition } from "dt-sql-parser/dist/parser/common/textAndWord";
@@ -214,4 +214,11 @@ export function findTokenAtPosition(
         );
     }
     return foundNode;
+}
+
+export function isKeyWord(node: ParseTree, key: string): boolean {
+    if (node instanceof TerminalNode) {
+        return node.symbol.type === HiveSqlParser[`KW_${key.toUpperCase()}` as keyof typeof HiveSqlParser];
+    }
+    return false;
 }

@@ -1,10 +1,10 @@
 
-import { ParserRuleContext, ParseTreeWalker } from "antlr4ng";
+import { ParserRuleContext, ParseTree, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
-import { ColumnNameContext, CteStatementContext, ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ColumnNameContext, CteStatementContext, ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
 import { posInRange } from "./ls_helper";
-import { printNode } from "./sql_ls_helper";
+import { isKeyWord, printNode } from "./sql_ls_helper";
 
 function uuidv4() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -263,10 +263,12 @@ export class ContextManager {
                         manager.currentContext?.setDefaultIdentifier(defaultTableInfo);
                     }
 
+                    const children = ctx.children!;
                     const joinSourceParts = ctx.joinSourcePart();
                     for (let i = 0; i < joinSourceParts.length; i++) {
                         const part = joinSourceParts[i];
-                        console.log('on and using',ctx.KW_ON(i), ctx.KW_USING(i));
+                        const nextOnExpression = getNextOnExpression(children, part);
+                        const nextUsingExpression = getNextUsingExpression(children, part);
                         tableInfoFromTableSource(
                             manager.currentContext,
                             part.tableSource()
@@ -523,4 +525,39 @@ function columnsMapFromSelectItems(selectItems: SelectItemContext[]): Map<string
         }
     }
     return columns;
+}
+
+function getNextOnExpression(children: ParseTree[], current: JoinSourcePartContext): ParserRuleContext | null {
+    const index = children.indexOf(current);
+    if (index === -1 || index === children.length - 1) {
+        return null;
+    }
+    for (let i = index + 1; i < children.length; i++) {
+        const child = children[i];
+        if (child instanceof JoinSourcePartContext) {
+            return null;
+        }
+        if (isKeyWord(child, 'ON')) {
+            return children[i + 1] as ParserRuleContext;
+        }
+    }
+    return null
+}
+
+
+function getNextUsingExpression(children: ParseTree[], current: JoinSourcePartContext): ParserRuleContext | null {
+    const index = children.indexOf(current);
+    if (index === -1 || index === children.length - 1) {
+        return null;
+    }
+    for (let i = index + 1; i < children.length; i++) {
+        const child = children[i];
+        if (child instanceof JoinSourcePartContext) {
+            return null;
+        }
+        if (isKeyWord(child, 'USING')) {
+            return children[i + 1] as ParserRuleContext;
+        }
+    }
+    return null
 }
