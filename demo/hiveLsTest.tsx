@@ -213,15 +213,20 @@ t2 as (
   select
     house_code, resblock_id, quota_date
   from data.data_test_quota_similar_house_region_da
+),
+t3 as (
+  select
+    *
+  from t2
 )
 select
-  t1.house_code, t1.resblock_id, t2.quota_date
+  t1.house_code, t1.resblock_id, t3.quota_date
   ^   ^                           ^  ^
 from t1
      ^
-  left join t2
+  left join t3
             ^
   on t1.house_code = t2.house_code
-  and t1.resblock_id = t2.resblock_id
+  and t1.resblock_id = t3.resblock_id
 ;
 `;

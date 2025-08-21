@@ -16,30 +16,44 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
         const referenceCount = referenceMap.length;
         const referenceNotFound = Array.from(context.referenceNotFound.keys());
         const referenceNotFoundCount = referenceNotFound.length;
-        console.log('tableIdentifierMap', tableIdentifierMap);
-        console.log('referenceMap', referenceMap);
-        console.log('referenceNotFound', referenceNotFound);
+
         return (
             <>
-                <div>
+                <div
+                    style={{
+                        marginTop: 12
+                    }}
+                >
                     {/* <h5>{context.uuid}</h5> */}
                     {tableCount ? <div>table declare</div> : null}
                     {
                         tableIdentifierMap.map((table) => {
                             const columns = context.tableColumnIdentifierMap.get(table);
+                            const columnsCount = columns ? columns.size : 0;
                             console.log('table', table, columns);
                             return (
                                 <div key={table}>
                                     <h4>{table}</h4>
-                                    <ul>
-                                        {
-                                            columns
-                                                ? Object.entries(columns).map(([column, _]) => (
-                                                    <li key={column}>{column}</li>
-                                                ))
-                                                : <li>No columns</li>
-                                        }
-                                    </ul>
+                                    {
+                                        columnsCount
+                                        ? (
+                                            <ul
+                                                style={{
+                                                    listStylePosition: 'inside',
+                                                    paddingLeft: 0,
+                                                }}
+                                            >
+                                                {
+                                                    columns
+                                                        ? Array.from(columns.keys()).map((column) => (
+                                                            <li key={column}>{column} -&gt; [ref from?] </li>
+                                                        ))
+                                                        : <li>No columns</li>
+                                                }
+                                            </ul>
+                                        )
+                                        : null
+                                    }
                                 </div>
                             );
                         })
@@ -52,7 +66,7 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
                             );
                         })
                     }
-                    {referenceNotFoundCount ? <h4>missing reference</h4> : null}
+                    {referenceNotFoundCount ? <h4>external reference</h4> : null}
                     {
                         referenceNotFound.map((name) => {
                             return (
@@ -66,7 +80,8 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
                         ? (
                             <div
                                 style={{
-                                    marginLeft: '20px'
+                                    marginLeft: 20,
+                                    marginTop: 8
                                 }}
                             >
                                 {context.children.map(x => {

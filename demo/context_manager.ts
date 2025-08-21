@@ -127,7 +127,14 @@ export class IdentifierScope {
     lookupDefinition(name: string): ParserRuleContext | null {
         const identifier = this.tableIdentifierMap.get(name);
         if (!identifier) {
-            return this.parent ? this.parent.lookupDefinition(name) : null;
+            if (this.parent) {
+                return this.parent.lookupDefinition(name);
+            }
+            const missingRef = this.referenceNotFound.get(name);
+            if (missingRef) {
+                return missingRef[0];
+            }
+            return null;
         }
         if (identifier instanceof TableSourceContext) {
             const name = identifier.tableOrView().getText();
@@ -184,7 +191,6 @@ export class IdentifierScope {
         }
         return [];
     }
-    
 }
 
 export class ContextManager {
@@ -258,7 +264,9 @@ export class ContextManager {
                     }
 
                     const joinSourceParts = ctx.joinSourcePart();
-                    for (const part of joinSourceParts) {
+                    for (let i = 0; i < joinSourceParts.length; i++) {
+                        const part = joinSourceParts[i];
+                        console.log('on and using',ctx.KW_ON(i), ctx.KW_USING(i));
                         tableInfoFromTableSource(
                             manager.currentContext,
                             part.tableSource()
@@ -422,12 +430,13 @@ function tableInfoFromTableSource(
             context.id_()?.getText() || '',
             context
         );
-    } else {
-        const tableName = context.tableOrView()?.getText();
-        if (tableName) {
-            currentContext.addIdentifier(tableName, context);
-        }
     }
+
+    const tableName = context.tableOrView()?.getText();
+    if (tableName) {
+        currentContext.addReference(tableName, context);
+    }
+
     return context;
 }
 
