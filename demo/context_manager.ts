@@ -1,7 +1,7 @@
 
 import { ParserRuleContext, ParseTree, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
-import { ColumnNameContext, CteStatementContext, ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ColumnNameContext, ColumnNameCreateContext, ConstantContext, CteStatementContext, ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableAllColumnsContext, TableNameContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
 import { posInRange } from "./ls_helper";
 import { isKeyWord, printNode } from "./sql_ls_helper";
@@ -27,6 +27,8 @@ export class IdentifierScope {
     defaultIdentifier: ParserRuleContext | null = null;
 
     children: IdentifierScope[] = [];
+
+    highlightRanges: { start: number; end: number }[] = [];
 
     constructor(
         public context: ParserRuleContext,
@@ -72,7 +74,7 @@ export class IdentifierScope {
         }
         return identifiers;
     }
-    
+
     getDefaultIdentifier(): ParserRuleContext | null {
         const defaultIdentifier = this.parent?.defaultIdentifier;
         if (defaultIdentifier) {
@@ -191,6 +193,43 @@ export class IdentifierScope {
         }
         return [];
     }
+
+    addHighlight(range: { start: number; end: number }) {
+        if (range.start === range.end) {
+            throw new Error(`Highlight ranges should not have zero length: ${JSON.stringify(range)}`);
+        }
+        this.highlightRanges.push(range);
+    }
+    
+    addHighlightNode(node: ParserRuleContext) {
+        console.log('Adding highlight node:', node);
+        this.addHighlight({
+            start: node.start?.start || 0,
+            end: (node.stop?.stop || 0) + 1
+        })
+    }
+
+    getHighlights(ret: {
+        start: number;
+        end: number;
+    }[] = []) {
+        this.children.forEach(child => {
+            child.getHighlights(ret);
+        });
+        this.highlightRanges.forEach(range => {
+            ret.push(range);
+        });
+
+        ret.sort((a, b) => {
+            if (a.start !== b.start) {
+                return a.start - b.start;
+            }
+            throw new Error(`Highlights should not have the same start position: ${JSON.stringify(a)} and ${JSON.stringify(b)}`);
+            return a.end - b.end;
+        });
+
+        return ret;
+    }
 }
 
 export class ContextManager {
@@ -211,7 +250,7 @@ export class ContextManager {
 
         function exitRule() {
             if (manager.currentContext) {
-                
+
                 manager.currentContext = manager.currentContext.exitScope()!;
             }
         }
@@ -238,6 +277,8 @@ export class ContextManager {
                 const ctes = ctx.cteStatement();
                 ctes.forEach((cte) => {
                     tableInfoFromCteStatement(manager.currentContext, cte);
+
+                    manager.currentContext?.addHighlightNode(cte.id_());
                 });
             };
 
@@ -353,6 +394,7 @@ export class ContextManager {
                     // TODO: 需要先记下来，在exit scope时清理引用
                     manager.currentContext?.addReference(tableName, ctx);
                 }
+                manager.currentContext?.addHighlightNode(ctx);
             };
 
             enterColumnNamePath = (ctx: ColumnNameContext) => {
@@ -365,6 +407,37 @@ export class ContextManager {
                     const tableName = ids[0].getText();
                     manager.currentContext?.addReference(tableName, ctx);
                 }
+                manager.currentContext?.addHighlightNode(ctx);
+            };
+
+            enterColumnNameCreate = (ctx: ColumnNameCreateContext) => {
+                manager.currentContext?.addHighlightNode(ctx);
+            };
+
+            enterTableName = (ctx: TableNameContext) => {
+                manager.currentContext?.addHighlightNode(ctx);
+            };
+
+            enterTableNamCreate = (ctx: TableNameContext) => {
+                manager.currentContext?.addHighlightNode(ctx);
+            };
+
+            enterTableAllColumns = (ctx: TableAllColumnsContext) => {
+                manager.currentContext?.addHighlightNode(ctx);
+            };
+
+            enterSelectItem = (ctx: SelectItemContext) => {
+                const ids = ctx.id_();
+                for (const id of ids) {
+                    manager.currentContext?.addHighlightNode(id);
+                }
+            };
+
+            enterConstant = (ctx: ConstantContext) => {
+                // manager.currentContext?.addHighlight({
+                //     start: ctx.start?.start || 0,
+                //     end: (ctx.stop?.stop || 0) + 1,
+                // });
             };
 
         };
@@ -409,6 +482,11 @@ export class ContextManager {
         }
 
         return this.rootContext.toString();
+    }
+
+    getHighlights() {
+        console.log('Getting highlights', this.rootContext);
+        return this.rootContext?.getHighlights() || [];
     }
 }
 

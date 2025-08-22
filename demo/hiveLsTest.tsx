@@ -218,6 +218,13 @@ t3 as (
   select
     *
   from t2
+),
+t4 as (
+  select
+    house_code as t4_house_code,
+    resblock_id as t4_resblock_id,
+    quota_date as t4_quota_date
+  from t2
 )
 select
   t1.house_code, t1.resblock_id, t3.quota_date

@@ -1,8 +1,9 @@
 import React from 'react';
 import { caseFromString, LsTestCase } from './ls_helper';
 import { createHiveLs } from './sql_ls';
-import { IdentifierScope } from './context_manager';
+import { ContextManager, IdentifierScope } from './context_manager';
 import { printNode } from './sql_ls_helper';
+import { TextHighlight } from './text_highlight';
 
 interface DisplayContextManagerProps {
     context: IdentifierScope
@@ -112,6 +113,7 @@ interface SqlTestDagState {
     currentTestIndex: number;
     sqlTest: string[];
     sqlTestCases: LsTestCase[];
+    contextManager: ContextManager | null;
 }
 
 
@@ -121,15 +123,28 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
         this.state = {
             currentTestIndex: 0,
             sqlTest: props.sqlTest,
-            sqlTestCases: props.sqlTest.map((test, index) => caseFromString(test))
+            sqlTestCases: [],
+            contextManager: null,
+            ...SqlTestDag.getDerivedStateFromProps(props, {
+                currentTestIndex: 0,
+                sqlTest: [],
+                sqlTestCases: [],
+                contextManager: null
+            }),
         };
     }
 
     static getDerivedStateFromProps(nextProps: SqlTestDagProps, prevState: SqlTestDagState) {
         if (nextProps.sqlTest !== prevState.sqlTest) {
+            const sqlTestCases = nextProps.sqlTest.map((test) => caseFromString(test));
+            const testCase = sqlTestCases[prevState.currentTestIndex];
+            const model = testCase.model;
+            const contextManager = createHiveLs(model).getContextManager();
+
             return {
                 sqlTest: nextProps.sqlTest,
-                sqlTestCases: nextProps.sqlTest.map((test) => caseFromString(test))
+                sqlTestCases,
+                contextManager
             };
         }
         return null;
@@ -137,20 +152,20 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
 
     getCurrentCaseText() {
         const testCase = this.state.sqlTestCases[this.state.currentTestIndex];
-        return testCase.model.getValue();
+        return testCase?.model?.getValue() || '';
+    }
+
+    getCurrentCaseHighlights() {
+        return this.state.contextManager?.getHighlights() || [];
     }
 
     getCurrentCaseContextManager() {
-        const testCase = this.state.sqlTestCases[this.state.currentTestIndex];
-        const model = testCase.model;
-        const contextManager = createHiveLs(model).getContextManager();
-
-        return contextManager;
+        return this.state.contextManager;
     }
 
     render() {
         const context = this.getCurrentCaseContextManager();
-        console.log(context);
+        console.log('getCurrentCaseContextManager', context);
         return (
             <div
                 style={{
@@ -177,7 +192,10 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
                         }}
                     >
                         <pre>
-                            {this.getCurrentCaseText()}
+                            <TextHighlight
+                                text={this.getCurrentCaseText()}
+                                highlights={this.getCurrentCaseHighlights()}
+                            />
                         </pre>
                     </div>
                     <div
@@ -185,7 +203,9 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
                             flex: '1 0 50%',
                         }}
                     >
-                        <DisplayContextManager context={context.rootContext!} />
+                        {context && (
+                            <DisplayContextManager context={context.rootContext!} />
+                        )}
                     </div>
                 </div>
             </div>
