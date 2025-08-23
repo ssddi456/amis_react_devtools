@@ -1,17 +1,45 @@
 import React from 'react';
 import { caseFromString, LsTestCase } from './ls_helper';
 import { createHiveLs } from './sql_ls';
-import { ContextManager, IdentifierScope } from './context_manager';
+import { ContextManager } from './context_manager';
+import { IdentifierScope } from "./Identifier_scope";
 import { printNode } from './sql_ls_helper';
 import { TextHighlight } from './text_highlight';
+import { MapReduceScope } from './mr_scope';
 
 interface DisplayContextManagerProps {
     context: IdentifierScope
 }
 
+class DisplayMRScope extends React.Component<{ mrScope: MapReduceScope }> {
+    render() {
+        const { mrScope } = this.props;
+        return (
+            <div>
+                <h4>MapReduce Scope</h4>
+                <div>
+                    <h5>Input Tables</h5>
+                    {Array.from(mrScope.inputTable.keys()).map(name => (
+                        <div key={name} style={{ paddingLeft: 12 }}>
+                            {name}
+                        </div>
+                    ))}
+                    <h5>Export Columns</h5>
+                    {mrScope.exportColumns.map((col, i) => (
+                        <div key={i} style={{ paddingLeft: 12 }}>
+                            {col.exportColumnName} -&gt; {col.referanceTableName || mrScope.getDefaultInputTableName()} . {col.referanceColumnName}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+}
+
 class DisplayContextManager extends React.Component<DisplayContextManagerProps> {
     render() {
         const context = this.props.context;
+        const mrScope = context.mrScope;
         const tableIdentifierMap = Array.from(context.tableIdentifierMap.keys());
         const tableCount = tableIdentifierMap.length;
         const referenceMap = Array.from(context.referenceMap.keys());
@@ -21,6 +49,7 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
 
         return (
             <>
+                {mrScope && <DisplayMRScope mrScope={mrScope} />}
                 <div
                     style={{
                         marginTop: 12
@@ -30,9 +59,6 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
                     {tableCount ? <div>table declare</div> : null}
                     {
                         tableIdentifierMap.map((table) => {
-                            const columns = context.tableColumnIdentifierMap.get(table);
-                            const columnsCount = columns ? columns.size : 0;
-                            console.log('table', table, columns);
                             return (
                                 <div
                                     key={table}
@@ -41,26 +67,6 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
                                     }}
                                 >
                                     <h4>{table}</h4>
-                                    {
-                                        columnsCount
-                                        ? (
-                                            <ul
-                                                style={{
-                                                    listStylePosition: 'inside',
-                                                    paddingLeft: 0,
-                                                }}
-                                            >
-                                                {
-                                                    columns
-                                                        ? Array.from(columns.keys()).map((column) => (
-                                                            <li key={column}>{column} -&gt; [ref from?] </li>
-                                                        ))
-                                                        : <li>No columns</li>
-                                                }
-                                            </ul>
-                                        )
-                                        : null
-                                    }
                                 </div>
                             );
                         })

@@ -11,7 +11,8 @@ import {
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import tableData from './data/example'
-import { createContextManager, IdentifierScope } from "./context_manager";
+import { createContextManager } from "./context_manager";
+import { IdentifierScope } from "./Identifier_scope";
 import { printNode, rangeFromNode, wordToRange, sliceToRange, findTokenAtPosition, printNodeTree } from "./sql_ls_helper";
 import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, unknownRes, functionRes } from "./sql_hover_res";
 import { matchSubPath, matchSubPathOneOf, matchType } from "./sql_tree_query";
@@ -68,20 +69,13 @@ function tableInfoFromSubQuerySource(
         console.warn('No table name found in sub query source:', printNode(subQuerySource));
         return null;
     }
-    const columns = context.tableColumnIdentifierMap.get(alias);
     const ret: TableInfo = {
         db_name: localDbId,
         table_name: '[subquery]',
         alias: alias,
         table_id: -1,
         description: '',
-        column_list: Array.from(columns?.keys() || []).map((name) => {
-            return {
-                column_name: name,
-                data_type_string: '<unknown>',
-                description: ''
-            };
-        }) || [],
+        column_list: [],
         range: rangeFromNode(subQuerySource)
     };
     if (collection) {
@@ -101,7 +95,6 @@ function tableInfoFromVirtualTableSource(
     }
     const alias = virtualTableSource.tableAlias()?.getText();
     console.log('collectTableInfo visitVirtualTableSource', printNode(virtualTableSource), 'alias:', alias);
-    const columns = context.tableColumnIdentifierMap.get(alias);
 
     const ret = {
         db_name: localDbId,
@@ -109,13 +102,7 @@ function tableInfoFromVirtualTableSource(
         alias: alias,
         table_id: -1,
         description: '',
-        column_list: Array.from(columns?.keys() || []).map((name) => {
-            return {
-                column_name: name,
-                data_type_string: '<unknown>',
-                description: ''
-            };
-        }) || [],
+        column_list: [],
         range: rangeFromNode(virtualTableSource)
     };
     if (collection) {
@@ -134,7 +121,6 @@ function tableInfoFromCteStatement(
     }
     const alias = cteStatement.id_()?.getText();
     console.log('collectTableInfo visitCteStatement', printNode(cteStatement), 'alias:', alias);
-    const columns = context.tableColumnIdentifierMap.get(alias);
 
     const ret = {
         db_name: localDbId,
@@ -142,13 +128,7 @@ function tableInfoFromCteStatement(
         alias: alias,
         table_id: -1,
         description: '',
-        column_list: Array.from(columns?.keys() || []).map((name) => {
-            return {
-                column_name: name,
-                data_type_string: '<unknown>',
-                description: ''
-            };
-        }) || [],
+        column_list: [],
         range: rangeFromNode(cteStatement)
     };
     if (collection) {
