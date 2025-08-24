@@ -201,7 +201,7 @@ from data.data_test_news_record_da
 
 console.log('sql test cases', sqlTest);
 
-export const sqlTestDag = `
+export const sqlTestDag1 = `
 with t1 as (
   select
     house_code, resblock_id, resblock_name

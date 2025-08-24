@@ -112,13 +112,12 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
 }
 
 interface SqlTestDagProps {
-    sqlTest: string[];
+    sqlTest: string;
 }
 
 interface SqlTestDagState {
-    currentTestIndex: number;
-    sqlTest: string[];
-    sqlTestCases: LsTestCase[];
+    sqlTest: string;
+    testCase: LsTestCase | null;
     contextManager: ContextManager | null;
 }
 
@@ -127,14 +126,12 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
     constructor(props: SqlTestDagProps) {
         super(props);
         this.state = {
-            currentTestIndex: 0,
             sqlTest: props.sqlTest,
-            sqlTestCases: [],
+            testCase: null,
             contextManager: null,
             ...SqlTestDag.getDerivedStateFromProps(props, {
-                currentTestIndex: 0,
-                sqlTest: [],
-                sqlTestCases: [],
+                sqlTest: '',
+                testCase: null,
                 contextManager: null
             }),
         };
@@ -142,14 +139,13 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
 
     static getDerivedStateFromProps(nextProps: SqlTestDagProps, prevState: SqlTestDagState) {
         if (nextProps.sqlTest !== prevState.sqlTest) {
-            const sqlTestCases = nextProps.sqlTest.map((test) => caseFromString(test));
-            const testCase = sqlTestCases[prevState.currentTestIndex];
+            const testCase = caseFromString(nextProps.sqlTest);
             const model = testCase.model;
             const contextManager = createHiveLs(model).getContextManager();
 
             return {
                 sqlTest: nextProps.sqlTest,
-                sqlTestCases,
+                testCase,
                 contextManager
             };
         }
@@ -157,7 +153,7 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
     }
 
     getCurrentCaseText() {
-        const testCase = this.state.sqlTestCases[this.state.currentTestIndex];
+        const testCase = this.state.testCase;
         return testCase?.model?.getValue() || '';
     }
 
@@ -176,25 +172,31 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
             <div
                 style={{
                     maxHeight: '100vh',
-                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
                     position: 'relative',
                 }}
             >
                 <h3
                     style={{
-                        position: 'sticky',
-                        top: 0,
-                        background: 'white'
+                        background: 'white',
+                        flex: '0 0 auto',
                     }}
                 >SQL Test DAG</h3>
                 <div
                     style={{
-                        display: 'flex'
+                        display: 'flex',
+                        flex: 1,
+                        overflowY: 'auto',
+                        position: 'relative',
                     }}
                 >
                     <div
                         style={{
                             flex: '1 0 50%',
+                            position: 'sticky',
+                            top: 0,
+                            overflowY: 'auto',
                         }}
                     >
                         <pre>

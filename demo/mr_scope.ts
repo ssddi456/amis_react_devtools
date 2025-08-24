@@ -1,10 +1,14 @@
 import { ParserRuleContext } from "antlr4ng";
 import { uuidv4 } from "./util";
 import { IdentifierScope } from "./Identifier_scope";
-
+import { AtomSelectStatementContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { type Position } from "monaco-editor";
+import { isPosInParserRuleContext } from "./sql_ls_helper";
+    
 interface TableSource {
     tableName: string;
     reference: ParserRuleContext,
+    defineReference: ParserRuleContext
 }
 
 interface ColumnInfo {
@@ -12,6 +16,7 @@ interface ColumnInfo {
     referanceTableName: string;
     referanceColumnName: string;
     reference: ParserRuleContext;
+    defineReference: ParserRuleContext;
 }
 
 export class MapReduceScope {
@@ -21,12 +26,10 @@ export class MapReduceScope {
 
     exportColumns: ColumnInfo[] = [];
 
-    groupByColumns: ColumnInfo[] = [];
-
     defaultInputTable: ParserRuleContext | null = null;
 
     constructor(
-        public context: ParserRuleContext,
+        public context: AtomSelectStatementContext,
         public identifierScope: IdentifierScope
     ) {
         
@@ -36,10 +39,11 @@ export class MapReduceScope {
         this.defaultInputTable = table;
     }
 
-    addInputTable(name: string, table: ParserRuleContext) {
+    addInputTable(name: string, table: ParserRuleContext, defineReference: ParserRuleContext) {
         this.inputTable.set(name, {
             tableName: name,
-            reference: table
+            reference: table,
+            defineReference,
         });
     }
 
@@ -54,10 +58,6 @@ export class MapReduceScope {
 
     addExportColumn(column: ColumnInfo) {
         this.exportColumns.push(column);
-    }
-
-    addGroupByColumn(column: ColumnInfo) {
-        this.groupByColumns.push(column);
     }
 
     validate() {
@@ -78,5 +78,55 @@ export class MapReduceScope {
         });
 
         return errors;
+    }
+
+    getScopeByPosition(position: Position): MapReduceScope | null {
+        const context = this.context;
+        const selectClause = context.selectClause();
+        if (selectClause && isPosInParserRuleContext(position, selectClause)) {
+            // input
+            return this;
+        }
+        const fromClause = context.fromClause();
+        if (fromClause && isPosInParserRuleContext(position, fromClause)) {
+            // input
+            return this.identifierScope.parent!.getMrScope();
+        }
+        const whereClause = context.whereClause();
+        if (whereClause && isPosInParserRuleContext(position, whereClause)) {
+            // input
+            return this;
+        }
+        const groupByClause = context.groupByClause();
+        if (groupByClause && isPosInParserRuleContext(position, groupByClause)) {
+            // input
+            return this;
+        }
+        const havingClause = context.havingClause();
+        if (havingClause && isPosInParserRuleContext(position, havingClause)) {
+            // input
+            return this;
+        }
+        const qualifyClause = context.qualifyClause();
+        if (qualifyClause && isPosInParserRuleContext(position, qualifyClause)) {
+            // input
+            return this;
+        }
+        return null;
+    }
+
+    getTableByName(name: string): ParserRuleContext | undefined {
+        return this.identifierScope.getReferencesByName(name)[0];
+    }
+
+    getColumnByName(tableName: string | null, columnName: string): ColumnInfo | null {
+        if (!tableName) {
+            return null;
+        }
+        const table = this.getTableByName(tableName);
+        if (!table) {
+            return null;
+        }
+        return this.exportColumns.find(column => column.referanceTableName === tableName && column.referanceColumnName === columnName) || null;
     }
 }

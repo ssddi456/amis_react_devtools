@@ -1,7 +1,7 @@
 
 import { ParserRuleContext, ParseTree, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
-import { ColumnNameContext, ColumnNameCreateContext, ConstantContext, CteStatementContext, ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableAllColumnsContext, TableNameContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { AtomSelectStatementContext, ColumnNameContext, ColumnNameCreateContext, ConstantContext, CteStatementContext, ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableAllColumnsContext, TableNameContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
 import { isKeyWord } from "./sql_ls_helper";
 import { IdentifierScope } from "./Identifier_scope";
@@ -33,7 +33,7 @@ export class ContextManager {
             }
         }
 
-        function enterTable(ctx: ParserRuleContext, identifierScope: IdentifierScope) {
+        function enterTable(ctx: AtomSelectStatementContext, identifierScope: IdentifierScope) {
             const mrScope = new MapReduceScope(ctx, identifierScope);
             manager.mrScopes.push(mrScope);
             identifierScope.mrScope = mrScope;
@@ -41,10 +41,16 @@ export class ContextManager {
 
         const listener = new class extends HiveSqlParserListener {
             enterQueryStatementExpression = (ctx: QueryStatementExpressionContext) => {
+                enterRule(ctx);
+            };
+            exitQueryStatementExpression = (ctx: QueryStatementExpressionContext) => {
+                exitRule();
+            };
+            enterAtomSelectStatement = (ctx: AtomSelectStatementContext) => {
                 const identifierScope = enterRule(ctx);
                 enterTable(ctx, identifierScope);
             };
-            exitQueryStatementExpression = (ctx: QueryStatementExpressionContext) => {
+            exitAtomSelectStatement = (ctx: AtomSelectStatementContext) => {
                 exitRule();
             };
             enterSelectStatementWithCTE = (ctx: SelectStatementWithCTEContext) => {
@@ -185,15 +191,6 @@ export class ContextManager {
                     manager.currentContext?.addReference(tableName, ctx);
                 }
                 manager.currentContext?.addHighlightNode(ctx);
-
-                if (ctx.parent instanceof GroupByClauseContext) {
-                    mrScope?.addGroupByColumn({
-                        exportColumnName: ctx.getText(),
-                        referanceColumnName: columnNameFromColumnPath(ctx),
-                        referanceTableName: tableNameFromColumnPath(ctx),
-                        reference: ctx
-                    });
-                }
             };
 
             enterColumnNamePath = (ctx: ColumnNameContext) => {
@@ -230,7 +227,8 @@ export class ContextManager {
                         exportColumnName: '*', // will be all_columns from the refed table;
                         referanceTableName: allColumns.id_(0)?.getText?.() || '',
                         referanceColumnName: '*',
-                        reference: allColumns
+                        reference: allColumns,
+                        defineReference: allColumns
                     });
                     context?.addHighlightNode(allColumns);
                     return;
@@ -245,14 +243,16 @@ export class ContextManager {
                             exportColumnName: id.getText(),
                             referanceColumnName: columnNameFromColumnPath(sourceColumn),
                             referanceTableName: tableNameFromColumnPath(sourceColumn),
-                            reference: sourceColumn
+                            reference: sourceColumn,
+                            defineReference: id,
                         });
                     } else {
                         mrScope?.addExportColumn({
                             exportColumnName: sourceColumn.getText(),
                             referanceColumnName: columnNameFromColumnPath(sourceColumn),
                             referanceTableName: tableNameFromColumnPath(sourceColumn),
-                            reference: sourceColumn
+                            reference: sourceColumn,
+                            defineReference: sourceColumn
                         });
                     }
                 }
@@ -266,7 +266,8 @@ export class ContextManager {
                             exportColumnName: i.getText(),
                             referanceColumnName: '',
                             referanceTableName: '',
-                            reference: expression
+                            reference: expression,
+                            defineReference: i,
                         });
                     }
                 }
@@ -353,13 +354,13 @@ function tableInfoFromTableSource(
             context.id_()?.getText() || '',
             context
         );
-        currentContext.getMrScope()?.addInputTable(alias, context);
+        currentContext.getMrScope()?.addInputTable(alias, context, context.id_()!);
     }
 
     const tableName = context.tableOrView()?.getText();
     if (tableName) {
         currentContext.addReference(tableName, context);
-        currentContext.getMrScope()?.addInputTable(tableName, context);
+        currentContext.getMrScope()?.addInputTable(tableName, context, context.tableOrView()!);
     }
 
     return context;
@@ -374,7 +375,7 @@ function tableInfoFromSubQuerySource(
     }
     const name = subQuerySource.id_()?.getText();
     currentContext.addIdentifier(name || '', subQuerySource, true);
-    currentContext.getMrScope()?.addInputTable(name || '', subQuerySource);
+    currentContext.getMrScope()?.addInputTable(name || '', subQuerySource, subQuerySource.id_()!);
 
     return subQuerySource;
 }
@@ -388,7 +389,7 @@ function tableInfoFromVirtualTableSource(
     }
     const name = virtualTableSource.tableAlias()?.getText();
     currentContext.addIdentifier(name || '', virtualTableSource, true);
-    currentContext.getMrScope()?.addInputTable(name || '', virtualTableSource);
+    currentContext.getMrScope()?.addInputTable(name || '', virtualTableSource, virtualTableSource.tableAlias()!);
     return virtualTableSource;
 }
 
@@ -401,7 +402,7 @@ function tableInfoFromCteStatement(
     }
     const name = cteStatement.id_()?.getText();
     currentContext.addIdentifier(name || '', cteStatement, true);
-    currentContext.getMrScope()?.addInputTable(name || '', cteStatement);
+    currentContext.getMrScope()?.addInputTable(name || '', cteStatement, cteStatement.id_()!);
     return cteStatement;
 }
 
