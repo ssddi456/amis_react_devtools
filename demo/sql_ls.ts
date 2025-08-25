@@ -4,18 +4,21 @@ import { EntityContext, HiveSQL, } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
 import { posInRange, WithSource } from "./ls_helper";
 import { TextSlice } from "dt-sql-parser/dist/parser/common/textAndWord";
-import { CteStatementContext, FunctionIdentifierContext, HiveSqlParser, SelectItemContext, SubQuerySourceContext, TableNameContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { CteStatementContext, FunctionIdentifierContext, HiveSqlParser, ProgramContext, SelectItemContext, SubQuerySourceContext, TableNameContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import {
     TableSourceContext,
     VirtualTableSourceContext,
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import tableData from './data/example'
-import { createContextManager, IdentifierScope } from "./context_manager";
+import { ContextManager, createContextManager } from "./context_manager";
+import { IdentifierScope } from "./Identifier_scope";
 import { printNode, rangeFromNode, wordToRange, sliceToRange, findTokenAtPosition, printNodeTree } from "./sql_ls_helper";
 import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, unknownRes, functionRes } from "./sql_hover_res";
 import { matchSubPath, matchSubPathOneOf, matchType } from "./sql_tree_query";
 import { formatHiveSQL } from './formatter';
+import { position } from "amis";
+import { MapReduceScope } from "./mr_scope";
 
 function tableInfoFromTableSource(
     tableSource: TableSourceContext | null,
@@ -54,7 +57,7 @@ function tableInfoFromTableSource(
 const localDbId = 'local db';
 
 function tableInfoFromSubQuerySource(
-    subQuerySource: any,
+    subQuerySource: SubQuerySourceContext,
     context: IdentifierScope,
     collection?: TableInfo[]
 ): TableInfo | null {
@@ -62,26 +65,25 @@ function tableInfoFromSubQuerySource(
         return null;
     }
     const alias = subQuerySource.id_()?.getText();
+    const mrScope = context.getMrScope();
+
     const tableQuery = subQuerySource.queryStatementExpression().getText();
     console.log('collectTableInfo visitJoinSourcePart', printNode(subQuerySource), 'alias:', alias, 'tableName:', tableQuery);
     if (!tableQuery) {
         console.warn('No table name found in sub query source:', printNode(subQuerySource));
         return null;
     }
-    const columns = context.tableColumnIdentifierMap.get(alias);
     const ret: TableInfo = {
         db_name: localDbId,
         table_name: '[subquery]',
         alias: alias,
         table_id: -1,
         description: '',
-        column_list: Array.from(columns?.keys() || []).map((name) => {
-            return {
-                column_name: name,
-                data_type_string: '<unknown>',
-                description: ''
-            };
-        }) || [],
+        column_list: mrScope?.exportColumns.map(col => ({
+            column_name: col.exportColumnName,
+            data_type_string: 'string', // unknown
+            description: '', // should be refer
+        })) || [],
         range: rangeFromNode(subQuerySource)
     };
     if (collection) {
@@ -101,7 +103,6 @@ function tableInfoFromVirtualTableSource(
     }
     const alias = virtualTableSource.tableAlias()?.getText();
     console.log('collectTableInfo visitVirtualTableSource', printNode(virtualTableSource), 'alias:', alias);
-    const columns = context.tableColumnIdentifierMap.get(alias);
 
     const ret = {
         db_name: localDbId,
@@ -109,13 +110,7 @@ function tableInfoFromVirtualTableSource(
         alias: alias,
         table_id: -1,
         description: '',
-        column_list: Array.from(columns?.keys() || []).map((name) => {
-            return {
-                column_name: name,
-                data_type_string: '<unknown>',
-                description: ''
-            };
-        }) || [],
+        column_list: [],
         range: rangeFromNode(virtualTableSource)
     };
     if (collection) {
@@ -134,21 +129,18 @@ function tableInfoFromCteStatement(
     }
     const alias = cteStatement.id_()?.getText();
     console.log('collectTableInfo visitCteStatement', printNode(cteStatement), 'alias:', alias);
-    const columns = context.tableColumnIdentifierMap.get(alias);
-
+    const mrScope = context.getMrScope();
     const ret = {
         db_name: localDbId,
         table_name: alias,
         alias: alias,
         table_id: -1,
         description: '',
-        column_list: Array.from(columns?.keys() || []).map((name) => {
-            return {
-                column_name: name,
-                data_type_string: '<unknown>',
-                description: ''
-            };
-        }) || [],
+        column_list: mrScope?.exportColumns.map(col => ({
+            column_name: col.exportColumnName,
+            data_type_string: 'string', // unknown
+            description: '', // should be refer
+        })) || [],
         range: rangeFromNode(cteStatement)
     };
     if (collection) {
@@ -348,7 +340,7 @@ const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): WithSource<langua
 
 const getTableAndColumnInfoAtPosition = (
     foundNode: ParserRuleContext,
-    position: Position,
+    mrScope: MapReduceScope | null | undefined,
     context: IdentifierScope,
     isTest?: boolean
 ): EntityInfo | null => {
@@ -356,18 +348,18 @@ const getTableAndColumnInfoAtPosition = (
     const pushExt = isTest ? (content: string) => {
         ext.push(content);
     } : () => { };
-    pushExt((position as any).text);
     pushExt(printNodeTree(foundNode));
     const logger = isTest ? console.log : () => { };
     const allIdentifiers = context.getAllIdentifiers() || {};
 
     const parent = foundNode.parent!;
-    logger('do hover entities', printNode(parent), position, allIdentifiers.keys());
+    logger('do hover entities', printNode(parent), allIdentifiers.keys());
 
     const commonFields = {
         range: rangeFromNode(foundNode),
         ext,
     };
+
     // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1392
     if (matchSubPathOneOf(foundNode, [
         ['id_', 'tableSource'],
@@ -464,7 +456,7 @@ const getTableAndColumnInfoAtPosition = (
 
         // column_name only
         if (!tableIdExp) {
-            const item = context.getDefaultIdentifier();
+            const item = mrScope?.getTableByName(mrScope?.getDefaultInputTableName());
             const tableInfo = item && tableInfoFromNode(item, context);
             if (!tableInfo) {
                 return {
@@ -547,6 +539,7 @@ const getTableAndColumnInfoAtPosition = (
 
 const getIdentifierReferences = (
     foundNode: ParserRuleContext,
+    mrScope: MapReduceScope | null | undefined,
     context: IdentifierScope,
 ): ParserRuleContext[] | undefined => {
     const foundTableSource = matchSubPathOneOf(foundNode, [
@@ -594,6 +587,34 @@ const getIdentifierReferences = (
     return;
 }
 
+interface ContextInfos {
+    hiveSqlParse: HiveSQL;
+    sqlSlices: ReturnType<HiveSQL['splitSQLByStatement']>;
+    tree: ProgramContext;
+    contextManager: ContextManager;
+}
+
+const contextCache = new Map<string, ContextInfos>();
+
+function getContextWithCache(text: string): ContextInfos {
+    if (contextCache.has(text)) {
+        return contextCache.get(text)!;
+    }
+    const hiveSqlParse = new HiveSQL();
+    const sqlSlices = hiveSqlParse.splitSQLByStatement(text);
+    const ctx = hiveSqlParse.createParser(text);
+    const tree = ctx.program();
+    const contextManager = createContextManager(tree);
+    const ret: ContextInfos = {
+        hiveSqlParse,
+        sqlSlices,
+        tree,
+        contextManager
+    };
+    contextCache.set(text, ret);
+    return ret;
+}
+
 // 这里列一下表
 // hive is from
 // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4
@@ -604,11 +625,14 @@ export const createHiveLs = (model: {
 }, isTest?: boolean) => {
 
     const document = TextDocument.create(model.uri.toString(), 'hivesql', 0, model.getValue());
-    const hiveSqlParse = new HiveSQL();
-    const sqlSlices = hiveSqlParse.splitSQLByStatement(document.getText());
-    const ctx = hiveSqlParse.createParser(document.getText());
-    const tree = ctx.program();
-    const contextManager = createContextManager(tree);
+    const  {
+        hiveSqlParse,
+        sqlSlices,
+        tree,
+        contextManager
+    } = getContextWithCache(document.getText());
+
+
     const logger = isTest ? console.log : () => { };
     logger('getCtxFromPos foundNode', contextManager.toString());
 
@@ -619,13 +643,17 @@ export const createHiveLs = (model: {
         for (let i = 0; i < sqlSlices.length; i++) {
             const slice = sqlSlices[i];
             if (posInRange(position, sliceToRange(slice))) {
-                const text = paddingSliceText(slice, document.getText());
-                logger('getCtxFromPos text', '-->' + text + '<--');
+                // const text = paddingSliceText(slice, document.getText());
+                // logger('getCtxFromPos text', '-->' + text + '<--');
                 const foundNode = findTokenAtPosition(position, tree);
                 const context = contextManager.getContextByPosition(position);
+                const mrScope = context?.getMrScope()?.getScopeByPosition(position) || null;
+
+                logger('getCtxFromPos mrScope', '-->', mrScope, '<--');
                 return {
                     foundNode,
                     context,
+                    mrScope,
                 };
             }
         }
@@ -642,8 +670,8 @@ export const createHiveLs = (model: {
             position: Position,
             isTest?: boolean
         ) => {
-            const { foundNode, context } = getCtxFromPos(position) || {};
-            if (!foundNode || !context || (
+            const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
+            if (!foundNode || !context || !mrScope || (
                 !matchType(foundNode, 'id_')
                 && !matchType(foundNode, 'DOT')
                 && !matchType(foundNode, 'columnNamePath')
@@ -653,7 +681,7 @@ export const createHiveLs = (model: {
                 return;
             }
 
-            const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, position, context, isTest);
+            const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, mrScope, context, isTest);
             if (!hoverInfo) {
                 return;
             }
@@ -709,7 +737,7 @@ export const createHiveLs = (model: {
             isTest?: boolean
         ) => {
             // TODO: implement definition functionality
-            const { foundNode, context } = getCtxFromPos(position) || {};
+            const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
             if (!foundNode || !context || (
                 !matchType(foundNode, 'id_')
                 && !matchType(foundNode, 'DOT')
@@ -720,7 +748,7 @@ export const createHiveLs = (model: {
                 return;
             }
 
-            const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, position, context, isTest);
+            const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, mrScope, context, isTest);
             if (!hoverInfo) {
                 return;
             }
@@ -732,7 +760,7 @@ export const createHiveLs = (model: {
             position: Position,
             isTest?: boolean
         ): WithSource<languages.Location[]> | undefined {
-            const { foundNode, context } = getCtxFromPos(position) || {};
+            const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
             if (!foundNode || !context || (
                 !matchType(foundNode, 'id_')
                 && !matchType(foundNode, 'DOT')
@@ -740,7 +768,7 @@ export const createHiveLs = (model: {
                 return;
             }
 
-            const references = getIdentifierReferences(foundNode, context);
+            const references = getIdentifierReferences(foundNode, mrScope, context);
             if (!references || references.length === 0) {
                 return;
             }

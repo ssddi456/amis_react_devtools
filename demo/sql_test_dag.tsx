@@ -1,17 +1,45 @@
 import React from 'react';
 import { caseFromString, LsTestCase } from './ls_helper';
 import { createHiveLs } from './sql_ls';
-import { ContextManager, IdentifierScope } from './context_manager';
+import { ContextManager } from './context_manager';
+import { IdentifierScope } from "./Identifier_scope";
 import { printNode } from './sql_ls_helper';
 import { TextHighlight } from './text_highlight';
+import { MapReduceScope } from './mr_scope';
 
 interface DisplayContextManagerProps {
     context: IdentifierScope
 }
 
+class DisplayMRScope extends React.Component<{ mrScope: MapReduceScope }> {
+    render() {
+        const { mrScope } = this.props;
+        return (
+            <div>
+                <h4>MapReduce Scope</h4>
+                <div>
+                    <h5>Input Tables</h5>
+                    {Array.from(mrScope.inputTable.keys()).map(name => (
+                        <div key={name} style={{ paddingLeft: 12 }}>
+                            {name}
+                        </div>
+                    ))}
+                    <h5>Export Columns</h5>
+                    {mrScope.exportColumns.map((col, i) => (
+                        <div key={i} style={{ paddingLeft: 12 }}>
+                            {col.exportColumnName} -&gt; {col.referanceTableName || mrScope.getDefaultInputTableName()} . {col.referanceColumnName}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+}
+
 class DisplayContextManager extends React.Component<DisplayContextManagerProps> {
     render() {
         const context = this.props.context;
+        const mrScope = context.mrScope;
         const tableIdentifierMap = Array.from(context.tableIdentifierMap.keys());
         const tableCount = tableIdentifierMap.length;
         const referenceMap = Array.from(context.referenceMap.keys());
@@ -21,6 +49,7 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
 
         return (
             <>
+                {mrScope && <DisplayMRScope mrScope={mrScope} />}
                 <div
                     style={{
                         marginTop: 12
@@ -30,9 +59,6 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
                     {tableCount ? <div>table declare</div> : null}
                     {
                         tableIdentifierMap.map((table) => {
-                            const columns = context.tableColumnIdentifierMap.get(table);
-                            const columnsCount = columns ? columns.size : 0;
-                            console.log('table', table, columns);
                             return (
                                 <div
                                     key={table}
@@ -41,33 +67,6 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
                                     }}
                                 >
                                     <h4>{table}</h4>
-                                    {
-                                        columnsCount
-                                            ? (
-                                                <ul
-                                                    style={{
-                                                        listStylePosition: 'inside',
-                                                        paddingLeft: 0,
-                                                    }}
-                                                >
-                                                    {
-                                                        columns
-                                                            ? Array.from(columns.keys()).map((columnName) => {
-                                                                const column = columns.get(columnName);
-                                                                return (
-                                                                    <li key={columnName}>
-                                                                        {column?.define.getText()}
-                                                                        &nbsp;-&gt;&nbsp;
-                                                                        {column?.source.getText()}
-                                                                    </li>
-                                                                )
-                                                            })
-                                                            : <li>No columns</li>
-                                                    }
-                                                </ul>
-                                            )
-                                            : null
-                                    }
                                 </div>
                             );
                         })
@@ -113,13 +112,12 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
 }
 
 interface SqlTestDagProps {
-    sqlTest: string[];
+    sqlTest: string;
 }
 
 interface SqlTestDagState {
-    currentTestIndex: number;
-    sqlTest: string[];
-    sqlTestCases: LsTestCase[];
+    sqlTest: string;
+    testCase: LsTestCase | null;
     contextManager: ContextManager | null;
 }
 
@@ -128,14 +126,12 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
     constructor(props: SqlTestDagProps) {
         super(props);
         this.state = {
-            currentTestIndex: 0,
             sqlTest: props.sqlTest,
-            sqlTestCases: [],
+            testCase: null,
             contextManager: null,
             ...SqlTestDag.getDerivedStateFromProps(props, {
-                currentTestIndex: 0,
-                sqlTest: [],
-                sqlTestCases: [],
+                sqlTest: '',
+                testCase: null,
                 contextManager: null
             }),
         };
@@ -143,14 +139,13 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
 
     static getDerivedStateFromProps(nextProps: SqlTestDagProps, prevState: SqlTestDagState) {
         if (nextProps.sqlTest !== prevState.sqlTest) {
-            const sqlTestCases = nextProps.sqlTest.map((test) => caseFromString(test));
-            const testCase = sqlTestCases[prevState.currentTestIndex];
+            const testCase = caseFromString(nextProps.sqlTest);
             const model = testCase.model;
             const contextManager = createHiveLs(model).getContextManager();
 
             return {
                 sqlTest: nextProps.sqlTest,
-                sqlTestCases,
+                testCase,
                 contextManager
             };
         }
@@ -158,7 +153,7 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
     }
 
     getCurrentCaseText() {
-        const testCase = this.state.sqlTestCases[this.state.currentTestIndex];
+        const testCase = this.state.testCase;
         return testCase?.model?.getValue() || '';
     }
 
@@ -177,25 +172,31 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
             <div
                 style={{
                     maxHeight: '100vh',
-                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
                     position: 'relative',
                 }}
             >
                 <h3
                     style={{
-                        position: 'sticky',
-                        top: 0,
-                        background: 'white'
+                        background: 'white',
+                        flex: '0 0 auto',
                     }}
                 >SQL Test DAG</h3>
                 <div
                     style={{
-                        display: 'flex'
+                        display: 'flex',
+                        flex: 1,
+                        overflowY: 'auto',
+                        position: 'relative',
                     }}
                 >
                     <div
                         style={{
                             flex: '1 0 50%',
+                            position: 'sticky',
+                            top: 0,
+                            overflowY: 'auto',
                         }}
                     >
                         <pre>

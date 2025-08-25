@@ -1,247 +1,18 @@
 
 import { ParserRuleContext, ParseTree, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
-import { ColumnNameContext, ColumnNameCreateContext, ConstantContext, CteStatementContext, ExpressionContext, FromClauseContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableAllColumnsContext, TableNameContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { AtomSelectStatementContext, ColumnNameContext, ColumnNameCreateContext, ConstantContext, CteStatementContext, ExpressionContext, FromClauseContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableAllColumnsContext, TableNameContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
-import { posInRange } from "./ls_helper";
-import { isKeyWord, printNode } from "./sql_ls_helper";
-
-function uuidv4() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
-
-type TableColumnsInfo = Map<string, {
-    define: ParserRuleContext,
-    source: ParserRuleContext
-}>;
-
-export class IdentifierScope {
-    uuid = uuidv4();
-
-    tableIdentifierMap: Map<string, ParserRuleContext> = new Map();
-
-    tableColumnIdentifierMap: Map<string, TableColumnsInfo> = new Map();
-
-    referenceMap: Map<string, ParserRuleContext[]> = new Map();
-
-    referenceNotFound: Map<string, ParserRuleContext[]> = new Map();
-
-    defaultIdentifier: ParserRuleContext | null = null;
-
-    children: IdentifierScope[] = [];
-
-    highlightRanges: { start: number; end: number }[] = [];
-
-    constructor(
-        public context: ParserRuleContext,
-        public parent: IdentifierScope | null = null
-    ) {
-    }
-
-    get range() {
-        if (!this.context) {
-            return null;
-        }
-
-        return {
-            startLineNumber: this.context.start!.line,
-            startColumn: this.context.start!.column,
-            endLineNumber: this.context.stop!.line,
-            endColumn: this.context.stop!.column + (this.context.stop!.text || '').length
-        };
-    }
-
-    setDefaultIdentifier(identifier: ParserRuleContext) {
-        this.defaultIdentifier = identifier;
-    }
-
-    addIdentifier(name: string, identifier: ParserRuleContext, isTempTable = false) {
-        if (identifier) {
-            this.tableIdentifierMap.set(name, identifier);
-            if (isTempTable) {
-                this.tableColumnIdentifierMap.set(name, new Map());
-            }
-        }
-    }
-
-    getAllIdentifiers() {
-        const identifiers = new Map<string, ParserRuleContext>(this.tableIdentifierMap);
-        if (this.parent) {
-            const parentIdentifiers = this.parent.getAllIdentifiers();
-            parentIdentifiers.forEach((value, key) => {
-                if (!identifiers.has(key)) {
-                    identifiers.set(key, value);
-                }
-            });
-        }
-        return identifiers;
-    }
-
-    getDefaultIdentifier(): ParserRuleContext | null {
-        const defaultIdentifier = this.parent?.defaultIdentifier;
-        if (defaultIdentifier) {
-            if (defaultIdentifier instanceof TableSourceContext) {
-                const tableName = defaultIdentifier.tableOrView().getText();
-                const parentRes = this.parent?.lookupDefinition(tableName);
-                if (parentRes) {
-                    return parentRes;
-                }
-            }
-            return defaultIdentifier;
-        }
-        return null;
-    }
-
-    enterScope(context: ParserRuleContext) {
-        const newScope = new IdentifierScope(context, this);
-        this.children.push(newScope);
-        return newScope;
-    }
-
-    exitScope() {
-        if (this.parent) {
-            const parent = this.parent;
-            // 清理references
-            this.referenceMap.forEach((refs, name) => {
-                if (!this.tableIdentifierMap.has(name)) {
-                    refs.forEach(ref => {
-                        parent.addReference(name, ref);
-                    });
-                } else {
-                    const identifier = this.tableIdentifierMap.get(name);
-                    this.referenceMap.set(name, refs.filter(ref => ref !== identifier));
-                }
-            });
-
-            return this.parent;
-        }
-
-        this.referenceMap.forEach((refs, name) => {
-            if (!this.tableIdentifierMap.has(name)) {
-                this.referenceNotFound.set(name, refs);
-            } else {
-                const identifier = this.tableIdentifierMap.get(name);
-                this.referenceMap.set(name, refs.filter(ref => ref !== identifier));
-            }
-        });
-    }
-
-    lookupDefinition(name: string): ParserRuleContext | null {
-        const identifier = this.tableIdentifierMap.get(name);
-        if (!identifier) {
-            if (this.parent) {
-                return this.parent.lookupDefinition(name);
-            }
-            const missingRef = this.referenceNotFound.get(name);
-            if (missingRef) {
-                return missingRef[0];
-            }
-            return null;
-        }
-        if (identifier instanceof TableSourceContext) {
-            const name = identifier.tableOrView().getText();
-            const parentRes = this.parent?.lookupDefinition(name)
-            if (parentRes) {
-                return parentRes;
-            }
-            return identifier;
-        }
-        return identifier;
-    }
-
-    containsPosition(position: Position): boolean {
-        if (!this.range) {
-            return false;
-        }
-        return posInRange(position, this.range);
-    }
-
-    toString(depth: number = 0, result: string[] = []) {
-        const indent = ' '.repeat(depth * 2);
-        result.push(`${indent}(${printNode(this.context)})`);
-        const identifiers = this.tableIdentifierMap.entries();
-        Array.from(identifiers).forEach(([name, identifier]) => {
-            result.push(`${indent}  ${name} -> ${printNode(identifier)}`);
-        });
-        this.children.forEach(child => {
-            child.toString(depth + 1, result);
-        });
-        return result.join('\n');
-    }
-
-    addReference(name: string, reference: ParserRuleContext) {
-        if (!this.referenceMap.has(name)) {
-            this.referenceMap.set(name, []);
-        }
-        this.referenceMap.get(name)!.push(reference);
-    }
-
-    getScopeByIdentifier(name: string): IdentifierScope | null {
-        if (this.tableIdentifierMap.has(name)) {
-            return this;
-        }
-        if (this.parent) {
-            return this.parent.getScopeByIdentifier(name);
-        }
-        return null;
-    }
-
-    getReferencesByName(name: string): ParserRuleContext[] {
-        if (this.tableIdentifierMap.has(name)) {
-            const references = this.referenceMap.get(name);
-            if (references) {
-                return references;
-            }
-            return [];
-        }
-        return this.parent?.getReferencesByName(name) || [];
-    }
-
-    addHighlight(range: { start: number; end: number }) {
-        if (range.start === range.end) {
-            throw new Error(`Highlight ranges should not have zero length: ${JSON.stringify(range)}`);
-        }
-        this.highlightRanges.push(range);
-    }
-    
-    addHighlightNode(node: ParserRuleContext) {
-        console.log('Adding highlight node:', node);
-        this.addHighlight({
-            start: node.start?.start || 0,
-            end: (node.stop?.stop || 0) + 1
-        })
-    }
-
-    getHighlights(ret: {
-        start: number;
-        end: number;
-    }[] = []) {
-        this.children.forEach(child => {
-            child.getHighlights(ret);
-        });
-        this.highlightRanges.forEach(range => {
-            ret.push(range);
-        });
-
-        ret.sort((a, b) => {
-            if (a.start !== b.start) {
-                return a.start - b.start;
-            }
-            throw new Error(`Highlights should not have the same start position: ${JSON.stringify(a)} and ${JSON.stringify(b)}`);
-            return a.end - b.end;
-        });
-
-        return ret;
-    }
-}
+import { isKeyWord } from "./sql_ls_helper";
+import { IdentifierScope } from "./Identifier_scope";
+import { MapReduceScope } from "./mr_scope";
 
 export class ContextManager {
     identifierMap: Map<string, IdentifierScope> = new Map();
     rootContext: IdentifierScope | null = null;
     currentContext: IdentifierScope | null = null;
+
+    mrScopes: MapReduceScope[] = [];
 
     constructor(public tree: ProgramContext) {
         const manager = this;
@@ -252,6 +23,7 @@ export class ContextManager {
             const newContext = manager.currentContext!.enterScope(ctx);
             manager.identifierMap.set(newContext.uuid, newContext);
             manager.currentContext = newContext;
+            return newContext;
         }
 
         function exitRule() {
@@ -260,11 +32,25 @@ export class ContextManager {
                 manager.currentContext = manager.currentContext.exitScope()!;
             }
         }
+
+        function enterTable(ctx: AtomSelectStatementContext, identifierScope: IdentifierScope) {
+            const mrScope = new MapReduceScope(ctx, identifierScope);
+            manager.mrScopes.push(mrScope);
+            identifierScope.mrScope = mrScope;
+        }
+
         const listener = new class extends HiveSqlParserListener {
             enterQueryStatementExpression = (ctx: QueryStatementExpressionContext) => {
                 enterRule(ctx);
             };
             exitQueryStatementExpression = (ctx: QueryStatementExpressionContext) => {
+                exitRule();
+            };
+            enterAtomSelectStatement = (ctx: AtomSelectStatementContext) => {
+                const identifierScope = enterRule(ctx);
+                enterTable(ctx, identifierScope);
+            };
+            exitAtomSelectStatement = (ctx: AtomSelectStatementContext) => {
                 exitRule();
             };
             enterSelectStatementWithCTE = (ctx: SelectStatementWithCTEContext) => {
@@ -314,6 +100,7 @@ export class ContextManager {
 
                     if (defaultTableInfo) {
                         manager.currentContext?.setDefaultIdentifier(defaultTableInfo);
+                        manager.currentContext?.getMrScope()?.setDefaultInputTable('', defaultTableInfo);
                     }
 
                     const children = ctx.children!;
@@ -396,6 +183,9 @@ export class ContextManager {
             };
 
             enterColumnName = (ctx: ColumnNameContext) => {
+                const context = manager.currentContext;
+                const mrScope = context?.getMrScope();
+
                 const ids = ctx.poolPath()?.id_();
                 if (ids?.length == 1) {
                     // Single identifier, likely a column name
@@ -434,14 +224,58 @@ export class ContextManager {
                 manager.currentContext?.addHighlightNode(ctx);
             };
 
-            enterTableAllColumns = (ctx: TableAllColumnsContext) => {
-                manager.currentContext?.addHighlightNode(ctx);
-            };
-
             enterSelectItem = (ctx: SelectItemContext) => {
-                const ids = ctx.id_();
-                for (const id of ids) {
-                    manager.currentContext?.addHighlightNode(id);
+                const context = manager.currentContext;
+                const mrScope = context?.getMrScope();
+                const allColumns = ctx.tableAllColumns();
+                if (allColumns) {
+                    mrScope?.addExportColumn({
+                        exportColumnName: '*', // will be all_columns from the refed table;
+                        referanceTableName: allColumns.id_(0)?.getText?.() || '',
+                        referanceColumnName: '*',
+                        reference: allColumns,
+                        defineReference: allColumns
+                    });
+                    context?.addHighlightNode(allColumns);
+                    return;
+                }
+
+                const sourceColumn = ctx.columnName();
+                if (sourceColumn) {
+                    const id = ctx.id_()[0];
+                    if (id) {
+                        context?.addHighlightNode(id);
+                        mrScope?.addExportColumn({
+                            exportColumnName: id.getText(),
+                            referanceColumnName: columnNameFromColumnPath(sourceColumn),
+                            referanceTableName: tableNameFromColumnPath(sourceColumn),
+                            reference: sourceColumn,
+                            defineReference: id,
+                        });
+                    } else {
+                        mrScope?.addExportColumn({
+                            exportColumnName: sourceColumn.getText(),
+                            referanceColumnName: columnNameFromColumnPath(sourceColumn),
+                            referanceTableName: tableNameFromColumnPath(sourceColumn),
+                            reference: sourceColumn,
+                            defineReference: sourceColumn
+                        });
+                    }
+                }
+                const expression = ctx.expression();
+                if (expression) {
+                    context?.addHighlightNode(expression);
+                    const id = ctx.id_();
+                    for (const i of id) {
+                        context?.addHighlightNode(i);
+                        mrScope?.addExportColumn({
+                            exportColumnName: i.getText(),
+                            referanceColumnName: '',
+                            referanceTableName: '',
+                            reference: expression,
+                            defineReference: i,
+                        });
+                    }
                 }
             };
 
@@ -500,6 +334,10 @@ export class ContextManager {
         console.log('Getting highlights', this.rootContext);
         return this.rootContext?.getHighlights() || [];
     }
+
+    validate() {
+        return this.rootContext?.validate() || [];
+    }
 }
 
 
@@ -522,11 +360,13 @@ function tableInfoFromTableSource(
             context.id_()?.getText() || '',
             context
         );
+        currentContext.getMrScope()?.addInputTable(alias, context, context.id_()!);
     }
 
     const tableName = context.tableOrView()?.getText();
     if (tableName) {
         currentContext.addReference(tableName, context);
+        currentContext.getMrScope()?.addInputTable(tableName, context, context.tableOrView()!);
     }
 
     return context;
@@ -541,17 +381,8 @@ function tableInfoFromSubQuerySource(
     }
     const name = subQuerySource.id_()?.getText();
     currentContext.addIdentifier(name || '', subQuerySource, true);
+    currentContext.getMrScope()?.addInputTable(name || '', subQuerySource, subQuerySource.id_()!);
 
-    const selectItems = (subQuerySource.queryStatementExpression()
-        .queryStatementExpressionBody()
-        .regularBody() as SelectStmtContext)
-        .selectStatement?.()
-        .atomSelectStatement()
-        .selectClause()?.selectItem();
-    if (selectItems) {
-        const columns = columnsMapFromSelectItems(selectItems);
-        currentContext.tableColumnIdentifierMap.set(name || '', columns);
-    }
     return subQuerySource;
 }
 
@@ -564,13 +395,7 @@ function tableInfoFromVirtualTableSource(
     }
     const name = virtualTableSource.tableAlias()?.getText();
     currentContext.addIdentifier(name || '', virtualTableSource, true);
-    const colunms = virtualTableSource.id_();
-    for (const column of colunms) {
-        currentContext.tableColumnIdentifierMap.get(name)?.set(column.getText(), {
-            define: column,
-            source: virtualTableSource
-        });
-    }
+    currentContext.getMrScope()?.addInputTable(name || '', virtualTableSource, virtualTableSource.tableAlias()!);
     return virtualTableSource;
 }
 
@@ -583,50 +408,8 @@ function tableInfoFromCteStatement(
     }
     const name = cteStatement.id_()?.getText();
     currentContext.addIdentifier(name || '', cteStatement, true);
-
-    const selectItems = (cteStatement.queryStatementExpression()
-        .queryStatementExpressionBody()
-        .regularBody() as SelectStmtContext)
-        .selectStatement?.()
-        .atomSelectStatement()
-        .selectClause()?.selectItem();
-    if (selectItems) {
-        const columns = columnsMapFromSelectItems(selectItems);
-        currentContext.tableColumnIdentifierMap.set(name || '', columns);
-    }
+    currentContext.getMrScope()?.addInputTable(name || '', cteStatement, cteStatement.id_()!);
     return cteStatement;
-}
-
-function columnsMapFromSelectItems(selectItems: SelectItemContext[]): TableColumnsInfo {
-    const columns = new Map<string, {
-        define: ParserRuleContext,
-        source: ParserRuleContext
-    }>();
-    for (const item of selectItems) {
-        if (item instanceof SelectItemContext) {
-            const columnName = item.id_();
-            if (columnName.length) {
-                for (const column of columnName) {
-                    columns.set(column.getText(), {
-                        define: column,
-                        source: (item.tableAllColumns() || item.columnName() || item.expression())!
-                    });
-                }
-            } else {
-                const columnName = item.columnName();
-                if (columnName) {
-                    const ids = columnName.poolPath()?.id_();
-                    if (ids && ids.length > 0) {
-                        columns.set(ids[ids.length - 1].getText(), {
-                            define: columnName,
-                            source: columnName
-                        });
-                    }
-                }
-            }
-        }
-    }
-    return columns;
 }
 
 function getNextOnExpression(children: ParseTree[], current: JoinSourcePartContext): ParserRuleContext | null {
@@ -662,4 +445,20 @@ function getNextUsingExpression(children: ParseTree[], current: JoinSourcePartCo
         }
     }
     return null
+}
+
+function tableNameFromColumnPath(ctx: ColumnNameContext): string {
+    const ids = ctx.poolPath()?.id_();
+    if (ids?.length == 1) {
+        return '';
+    }
+    if ((ids?.length || 0) > 1) {
+        return ids ? ids[ids.length - 2]?.getText() : '';
+    }
+    return '';
+}
+
+function columnNameFromColumnPath(ctx: ColumnNameContext): string {
+    const ids = ctx.poolPath()?.id_();
+    return ids ? ids[ids.length - 1]?.getText() : '';
 }

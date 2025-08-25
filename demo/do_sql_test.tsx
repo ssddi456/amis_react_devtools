@@ -79,7 +79,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
     useEffect(() => {
         const model = testCase.model;
         const positions = testCase.positions;
-        const hiveLs = createHiveLs(model);
+        const hiveLs = createHiveLs(model, showDebug);
         const hoverResults = positions.map(pos => {
             const resInfo = hiveLs.doHover(pos, showDebug);
             return resInfo;

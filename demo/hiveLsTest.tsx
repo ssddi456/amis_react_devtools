@@ -201,12 +201,11 @@ from data.data_test_news_record_da
 
 console.log('sql test cases', sqlTest);
 
-export const sqlTestDag = `
+export const sqlTestDag1 = `
 with t1 as (
   select
     house_code, resblock_id, resblock_name
   from data.data_test_news_record_di
-        ^     ^
   where pt = 2
 ),
 t2 as (
@@ -225,19 +224,30 @@ t4 as (
     resblock_id as t4_resblock_id,
     quota_date as t4_quota_date
   from t2
+),
+t5 as (
+  select
+    a.house_code as t5_house_code,
+    a.resblock_id as t5_resblock_id,
+    a.quota_date as t5_quota_date
+  from t2 a
+),
+t6 as (
+  select
+    a.house_code as house_code,
+    '' as test,
+    count(*) as count
+  from t2 a
+  group by a.house_code
+  having count > 0
 )
 select
   t1.house_code, t1.resblock_id, t3.quota_date
-  ^   ^                           ^  ^
 from t1
-     ^
   left join t2
-            ^
     on t1.house_code = t2.house_code
     and t1.resblock_id = t2.resblock_id
   left join t3
-            ^
     using (house_code, resblock_id)
-
 ;
 `;

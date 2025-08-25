@@ -88,7 +88,7 @@ export function isPosInParserRuleContext(position: Position, context: ParserRule
 }
 
 
-function ruleIndexToDisplayName(node: ParserRuleContext | TerminalNode): string | undefined {
+export function ruleIndexToDisplayName(node: ParserRuleContext | TerminalNode): string | undefined {
     const symbolicNames = HiveSqlParser.symbolicNames;
     if (node instanceof TerminalNode) {
         if (node.symbol.type >= 0 && node.symbol.type < symbolicNames.length) {
