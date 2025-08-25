@@ -111,7 +111,7 @@ const App = () => {
       {/* <ClickToComponent /> */}
       {AppComponent}
       <SqlTestDag
-        sqlTest={sqlTest[0].model.getValue()}
+        sqlTest={sqlTest[6].model.getValue()}
       />
       <SqlTestNavigation
         sqlTest={sqlTest}

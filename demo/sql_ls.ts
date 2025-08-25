@@ -303,6 +303,7 @@ interface EntityInfo {
 }
 
 const formatHoverRes = (hoverInfo: EntityInfo): WithSource<languages.Hover> => {
+    console.log('formatHoverRes', hoverInfo);
     switch (hoverInfo.type) {
         case 'table':
             return { ...tableRes(hoverInfo.tableInfo!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
@@ -632,8 +633,14 @@ export const createHiveLs = (model: {
         contextManager
     } = getContextWithCache(document.getText());
 
+    const logSource = (arg: any) => {
+        if (arg && '__source' in arg) {
+            const source = arg.__source;
+            console.log(`vscode://file/${source.fileName}:${source.lineNumber}:${source.columnNumber}`);
+        }
+    };
+    const logger: (...args: any[]) => void = isTest ?  console.log : () => { };
 
-    const logger = isTest ? console.log : () => { };
     logger('getCtxFromPos foundNode', contextManager.toString());
 
     const getCtxFromPos = (position: Position) => {
@@ -671,7 +678,7 @@ export const createHiveLs = (model: {
             isTest?: boolean
         ) => {
             const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
-            if (!foundNode || !context || !mrScope || (
+            if (!foundNode || !context || (
                 !matchType(foundNode, 'id_')
                 && !matchType(foundNode, 'DOT')
                 && !matchType(foundNode, 'columnNamePath')
@@ -682,6 +689,8 @@ export const createHiveLs = (model: {
             }
 
             const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, mrScope, context, isTest);
+            logger('getTableAndColumnInfoAtPosition', hoverInfo);
+            logSource(hoverInfo);
             if (!hoverInfo) {
                 return;
             }
