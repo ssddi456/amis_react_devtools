@@ -43,23 +43,30 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
                                     <h4>{table}</h4>
                                     {
                                         columnsCount
-                                        ? (
-                                            <ul
-                                                style={{
-                                                    listStylePosition: 'inside',
-                                                    paddingLeft: 0,
-                                                }}
-                                            >
-                                                {
-                                                    columns
-                                                        ? Array.from(columns.keys()).map((column) => (
-                                                            <li key={column}>{column} -&gt; [ref from?] </li>
-                                                        ))
-                                                        : <li>No columns</li>
-                                                }
-                                            </ul>
-                                        )
-                                        : null
+                                            ? (
+                                                <ul
+                                                    style={{
+                                                        listStylePosition: 'inside',
+                                                        paddingLeft: 0,
+                                                    }}
+                                                >
+                                                    {
+                                                        columns
+                                                            ? Array.from(columns.keys()).map((columnName) => {
+                                                                const column = columns.get(columnName);
+                                                                return (
+                                                                    <li key={columnName}>
+                                                                        {column?.define.getText()}
+                                                                        &nbsp;-&gt;&nbsp;
+                                                                        {column?.source.getText()}
+                                                                    </li>
+                                                                )
+                                                            })
+                                                            : <li>No columns</li>
+                                                    }
+                                                </ul>
+                                            )
+                                            : null
                                     }
                                 </div>
                             );

@@ -559,10 +559,7 @@ const getIdentifierReferences = (
             if (!alias) {
                 return;
             }
-            const isDeclared = context.tableIdentifierMap.has(alias);
-            if (isDeclared) {
-                return context.getReferencesByName(alias);
-            }
+            return context.getReferencesByName(alias);
         }
         return;
     }
@@ -572,11 +569,7 @@ const getIdentifierReferences = (
     ]) as TableNameContext | null;
     if (foundTableName) {
         const tableName = foundTableName.getText();
-        const isDeclared = context.tableIdentifierMap.has(tableName);
-        if (isDeclared) {
-            return context.getReferencesByName(tableName);
-        }
-        return;
+        return context.getReferencesByName(tableName);
     }
 
 
@@ -586,12 +579,7 @@ const getIdentifierReferences = (
         if (!alias) {
             return;
         }
-        const isDeclared = context.tableIdentifierMap.has(alias);
-        console.log('foundSubQuerySource', printNode(foundSubQuerySource), 'alias:', alias, 'isDeclared:', isDeclared);
-        if (isDeclared) {
-            return context.getReferencesByName(alias);
-        }
-        return;
+        return context.getReferencesByName(alias);
     }
 
     const foundVirtualTableSource = matchSubPath(foundNode, ['id_', 'virtualTableSource']) as VirtualTableSourceContext | null;
@@ -600,11 +588,7 @@ const getIdentifierReferences = (
         if (!alias) {
             return;
         }
-        const isDeclared = context.tableIdentifierMap.has(alias);
-        if (isDeclared) {
-            return context.getReferencesByName(alias);
-        }
-        return;
+        return context.getReferencesByName(alias);
     }
 
     return;
@@ -706,13 +690,15 @@ export const createHiveLs = (model: {
             });
 
             contextManager.rootContext?.referenceNotFound.forEach(refs => {
-                refs.forEach(ref => {
-                    validations.push({
-                        severity: MarkerSeverity.Error,
-                        ...rangeFromNode(ref),
-                        message: `Reference not found: ${ref.getText()}`
-                    })
-                })
+                if (!tableInfoFromNode(refs[0], contextManager.rootContext!)) {
+                    refs.forEach(ref => {
+                        validations.push({
+                            severity: MarkerSeverity.Error,
+                            ...rangeFromNode(ref),
+                            message: `Reference not found: ${ref.getText()}`,
+                        });
+                    });
+                }
             });
 
             return validations;

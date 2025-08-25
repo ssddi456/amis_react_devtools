@@ -1,7 +1,7 @@
 
 import { ParserRuleContext, ParseTree, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
-import { ColumnNameContext, ColumnNameCreateContext, ConstantContext, CteStatementContext, ExpressionContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableAllColumnsContext, TableNameContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ColumnNameContext, ColumnNameCreateContext, ConstantContext, CteStatementContext, ExpressionContext, FromClauseContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableAllColumnsContext, TableNameContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
 import { posInRange } from "./ls_helper";
 import { isKeyWord, printNode } from "./sql_ls_helper";
@@ -13,12 +13,17 @@ function uuidv4() {
     });
 }
 
+type TableColumnsInfo = Map<string, {
+    define: ParserRuleContext,
+    source: ParserRuleContext
+}>;
+
 export class IdentifierScope {
     uuid = uuidv4();
 
     tableIdentifierMap: Map<string, ParserRuleContext> = new Map();
 
-    tableColumnIdentifierMap: Map<string, Map<string, ParserRuleContext>> = new Map();
+    tableColumnIdentifierMap: Map<string, TableColumnsInfo> = new Map();
 
     referenceMap: Map<string, ParserRuleContext[]> = new Map();
 
@@ -102,7 +107,6 @@ export class IdentifierScope {
             // 清理references
             this.referenceMap.forEach((refs, name) => {
                 if (!this.tableIdentifierMap.has(name)) {
-                    this.referenceMap.delete(name);
                     refs.forEach(ref => {
                         parent.addReference(name, ref);
                     });
@@ -118,7 +122,6 @@ export class IdentifierScope {
         this.referenceMap.forEach((refs, name) => {
             if (!this.tableIdentifierMap.has(name)) {
                 this.referenceNotFound.set(name, refs);
-                this.referenceMap.delete(name);
             } else {
                 const identifier = this.tableIdentifierMap.get(name);
                 this.referenceMap.set(name, refs.filter(ref => ref !== identifier));
@@ -187,11 +190,14 @@ export class IdentifierScope {
     }
 
     getReferencesByName(name: string): ParserRuleContext[] {
-        const references = this.referenceMap.get(name);
-        if (references) {
-            return references;
+        if (this.tableIdentifierMap.has(name)) {
+            const references = this.referenceMap.get(name);
+            if (references) {
+                return references;
+            }
+            return [];
         }
-        return [];
+        return this.parent?.getReferencesByName(name) || [];
     }
 
     addHighlight(range: { start: number; end: number }) {
@@ -271,6 +277,12 @@ export class ContextManager {
                 enterRule(ctx);
             };
             exitSelectStatement = (ctx: SelectStatementContext) => {
+                exitRule();
+            };
+            enterFromClause = (ctx: FromClauseContext) => {
+                enterRule(ctx);
+            };
+            exitFromClause = (ctx: FromClauseContext) => {
                 exitRule();
             };
             enterWithClause = (ctx: WithClauseContext) => {
@@ -554,7 +566,10 @@ function tableInfoFromVirtualTableSource(
     currentContext.addIdentifier(name || '', virtualTableSource, true);
     const colunms = virtualTableSource.id_();
     for (const column of colunms) {
-        currentContext.tableColumnIdentifierMap.get(name)?.set(column.getText(), column);
+        currentContext.tableColumnIdentifierMap.get(name)?.set(column.getText(), {
+            define: column,
+            source: virtualTableSource
+        });
     }
     return virtualTableSource;
 }
@@ -582,21 +597,30 @@ function tableInfoFromCteStatement(
     return cteStatement;
 }
 
-function columnsMapFromSelectItems(selectItems: SelectItemContext[]): Map<string, ParserRuleContext> {
-    const columns = new Map<string, ParserRuleContext>();
+function columnsMapFromSelectItems(selectItems: SelectItemContext[]): TableColumnsInfo {
+    const columns = new Map<string, {
+        define: ParserRuleContext,
+        source: ParserRuleContext
+    }>();
     for (const item of selectItems) {
         if (item instanceof SelectItemContext) {
             const columnName = item.id_();
             if (columnName.length) {
                 for (const column of columnName) {
-                    columns.set(column.getText(), column);
+                    columns.set(column.getText(), {
+                        define: column,
+                        source: (item.tableAllColumns() || item.columnName() || item.expression())!
+                    });
                 }
             } else {
                 const columnName = item.columnName();
                 if (columnName) {
                     const ids = columnName.poolPath()?.id_();
                     if (ids && ids.length > 0) {
-                        columns.set(ids[ids.length - 1].getText(), columnName);
+                        columns.set(ids[ids.length - 1].getText(), {
+                            define: columnName,
+                            source: columnName
+                        });
                     }
                 }
             }
