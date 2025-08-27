@@ -63,11 +63,7 @@ export function isPosInParserRuleContext(position: Position, context: ParserRule
     let startLine = startToken.line;
     let startColumn = startToken.column;
     let endLine = endToken.line;
-    let endColumn = endToken.column;
-
-    if (context.ruleIndex === HiveSqlParser.RULE_id_) {
-        endColumn = startColumn + (context.getText ? context.getText().length : 0);
-    }
+    let endColumn = endToken.column + (endToken.text?.length || 0);
 
     if (lineNumber === startLine && column >= startColumn && lineNumber === endLine && column < endColumn) {
         return true;

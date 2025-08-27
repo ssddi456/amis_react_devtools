@@ -417,7 +417,7 @@ const getTableAndColumnInfoAtPosition = (
             ['id_', 'subQuerySource'],
         ])
     ) {
-        const item = allIdentifiers.get(foundNode.getText());
+        const item = mrScope?.getTableByName(foundNode.getText());
         const tableInfo = item && tableInfoFromNode(item, context);
         if (!tableInfo) {
             return {
@@ -483,8 +483,9 @@ const getTableAndColumnInfoAtPosition = (
             };
         }
 
-        const item = context.lookupDefinition(tableIdExp);
+        const item = mrScope?.getTableByName(tableIdExp);
         const tableInfo = item && tableInfoFromNode(item, context);
+        console.log('tableIdExp', tableIdExp, 'context', context, 'mrScope', mrScope, 'mrScope?.getTableByName()', mrScope?.getTableByName(tableIdExp), 'item', item)
 
         if (!tableInfo) {
             console.log('No table info found for:', printNode(item));
@@ -597,8 +598,8 @@ interface ContextInfos {
 
 const contextCache = new Map<string, ContextInfos>();
 
-function getContextWithCache(text: string): ContextInfos {
-    if (contextCache.has(text)) {
+function getContextWithCache(text: string, noCache: boolean): ContextInfos {
+    if (contextCache.has(text) && !noCache) {
         return contextCache.get(text)!;
     }
     const hiveSqlParse = new HiveSQL();
@@ -620,10 +621,14 @@ function getContextWithCache(text: string): ContextInfos {
 // hive is from
 // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4
 //
-export const createHiveLs = (model: {
-    uri: { toString: () => string; };
-    getValue: () => string;
-}, isTest?: boolean) => {
+export const createHiveLs = (
+    model: {
+        uri: { toString: () => string; };
+        getValue: () => string;
+    },
+    isTest: boolean = false,
+    noCache: boolean = false,
+) => {
 
     const document = TextDocument.create(model.uri.toString(), 'hivesql', 0, model.getValue());
     const  {
@@ -631,7 +636,7 @@ export const createHiveLs = (model: {
         sqlSlices,
         tree,
         contextManager
-    } = getContextWithCache(document.getText());
+    } = getContextWithCache(document.getText(), noCache);
 
     const logSource = (arg: any) => {
         if (arg && '__source' in arg) {

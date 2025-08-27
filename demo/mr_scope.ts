@@ -116,7 +116,8 @@ export class MapReduceScope {
     }
 
     getTableByName(name: string): ParserRuleContext | undefined {
-        return this.identifierScope.getReferencesByName(name)[0];
+        const tableInfo = this.inputTable.get(name);
+        return tableInfo?.reference;
     }
 
     getColumnByName(tableName: string | null, columnName: string): ColumnInfo | null {

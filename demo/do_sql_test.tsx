@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactElement } from "react";
+import { useState, useEffect, ReactElement, useCallback } from "react";
 import { LsTestCase, WithSource } from "./ls_helper";
 import { languages, editor } from 'monaco-editor';
 import { createHiveLs } from "./sql_ls";
@@ -56,12 +56,12 @@ export function createHighlightedText(text: string, positions: Array<{ lineNumbe
 
 
 export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; showDebug?: boolean }) {
-    // 从 localStorage 获取初始 tab 状态，默认为 'hover'
-    const [activeTab, setActiveTab] = useState<'hover' | 'definition' | 'references' | 'validation'>(() => {
+    // 从 localStorage 获取初始 tab 状态，默认为 'results'
+    const [activeTab, setActiveTab] = useState<'results' | 'validation'>(() => {
         const saved = localStorage.getItem('doSqlTest_activeTab');
-        return (saved === 'hover' || saved === 'definition' || saved === 'references' || saved === 'validation') ? saved : 'hover';
+        return (saved === 'results' || saved === 'validation') ? saved : 'results';
     });
-
+    const [resultIdx, setResultIdx] = useState(0);
     // 保存 tab 状态到 localStorage
     useEffect(() => {
         localStorage.setItem('doSqlTest_activeTab', activeTab);
@@ -70,32 +70,55 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
     const [results, setResult] = useState<{
         model: LsTestCase['model'];
         positions: LsTestCase['positions'];
-        hoverResults: (WithSource<languages.Hover> | undefined)[];
-        definitionResults: (WithSource<languages.Definition> | undefined)[];
-        referencesResults: (WithSource<languages.Location[]> | undefined)[];
         validationResults: WithSource<editor.IMarkerData>[] | undefined;
+        resultItems: {
+            hoverResult: (WithSource<languages.Hover> | undefined);
+            definitionResult: (WithSource<languages.Definition> | undefined);
+            referencesResult: (WithSource<languages.Location[]> | undefined);
+        }[]
     } | null>(null);
 
     useEffect(() => {
         const model = testCase.model;
         const positions = testCase.positions;
         const hiveLs = createHiveLs(model, showDebug);
-        const hoverResults = positions.map(pos => {
-            const resInfo = hiveLs.doHover(pos, showDebug);
-            return resInfo;
+        const resultItems = positions.map(pos => {
+            const hoverResult = hiveLs.doHover(pos, showDebug);
+            const definitionResult = hiveLs.doDefinition(pos, showDebug);
+            const referencesResult = hiveLs.doReferences(pos, showDebug);
+            return { hoverResult, definitionResult, referencesResult };
         });
-        const definitionResults = positions.map(pos => {
-            const resInfo = hiveLs.doDefinition(pos, showDebug);
-            return resInfo;
-        });
-        const referencesResults = positions.map(pos => {
-            const resInfo = hiveLs.doReferences(pos, showDebug);
-            return resInfo;
-        });
+
         const validationResults = hiveLs.doValidation();
-        setResult({ model, positions, hoverResults, definitionResults, referencesResults, validationResults });
+        setResult({
+            model, positions,
+            validationResults,
+            resultItems, 
+        });
+        setResultIdx(0);
     }, [testCase, showDebug]);
 
+    const rephrase = useCallback((idx: number) => {
+        const resultItems = results!.resultItems.map((item, i) => {
+            if (i === idx) {
+                const model = testCase.model;
+                const hiveLs = createHiveLs(model, showDebug, true);
+                const positions = testCase.positions;
+                const pos = positions[i]; // Get the position of the item
+                // Apply rephrasing logic to the selected item
+                const hoverResult = hiveLs.doHover(pos, showDebug);
+                const definitionResult = hiveLs.doDefinition(pos, showDebug);
+                const referencesResult = hiveLs.doReferences(pos, showDebug);
+                return {
+                    hoverResult,
+                    definitionResult,
+                    referencesResult
+                };
+            }
+            return item;
+        });
+        setResult(prev => prev ? { ...prev, resultItems } : null);
+    }, [results]);
     const highlightedText = createHighlightedText(testCase.model.getValue(), testCase.positions);
 
     // Tab 按钮样式
@@ -119,6 +142,8 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
             </div>
         );
     }
+
+    const currentResultItem = results.resultItems[resultIdx];
 
     return (
         <div
@@ -161,22 +186,10 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                     }}
                 >
                     <button
-                        style={tabButtonStyle(activeTab === 'hover')}
-                        onClick={() => setActiveTab('hover')}
+                        style={tabButtonStyle(activeTab === 'results')}
+                        onClick={() => setActiveTab('results')}
                     >
-                        Hover Results
-                    </button>
-                    <button
-                        style={tabButtonStyle(activeTab === 'definition')}
-                        onClick={() => setActiveTab('definition')}
-                    >
-                        Definition Results
-                    </button>
-                    <button
-                        style={tabButtonStyle(activeTab === 'references')}
-                        onClick={() => setActiveTab('references')}
-                    >
-                        References Results
+                        Results
                     </button>
                     <button
                         style={tabButtonStyle(activeTab === 'validation')}
@@ -187,26 +200,62 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                 </div>
 
                 {/* Tab 内容 */}
-                {activeTab === 'hover' && (
-                    <HoverResults 
-                        hoverResults={results.hoverResults} 
-                        positions={results.positions} 
-                    />
+                {activeTab === 'results' && (
+                    <>
+                        <div style={{ marginBottom: '10px', display: 'flex', gap: '4px' }}>
+                            {results.positions.map((_, idx) => {
+                                const result = results.resultItems[idx].hoverResult;
+                                return (
+                                <button
+                                    key={idx}
+                                    style={{
+                                        padding: '4px 8px',
+                                        backgroundColor: idx === resultIdx ? '#007acc' : '#f0f0f0',
+                                        color: idx === resultIdx ? 'white' : '#333',
+                                        border: !result ? '1px solid red' : 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer'
+                                    }}
+                                    onClick={() => setResultIdx(idx)}
+                                >
+                                    {idx + 1}
+                                    <span style={{ marginLeft: '4px', fontSize: '12px', color: 'red' }}>
+                                        {!results.resultItems[idx].hoverResult ? '!' : null}
+                                    </span>
+                                </button>
+                            )})}
+                        </div>
+                        <div>
+                            <button style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#007acc',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                            }}
+                                onClick={() => {
+                                    rephrase(resultIdx);
+                                }}
+                            >
+                                rephrase
+                            </button>
+                        </div>
+                        <HoverResults
+                            hoverResults={[currentResultItem.hoverResult]} 
+                            positions={[results.positions[resultIdx]]} 
+                        />
+                        <DefinitionResults 
+                            definitionResults={[currentResultItem.definitionResult]} 
+                            positions={[results.positions[resultIdx]]} 
+                        />
+                        <ReferencesResults 
+                            referencesResults={[currentResultItem.referencesResult]} 
+                            positions={[results.positions[resultIdx]]}
+                        />
+                    </>
                 )}
 
-                {activeTab === 'definition' && (
-                    <DefinitionResults 
-                        definitionResults={results.definitionResults} 
-                        positions={results.positions} 
-                    />
-                )}
-
-                {activeTab === 'references' && (
-                    <ReferencesResults 
-                        referencesResults={results.referencesResults} 
-                        positions={results.positions} 
-                    />
-                )}
 
                 {activeTab === 'validation' && (
                     <ValidationResults 
