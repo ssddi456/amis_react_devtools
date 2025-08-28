@@ -96,32 +96,30 @@ export class IdentifierScope {
         return newScope;
     }
 
-    exitScope() {
-        if (this.parent) {
-            const parent = this.parent;
-            // 清理references
-            this.referenceMap.forEach((refs, name) => {
-                if (!this.tableIdentifierMap.has(name)) {
-                    this.referenceMap.delete(name);
+    collectScope() {
+        this.children.forEach((child) => {
+            child.collectScope();
+        });
+
+        const mrScope = this.getMrScope();
+        const parent = this.parent;
+        this.referenceMap.forEach((refs, name) => {
+            const identifier = mrScope?.inputTable.get(name);
+            if (identifier) {
+                const referenceMap = mrScope!.identifierScope.referenceMap;
+                const oldRefs = referenceMap.get(name) || [];
+                referenceMap.set(name, [...oldRefs, ...refs].filter(ref => ref !== identifier.defineReference));
+                return;
+            } else {
+
+                console.log('Reference not found:', name, refs);
+                if (parent) {
                     refs.forEach(ref => {
                         parent.addReference(name, ref);
                     });
-                } else {
-                    const identifier = this.tableIdentifierMap.get(name);
-                    this.referenceMap.set(name, refs.filter(ref => ref !== identifier));
                 }
-            });
-
-            return this.parent;
-        }
-
-        this.referenceMap.forEach((refs, name) => {
-            if (!this.tableIdentifierMap.has(name)) {
+    
                 this.referenceNotFound.set(name, refs);
-                this.referenceMap.delete(name);
-            } else {
-                const identifier = this.tableIdentifierMap.get(name);
-                this.referenceMap.set(name, refs.filter(ref => ref !== identifier));
             }
         });
     }

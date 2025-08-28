@@ -28,12 +28,11 @@ export class ContextManager {
 
         function exitRule() {
             if (manager.currentContext) {
-
-                manager.currentContext = manager.currentContext.exitScope()!;
+                manager.currentContext = manager.currentContext.parent;
             }
         }
 
-        function enterTable(ctx: AtomSelectStatementContext, identifierScope: IdentifierScope) {
+        function enterTable(ctx: QueryStatementExpressionContext | AtomSelectStatementContext, identifierScope: IdentifierScope) {
             const mrScope = new MapReduceScope(ctx, identifierScope);
             manager.mrScopes.push(mrScope);
             identifierScope.mrScope = mrScope;
@@ -41,7 +40,8 @@ export class ContextManager {
 
         const listener = new class extends HiveSqlParserListener {
             enterQueryStatementExpression = (ctx: QueryStatementExpressionContext) => {
-                enterRule(ctx);
+                const identifierScope = enterRule(ctx);
+                enterTable(ctx, identifierScope);
             };
             exitQueryStatementExpression = (ctx: QueryStatementExpressionContext) => {
                 exitRule();
@@ -290,7 +290,7 @@ export class ContextManager {
 
         ParseTreeWalker.DEFAULT.walk(listener, tree);
         console.assert(this.currentContext === this.rootContext, 'Context manager did not exit all scopes correctly');
-        this.rootContext.exitScope();
+        this.rootContext.collectScope();
     }
 
     getContextByPosition(position: Position): IdentifierScope | null {
@@ -361,10 +361,8 @@ function tableInfoFromTableSource(
             context
         );
         currentContext.getMrScope()?.addInputTable(alias, context, context.id_()!);
-    }
-
-    const tableName = context.tableOrView()?.getText();
-    if (tableName) {
+    } else {
+        const tableName = context.tableOrView()?.getText();
         currentContext.addReference(tableName, context);
         currentContext.getMrScope()?.addInputTable(tableName, context, context.tableOrView()!);
     }

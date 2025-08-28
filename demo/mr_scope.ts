@@ -1,7 +1,7 @@
 import { ParserRuleContext } from "antlr4ng";
 import { uuidv4 } from "./util";
 import { IdentifierScope } from "./Identifier_scope";
-import { AtomSelectStatementContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { AtomSelectStatementContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { type Position } from "monaco-editor";
 import { isPosInParserRuleContext } from "./sql_ls_helper";
     
@@ -29,7 +29,7 @@ export class MapReduceScope {
     defaultInputTable: ParserRuleContext | null = null;
 
     constructor(
-        public context: AtomSelectStatementContext,
+        public context: QueryStatementExpressionContext | AtomSelectStatementContext,
         public identifierScope: IdentifierScope
     ) {
         
@@ -80,44 +80,59 @@ export class MapReduceScope {
         return errors;
     }
 
-    getScopeByPosition(position: Position): MapReduceScope | null {
+    getScopeByPosition(position: Position): MapReduceScope | null | undefined {
         const context = this.context;
-        const selectClause = context.selectClause();
-        if (selectClause && isPosInParserRuleContext(position, selectClause)) {
-            // input
+        if (context instanceof QueryStatementExpressionContext) {
             return this;
         }
-        const fromClause = context.fromClause();
-        if (fromClause && isPosInParserRuleContext(position, fromClause)) {
-            // input
-            return this.identifierScope.parent!.getMrScope();
-        }
-        const whereClause = context.whereClause();
-        if (whereClause && isPosInParserRuleContext(position, whereClause)) {
-            // input
-            return this;
-        }
-        const groupByClause = context.groupByClause();
-        if (groupByClause && isPosInParserRuleContext(position, groupByClause)) {
-            // input
-            return this;
-        }
-        const havingClause = context.havingClause();
-        if (havingClause && isPosInParserRuleContext(position, havingClause)) {
-            // input
-            return this;
-        }
-        const qualifyClause = context.qualifyClause();
-        if (qualifyClause && isPosInParserRuleContext(position, qualifyClause)) {
-            // input
-            return this;
+
+        if (context instanceof AtomSelectStatementContext) {
+            const selectClause = context.selectClause();
+            if (selectClause && isPosInParserRuleContext(position, selectClause)) {
+                // input
+                return this;
+            }
+            const fromClause = context.fromClause();
+            if (fromClause && isPosInParserRuleContext(position, fromClause)) {
+                // input
+                return this.getParentMrScope();
+            }
+            const whereClause = context.whereClause();
+            if (whereClause && isPosInParserRuleContext(position, whereClause)) {
+                // input
+                return this;
+            }
+            const groupByClause = context.groupByClause();
+            if (groupByClause && isPosInParserRuleContext(position, groupByClause)) {
+                // input
+                return this;
+            }
+            const havingClause = context.havingClause();
+            if (havingClause && isPosInParserRuleContext(position, havingClause)) {
+                // input
+                return this;
+            }
+            const qualifyClause = context.qualifyClause();
+            if (qualifyClause && isPosInParserRuleContext(position, qualifyClause)) {
+                // input
+                return this;
+            }
         }
         return null;
     }
 
     getTableByName(name: string): ParserRuleContext | undefined {
         const tableInfo = this.inputTable.get(name);
-        return tableInfo?.reference;
+        const reference = tableInfo?.reference;
+        if (reference) {
+            if (reference instanceof TableSourceContext) {
+                const tableName = reference.tableOrView().getText();
+                const parentMrScope = this.identifierScope.getMrScope();
+                console.log('getTableByName from parent MR scope:', tableName);
+                return parentMrScope?.getTableByName(tableName);
+            }
+        }
+        return reference;
     }
 
     getColumnByName(tableName: string | null, columnName: string): ColumnInfo | null {
@@ -129,5 +144,9 @@ export class MapReduceScope {
             return null;
         }
         return this.exportColumns.find(column => column.referanceTableName === tableName && column.referanceColumnName === columnName) || null;
+    }
+
+    getParentMrScope() {
+        return this.identifierScope?.parent?.getMrScope();
     }
 }

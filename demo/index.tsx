@@ -110,11 +110,11 @@ const App = () => {
     <div className="container">
       {/* <ClickToComponent /> */}
       {AppComponent}
-      <SqlTestDag
-        sqlTest={sqlTest[6].model.getValue()}
-      />
       <SqlTestNavigation
         sqlTest={sqlTest}
+      />
+      <SqlTestDag
+        sqlTest={sqlTest[11].model.getValue()}
       />
     </div>
   );

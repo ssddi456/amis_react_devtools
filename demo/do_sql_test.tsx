@@ -98,7 +98,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
         setResultIdx(0);
     }, [testCase, showDebug]);
 
-    const rephrase = useCallback((idx: number) => {
+    const reparse = useCallback((idx: number) => {
         const resultItems = results!.resultItems.map((item, i) => {
             if (i === idx) {
                 const model = testCase.model;
@@ -118,6 +118,11 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
             return item;
         });
         setResult(prev => prev ? { ...prev, resultItems } : null);
+    }, [results]);
+
+    const reValidate = useCallback(() => {
+        const validationResults = createHiveLs(testCase.model, showDebug, true).doValidation();
+        setResult(prev => prev ? { ...prev, validationResults } : null);
     }, [results]);
     const highlightedText = createHighlightedText(testCase.model.getValue(), testCase.positions);
 
@@ -235,7 +240,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                                 cursor: 'pointer'
                             }}
                                 onClick={() => {
-                                    rephrase(resultIdx);
+                                    reparse(resultIdx);
                                 }}
                             >
                                 rephrase
@@ -258,9 +263,27 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
 
 
                 {activeTab === 'validation' && (
-                    <ValidationResults 
-                        validationResults={results.validationResults} 
-                    />
+                    <>
+                        <div>
+                            <button style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#007acc',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                            }}
+                                onClick={() => {
+                                    reValidate();
+                                }}
+                            >
+                                reValidate
+                            </button>
+                        </div>
+                        <ValidationResults 
+                            validationResults={results.validationResults} 
+                        />
+                    </>
                 )}
             </div>
         </div>);

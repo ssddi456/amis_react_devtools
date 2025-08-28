@@ -151,13 +151,19 @@ function tableInfoFromCteStatement(
 
 function tableInfoFromNode(
     node: ParserRuleContext | null,
-    context: IdentifierScope
+    context: IdentifierScope,
+    mrScope?: MapReduceScope | null,
 ): TableInfo | null {
     if (!node) {
         return null;
     }
+    console.log('tableInfoFromNode find by node', printNode(node));
+
     const collection: TableInfo[] = [];
     if (node instanceof TableSourceContext) {
+        const tableOrView = node.tableOrView();
+        const alias = node.id_();
+
         return tableInfoFromTableSource(node, context, collection);
     } else if (node instanceof SubQuerySourceContext) {
         return tableInfoFromSubQuerySource(node, context, collection);
@@ -367,8 +373,8 @@ const getTableAndColumnInfoAtPosition = (
     ])) {
         const tableName = (parent as TableSourceContext).tableOrView().tableName()?.getText();
         if (tableName) {
-            const item = context.lookupDefinition(tableName);
-            const tableInfo = item && tableInfoFromNode(item, context);
+            const item = mrScope?.getTableByName(tableName);
+            const tableInfo = item && tableInfoFromNode(item, context, mrScope);
             if (tableInfo) {
                 return {
                     type: 'table',
@@ -391,8 +397,8 @@ const getTableAndColumnInfoAtPosition = (
         ])
     ) {
         const tableName = parent.getText();
-        const item = context.lookupDefinition(tableName);
-        const tableInfo = item && tableInfoFromNode(item, context);
+        const item = mrScope?.getTableByName(tableName);
+        const tableInfo = item && tableInfoFromNode(item, context, mrScope);
 
         pushExt(`do hover tableName ${printNode(parent)}, 'tableIdExp', ${tableName}, 'tableInfo', ${JSON.stringify(tableInfo)}`);
 
@@ -418,7 +424,7 @@ const getTableAndColumnInfoAtPosition = (
         ])
     ) {
         const item = mrScope?.getTableByName(foundNode.getText());
-        const tableInfo = item && tableInfoFromNode(item, context);
+        const tableInfo = item && tableInfoFromNode(item, context, mrScope);
         if (!tableInfo) {
             return {
                 type: 'unknown',
@@ -458,7 +464,7 @@ const getTableAndColumnInfoAtPosition = (
         // column_name only
         if (!tableIdExp) {
             const item = mrScope?.getTableByName(mrScope?.getDefaultInputTableName());
-            const tableInfo = item && tableInfoFromNode(item, context);
+            const tableInfo = item && tableInfoFromNode(item, context, mrScope);
             if (!tableInfo) {
                 return {
                     type: 'noTable',
@@ -484,7 +490,7 @@ const getTableAndColumnInfoAtPosition = (
         }
 
         const item = mrScope?.getTableByName(tableIdExp);
-        const tableInfo = item && tableInfoFromNode(item, context);
+        const tableInfo = item && tableInfoFromNode(item, context, mrScope);
         console.log('tableIdExp', tableIdExp, 'context', context, 'mrScope', mrScope, 'mrScope?.getTableByName()', mrScope?.getTableByName(tableIdExp), 'item', item)
 
         if (!tableInfo) {
@@ -732,7 +738,10 @@ export const createHiveLs = (
             });
 
             contextManager.rootContext?.referenceNotFound.forEach(refs => {
-                if (!tableInfoFromNode(refs[0], contextManager.rootContext!)) {
+                if (
+                    !(refs[0] instanceof TableSourceContext) ||
+                    !tableInfoFromNode(refs[0], contextManager.rootContext!)
+                ) {
                     refs.forEach(ref => {
                         validations.push({
                             severity: MarkerSeverity.Error,
