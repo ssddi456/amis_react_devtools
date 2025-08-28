@@ -29,7 +29,7 @@ export function createHighlightedText(text: string, positions: Array<{ lineNumbe
                 const char = line[index];
                 const prevContent = index > 0 ? line.slice(prevPosition, index) : '';
                 if (prevContent) {
-                    result.push(<span key={`prev-${i}`} style={{ color: 'gray' }}>{prevContent}</span>);
+                    result.push(<span key={`prev-${i}`}>{prevContent}</span>);
                 }
                 result.push(
                     <span key={i} style={{ backgroundColor: 'yellow', fontWeight: 'bold', color: 'red', position: 'relative' }}>

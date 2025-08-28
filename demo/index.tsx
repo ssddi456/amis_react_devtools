@@ -108,7 +108,7 @@ const AppComponent = amisRender(
 const App = () => {
   return (
     <div className="container">
-      {/* <ClickToComponent /> */}
+      <ClickToComponent />
       {AppComponent}
       <SqlTestNavigation
         sqlTest={sqlTest}

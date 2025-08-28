@@ -127,9 +127,11 @@ export class MapReduceScope {
         if (reference) {
             if (reference instanceof TableSourceContext) {
                 const tableName = reference.tableOrView().getText();
-                const parentMrScope = this.identifierScope.getMrScope();
-                console.log('getTableByName from parent MR scope:', tableName);
-                return parentMrScope?.getTableByName(tableName);
+                const parentMrScope = this.getParentMrScope();
+                const parentRef = parentMrScope?.getTableByName(tableName);
+                if (parentRef) {
+                    return parentRef;
+                }
             }
         }
         return reference;
