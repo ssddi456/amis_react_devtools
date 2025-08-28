@@ -1,4 +1,4 @@
-import { editor, type IRange, languages, type Position, Uri, MarkerSeverity } from "monaco-editor";
+import { editor, type IRange, languages, Position, Uri, MarkerSeverity } from "monaco-editor";
 import { TextDocument } from 'vscode-json-languageservice';
 import { EntityContext, HiveSQL, } from 'dt-sql-parser';
 import { AttrName } from 'dt-sql-parser/dist/parser/common/entityCollector';
@@ -346,11 +346,21 @@ const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): WithSource<langua
 
 
 const getTableAndColumnInfoAtPosition = (
-    foundNode: ParserRuleContext,
-    mrScope: MapReduceScope | null | undefined,
-    context: IdentifierScope,
+    foundNode?: ParserRuleContext | null,
+    mrScope?: MapReduceScope | null,
+    context?: IdentifierScope | null,
     isTest?: boolean
 ): EntityInfo | null => {
+    if (!foundNode || !context || (
+        !matchType(foundNode, 'id_')
+        && !matchType(foundNode, 'DOT')
+        && !matchType(foundNode, 'columnNamePath')
+        && !matchType(foundNode, 'poolPath')
+        && !matchType(foundNode, 'constant')
+    )) {
+        return null;
+    }
+
     const ext: string[] = [];
     const pushExt = isTest ? (content: string) => {
         ext.push(content);
@@ -689,16 +699,6 @@ export const createHiveLs = (
             isTest?: boolean
         ) => {
             const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
-            if (!foundNode || !context || (
-                !matchType(foundNode, 'id_')
-                && !matchType(foundNode, 'DOT')
-                && !matchType(foundNode, 'columnNamePath')
-                && !matchType(foundNode, 'poolPath')
-                && !matchType(foundNode, 'constant')
-            )) {
-                return;
-            }
-
             const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, mrScope, context, isTest);
             logger('getTableAndColumnInfoAtPosition', hoverInfo);
             logSource(hoverInfo);
@@ -728,8 +728,8 @@ export const createHiveLs = (
         doValidation(): WithSource<editor.IMarkerData>[] {
             const validations: editor.IMarkerData[] = [];
             
-            const errors = hiveSqlParse.validate(document.getText());
-            errors.forEach(err => {
+            const SyntaxErrors = hiveSqlParse.validate(document.getText());
+            SyntaxErrors.forEach(err => {
                 validations.push({
                     severity: MarkerSeverity.Error,
                     ...sliceToRange(err),
@@ -752,6 +752,45 @@ export const createHiveLs = (
                 }
             });
 
+            const errors = contextManager.rootContext?.validate() || [];
+            errors.forEach(err => {
+                validations.push({
+                    severity: MarkerSeverity.Error,
+                    ...rangeFromNode(err.context),
+                    message: err.message
+                })
+            });
+
+            const ranges = contextManager.rootContext?.getHighlights() || [];
+            ranges.forEach(x => {
+                const position = new Position(x.lineNumber, x.column + 1);
+                const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
+
+                const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, mrScope, context, isTest);
+                if (!hoverInfo) {
+                    validations.push({
+                        severity: MarkerSeverity.Error,
+                        startLineNumber: x.lineNumber,
+                        startColumn: x.column,
+                        endLineNumber: x.lineNumber,
+                        endColumn: x.column + (x.end - x.start),
+                        message: `Reference not found: ${printNode(foundNode)}`,
+                    });
+                    return;
+                }
+                if (
+                    hoverInfo.type == 'unknown'
+                     || hoverInfo.type == 'noTable'
+                     || hoverInfo.type == 'noColumn'
+                ) {
+                    const res = formatHoverRes(hoverInfo);
+                    validations.push({
+                        severity: MarkerSeverity.Error,
+                        ...rangeFromNode(foundNode!),
+                        message: res.contents[0].value,
+                    });
+                }
+            })
             return validations;
         },
 
@@ -761,15 +800,7 @@ export const createHiveLs = (
         ) => {
             // TODO: implement definition functionality
             const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
-            if (!foundNode || !context || (
-                !matchType(foundNode, 'id_')
-                && !matchType(foundNode, 'DOT')
-                && !matchType(foundNode, 'columnNamePath')
-                && !matchType(foundNode, 'poolPath')
-                && !matchType(foundNode, 'constant')
-            )) {
-                return;
-            }
+            
 
             const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, mrScope, context, isTest);
             if (!hoverInfo) {

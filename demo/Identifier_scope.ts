@@ -6,6 +6,14 @@ import { printNode, ruleIndexToDisplayName } from "./sql_ls_helper";
 import { uuidv4 } from "./util";
 import { MapReduceScope } from "./mr_scope";
 
+interface HighlightRange {
+    start: number;
+    end: number;
+    lineNumber: number;
+    column: number;
+    type: string;
+}
+
 export class IdentifierScope {
     uuid = uuidv4();
 
@@ -19,7 +27,7 @@ export class IdentifierScope {
 
     children: IdentifierScope[] = [];
 
-    highlightRanges: { start: number; end: number; type: string }[] = [];
+    highlightRanges: HighlightRange[] = [];
 
     mrScope: MapReduceScope | null = null;
     
@@ -192,7 +200,7 @@ export class IdentifierScope {
         return [];
     }
 
-    addHighlight(range: { start: number; end: number; type: string }) {
+    addHighlight(range: HighlightRange) {
         if (range.start === range.end) {
             throw new Error(`Highlight ranges should not have zero length: ${JSON.stringify(range)}`);
         }
@@ -204,15 +212,13 @@ export class IdentifierScope {
         this.addHighlight({
             start: node.start?.start || 0,
             end: (node.stop?.stop || 0) + 1,
+            lineNumber: node.start?.line || 0,
+            column: node.start?.column || 0,
             type: ruleIndexToDisplayName(node) || ''
         });
     }
 
-    getHighlights(ret: {
-        start: number;
-        end: number;
-        type: string;
-    }[] = []) {
+    getHighlights(ret: HighlightRange[] = []) {
         this.children.forEach(child => {
             child.getHighlights(ret);
         });
@@ -250,6 +256,7 @@ export class IdentifierScope {
                 });
             });
         }
+
         return errors;
     }
 }

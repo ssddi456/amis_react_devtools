@@ -1,7 +1,7 @@
 export default [
     {
-        db_name: "data",
-        table_name: "data_test_news_record_di",
+        db_name: "rpr",
+        table_name: "rpr_test_news_record_di",
         table_id: 1,
         description: "测试表1",
         column_list: [
@@ -48,8 +48,8 @@ export default [
         ],
     },
     {
-        db_name: "data",
-        table_name: "data_test_news_record_da",
+        db_name: "rpr",
+        table_name: "rpr_test_news_record_da",
         table_id: 2,
         description: "测试表2",
         column_list: [
@@ -96,8 +96,8 @@ export default [
         ],
     },
     {
-        db_name: "data",
-        table_name: "data_test_quota_similar_house_region_da",
+        db_name: "rpr",
+        table_name: "rpr_test_quota_similar_house_region_da",
         table_id: 3,
         description: "测试表3",
         column_list: [

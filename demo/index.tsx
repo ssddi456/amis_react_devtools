@@ -114,7 +114,7 @@ const App = () => {
         sqlTest={sqlTest}
       />
       <SqlTestDag
-        sqlTest={sqlTest[11].model.getValue()}
+        sqlTest={sqlTest[15].model.getValue()}
       />
     </div>
   );
