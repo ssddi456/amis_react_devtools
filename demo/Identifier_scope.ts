@@ -2,7 +2,7 @@ import { ParserRuleContext } from "antlr4ng";
 import { TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { posInRange } from "./ls_helper";
-import { printNode, ruleIndexToDisplayName } from "./sql_ls_helper";
+import { printNode, rangeFromNode, ruleIndexToDisplayName } from "./sql_ls_helper";
 import { uuidv4 } from "./util";
 import { MapReduceScope } from "./mr_scope";
 
@@ -209,11 +209,12 @@ export class IdentifierScope {
 
     addHighlightNode(node: ParserRuleContext) {
         console.log('Adding highlight node:', node);
+        const range = rangeFromNode(node);
         this.addHighlight({
             start: node.start?.start || 0,
             end: (node.stop?.stop || 0) + 1,
-            lineNumber: node.start?.line || 0,
-            column: node.start?.column || 0,
+            lineNumber: range.endLineNumber,
+            column: range.endColumn - 1,
             type: ruleIndexToDisplayName(node) || ''
         });
     }

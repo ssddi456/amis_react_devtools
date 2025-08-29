@@ -63,7 +63,8 @@ export function ValidationResults({ validationResults }: ValidationResultsProps)
                                         <div style={{ 
                                             fontFamily: 'monospace',
                                             fontSize: '13px',
-                                            color: '#333'
+                                            color: '#333',
+                                            whiteSpace: 'pre-wrap',
                                         }}>
                                             {marker.message}
                                         </div>

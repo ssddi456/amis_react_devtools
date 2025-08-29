@@ -763,7 +763,7 @@ export const createHiveLs = (
 
             const ranges = contextManager.rootContext?.getHighlights() || [];
             ranges.forEach(x => {
-                const position = new Position(x.lineNumber, x.column + 1);
+                const position = new Position(x.lineNumber, x.column);
                 const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
 
                 const hoverInfo = getTableAndColumnInfoAtPosition(foundNode, mrScope, context, isTest);

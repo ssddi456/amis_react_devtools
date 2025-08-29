@@ -207,7 +207,12 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                 {/* Tab 内容 */}
                 {activeTab === 'results' && (
                     <>
-                        <div style={{ marginBottom: '10px', display: 'flex', gap: '4px' }}>
+                        <div
+                            style={{ marginBottom: '10px', display: 'flex', gap: '4px' }}
+                            onScroll={(e) => {
+                                e.stopPropagation()
+                            }}
+                        >
                             {results.positions.map((_, idx) => {
                                 const result = results.resultItems[idx].hoverResult;
                                 return (
@@ -264,7 +269,12 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
 
                 {activeTab === 'validation' && (
                     <>
-                        <div>
+                        <div
+                            style={{ marginBottom: '10px', overflowY: 'auto' }}
+                            onScroll={(e) => {
+                                e.stopPropagation()
+                            }}  
+                        >
                             <button style={{
                                 padding: '4px 8px',
                                 backgroundColor: '#007acc',

@@ -65,14 +65,14 @@ const createSqlEditor = (name: string) => ({
         }));
 
 
-        disposables.add(editor.onDidChangeMarkers((e) => {
-            const markers = monaco.editor.getModelMarkers({ owner: LanguageIdEnum.HIVE });
-            if (markers.length === 0) {
-                debugger;
-            }
-            console.log('markers changed', e, editorInstance.getModel());
-            console.log('markers changed', markers);
-        }))
+        // disposables.add(editor.onDidChangeMarkers((e) => {
+        //     const markers = monaco.editor.getModelMarkers({ owner: LanguageIdEnum.HIVE });
+        //     if (markers.length === 0) {
+        //         debugger;
+        //     }
+        //     console.log('markers changed', e, editorInstance.getModel());
+        //     console.log('markers changed', markers);
+        // }))
         disposables.add(monaco.languages.registerCompletionItemProvider(LanguageIdEnum.HIVE, {
             triggerCharacters: ['.', '"', ' '],
             provideCompletionItems: (model, position) => {
