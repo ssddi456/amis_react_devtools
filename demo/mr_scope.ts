@@ -3,7 +3,7 @@ import { uuidv4 } from "./util";
 import { IdentifierScope } from "./Identifier_scope";
 import { AtomSelectStatementContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { type Position } from "monaco-editor";
-import { isPosInParserRuleContext } from "./sql_ls_helper";
+import { getOnConditionOfFromClause, isPosInParserRuleContext } from "./sql_ls_helper";
     
 interface TableSource {
     tableName: string;
@@ -94,6 +94,18 @@ export class MapReduceScope {
             }
             const fromClause = context.fromClause();
             if (fromClause && isPosInParserRuleContext(position, fromClause)) {
+                // if in on expression
+                const conditions = getOnConditionOfFromClause(fromClause);
+                if (conditions) {
+                    for (let index = 0; index < conditions.length; index++) {
+                        const cond = conditions[index];
+                        if (isPosInParserRuleContext(position, cond)) {
+                            // input
+                            return this;
+                        }
+                    }
+                }
+
                 // input
                 return this.getParentMrScope();
             }

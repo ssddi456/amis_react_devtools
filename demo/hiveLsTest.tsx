@@ -52,7 +52,7 @@ group by
 from rpr.rpr_test_news_record_di t1
      ^      ^
   left join rpr.rpr_test_quota_similar_house_region_da t2
-              ^  ^                                       ^
+              ^  ^                                      ^
   on t1.house_code = t2.house_code
       ^  ^           ^     ^
     and t1.resblock_id = t2.resblock_id

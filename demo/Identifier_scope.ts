@@ -12,6 +12,7 @@ interface HighlightRange {
     lineNumber: number;
     column: number;
     type: string;
+    context: ParserRuleContext;
 }
 
 export class IdentifierScope {
@@ -215,7 +216,8 @@ export class IdentifierScope {
             end: (node.stop?.stop || 0) + 1,
             lineNumber: range.endLineNumber,
             column: range.endColumn - 1,
-            type: ruleIndexToDisplayName(node) || ''
+            type: ruleIndexToDisplayName(node) || '',
+            context: node
         });
     }
 
@@ -233,6 +235,18 @@ export class IdentifierScope {
             }
             throw new Error(`Highlights should not have the same start position: ${JSON.stringify(a)} and ${JSON.stringify(b)}`);
             return a.end - b.end;
+        });
+
+        return ret;
+    }
+
+    getSymbolsAndContext(ret: { range: HighlightRange, context: IdentifierScope, mrScope: MapReduceScope | null}[] = []) {
+        this.children.forEach(child => {
+            child.getSymbolsAndContext(ret);
+        });
+        
+        this.highlightRanges.forEach(range => {
+            ret.push({ range, context: this, mrScope: this.getMrScope() });
         });
 
         return ret;

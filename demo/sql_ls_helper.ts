@@ -1,7 +1,7 @@
 import { Position } from "monaco-editor";
 import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import { HiveSqlParserVisitor } from "dt-sql-parser";
-import { HiveSqlParser, ProgramContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { FromClauseContext, HiveSqlParser, ProgramContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { WordPosition } from "dt-sql-parser/dist/parser/common/textAndWord";
 import { IRange } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { matchSubPath } from "./sql_tree_query";
@@ -217,4 +217,27 @@ export function isKeyWord(node: ParseTree, key: string): boolean {
         return node.symbol.type === HiveSqlParser[`KW_${key.toUpperCase()}` as keyof typeof HiveSqlParser];
     }
     return false;
+}
+
+
+export function getOnConditionOfFromClause(fromClause: FromClauseContext): ParserRuleContext[] | null {
+    const fromSource = fromClause.fromSource();
+    const joinSources = fromSource.joinSource();
+    if (!joinSources) {
+        return null;
+    }
+
+    const ret: ParserRuleContext[] = [];
+    const children = joinSources.children || [];
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        const nextToken = children[i + 1];
+        if (isKeyWord(child, 'ON') && nextToken instanceof ParserRuleContext) {
+            ret.push(nextToken);
+        }
+        if (isKeyWord(child, 'USING') && nextToken instanceof ParserRuleContext) {
+            ret.push(nextToken);
+        }
+    }
+    return ret.length > 0 ? ret : null;
 }
