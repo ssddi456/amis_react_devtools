@@ -82,8 +82,17 @@ export const createHiveLs = (
             if (posInRange(position, sliceToRange(slice))) {
                 // const text = paddingSliceText(slice, document.getText());
                 // logger('getCtxFromPos text', '-->' + text + '<--');
-                const foundNode = findTokenAtPosition(position, tree);
+                const symbolAndContext = contextManager.getSymbolByPosition(position);
+                if (symbolAndContext) {
+                    return {
+                        foundNode: symbolAndContext.range.context,
+                        context: symbolAndContext.context,
+                        mrScope: symbolAndContext.mrScope
+                    }
+                }
+
                 const context = contextManager.getContextByPosition(position);
+                const foundNode = findTokenAtPosition(position, tree);
                 const mrScope = context?.getMrScope()?.getScopeByPosition(position) || null;
 
                 logger('getCtxFromPos mrScope', '-->', mrScope, '<--');
@@ -170,7 +179,7 @@ export const createHiveLs = (
                 })
             });
 
-            const symbols = contextManager.rootContext?.getSymbolsAndContext() || [];
+            const symbols = contextManager.getSymbolsAndContext() || [];
             symbols.forEach(({ range, mrScope, context }, i) => {
                 // console.log('doValidation foundNode', range.context?.getText());
                 // const foundNodeText = range.context?.getText() || '';

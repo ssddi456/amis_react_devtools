@@ -80,7 +80,7 @@ export class MapReduceScope {
         return errors;
     }
 
-    getScopeByPosition(position: Position): MapReduceScope | null | undefined {
+    getScopeByPosition(position: Position): MapReduceScope | null {
         const context = this.context;
         if (context instanceof QueryStatementExpressionContext) {
             return this;
@@ -161,6 +161,6 @@ export class MapReduceScope {
     }
 
     getParentMrScope() {
-        return this.identifierScope?.parent?.getMrScope();
+        return this.identifierScope?.parent?.getMrScope() || null;
     }
 }

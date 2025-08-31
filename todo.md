@@ -10,6 +10,8 @@
     [ ] group by
     [ ] using
     [ ] join on
+    [ ] duplicate column/alias
+    [ ] duplicate table/alias
 
 1. get references
     [ ] get table references

@@ -1,9 +1,9 @@
 import { ParserRuleContext } from "antlr4ng";
-import { TableSourceContext, HiveSqlParser, SelectItemContext, FunctionIdentifierContext, ColumnNameContext, ColumnNamePathContext, SubQuerySourceContext, TableNameContext, Id_Context, CteStatementContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { TableSourceContext, HiveSqlParser, SelectItemContext, FunctionIdentifierContext, ColumnNameContext, ColumnNamePathContext, SubQuerySourceContext, TableNameContext, Id_Context, CteStatementContext, ExpressionContext, TableAllColumnsContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { IdentifierScope } from "./Identifier_scope";
 import { MapReduceScope } from "./mr_scope";
 import { EntityInfo, tableInfoFromNode, getColumnInfoByName, getTableInfoByName } from "./formatHoverRes";
-import { printNodeTree, printNode, rangeFromNode } from "./sql_ls_helper";
+import { printNodeTree, printNode, rangeFromNode, isKeyWord } from "./sql_ls_helper";
 import { matchType, matchSubPathOneOf, matchSubPath } from "./sql_tree_query";
 
 export const getEntityInfoAtPosition = (
@@ -175,6 +175,37 @@ export const getAllEntityInfoFromNode = (
                 ...commonFields,
             };
         }
+        if (node.parent instanceof SelectItemContext) {
+            return {
+                type: 'column' as const,
+                columnInfo: {
+                    column_name: node.getText(),
+                    data_type_string: '',
+                    description: '',
+                },
+                ...commonFields,
+            };
+        }
+    }
+
+    if (node instanceof ExpressionContext) {
+        return {
+            type: 'function' as const,
+            text: node.getText(),
+            ...commonFields,
+        };
+    }
+
+    if (node instanceof TableAllColumnsContext) {
+        return {
+            type: 'column' as const,
+            columnInfo: {
+                column_name: '*',
+                data_type_string: '',
+                description: '',
+            },
+            ...commonFields,
+        };
     }
 
     return {

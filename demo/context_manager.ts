@@ -4,7 +4,7 @@ import { HiveSqlParserListener } from "dt-sql-parser";
 import { AtomSelectStatementContext, ColumnNameContext, ColumnNameCreateContext, ConstantContext, CteStatementContext, ExpressionContext, FromClauseContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableAllColumnsContext, TableNameContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
 import { isKeyWord } from "./sql_ls_helper";
-import { IdentifierScope } from "./Identifier_scope";
+import { IdentifierScope, SymbolAndContext } from "./Identifier_scope";
 import { MapReduceScope } from "./mr_scope";
 
 export class ContextManager {
@@ -293,9 +293,20 @@ export class ContextManager {
         this.rootContext.collectScope();
     }
 
+
+
     getContextByPosition(position: Position): IdentifierScope | null {
         if (!this.rootContext) {
             return null;
+        }
+        const symbols = this.getSymbolsAndContext();
+        if (symbols) {
+            for (let i = 0; i < symbols.length; i++) {
+                const element = symbols[i];
+                if (element.context.containsPosition(position)) {
+                    return element.context;
+                }
+            }
         }
         let checkNodes: IdentifierScope[] = [this.rootContext];
         let lastContext: IdentifierScope | null = null;
@@ -333,6 +344,27 @@ export class ContextManager {
     getHighlights() {
         console.log('Getting highlights', this.rootContext);
         return this.rootContext?.getHighlights() || [];
+    }
+
+    _symbolsCache: SymbolAndContext[] | null = null;
+    getSymbolsAndContext() {
+        if (!this._symbolsCache) {
+            this._symbolsCache = this.rootContext?.getSymbolsAndContext() || [];
+        }
+        return this._symbolsCache;
+    }
+
+    getSymbolByPosition(position: Position): SymbolAndContext | null {
+        const symbols = this.getSymbolsAndContext();
+        if (symbols) {
+            for (let i = 0; i < symbols.length; i++) {
+                const element = symbols[i];
+                if (element.context.containsPosition(position)) {
+                    return element;
+                }
+            }
+        }
+        return null;
     }
 
     validate() {

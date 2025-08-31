@@ -15,6 +15,12 @@ interface HighlightRange {
     context: ParserRuleContext;
 }
 
+export interface SymbolAndContext {
+    range: HighlightRange;
+    context: IdentifierScope;
+    mrScope: MapReduceScope | null;
+}
+
 export class IdentifierScope {
     uuid = uuidv4();
 
@@ -240,13 +246,20 @@ export class IdentifierScope {
         return ret;
     }
 
-    getSymbolsAndContext(ret: { range: HighlightRange, context: IdentifierScope, mrScope: MapReduceScope | null}[] = []) {
+    getSymbolsAndContext(ret: SymbolAndContext[] = []) {
         this.children.forEach(child => {
             child.getSymbolsAndContext(ret);
         });
         
         this.highlightRanges.forEach(range => {
-            ret.push({ range, context: this, mrScope: this.getMrScope() });
+            ret.push({
+                range,
+                context: this,
+                mrScope: this.getMrScope()?.getScopeByPosition({
+                    lineNumber: range.lineNumber,
+                    column: range.column
+                } as Position) || null
+            });
         });
 
         return ret;
