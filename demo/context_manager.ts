@@ -3,7 +3,7 @@ import { ParserRuleContext, ParseTree, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
 import { AtomSelectStatementContext, ColumnNameContext, ColumnNameCreateContext, ConstantContext, CteStatementContext, ExpressionContext, FromClauseContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableAllColumnsContext, TableNameContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
-import { isKeyWord } from "./sql_ls_helper";
+import { findTokenAtPosition, isKeyWord } from "./sql_ls_helper";
 import { IdentifierScope, SymbolAndContext } from "./Identifier_scope";
 import { MapReduceScope } from "./mr_scope";
 
@@ -354,13 +354,18 @@ export class ContextManager {
         return this._symbolsCache;
     }
 
-    getSymbolByPosition(position: Position): SymbolAndContext | null {
+    getSymbolByPosition(position: Position): SymbolAndContext & { foundNode: ParserRuleContext | null } | null {
         const symbols = this.getSymbolsAndContext();
         if (symbols) {
             for (let i = 0; i < symbols.length; i++) {
                 const element = symbols[i];
                 if (element.context.containsPosition(position)) {
-                    return element;
+
+                    const foundNode = findTokenAtPosition(position, element.range.context);
+                    return {
+                        foundNode,
+                        ...element,
+                    };
                 }
             }
         }

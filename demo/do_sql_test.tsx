@@ -105,7 +105,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                 const hiveLs = createHiveLs(model, showDebug, true);
                 const positions = testCase.positions;
                 const pos = positions[i]; // Get the position of the item
-                // Apply rephrasing logic to the selected item
+                // Apply re-parsing logic to the selected item
                 const hoverResult = hiveLs.doHover(pos, showDebug);
                 const definitionResult = hiveLs.doDefinition(pos, showDebug);
                 const referencesResult = hiveLs.doReferences(pos, showDebug);
@@ -248,7 +248,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                                     reparse(resultIdx);
                                 }}
                             >
-                                rephrase
+                                reparse
                             </button>
                         </div>
                         <HoverResults

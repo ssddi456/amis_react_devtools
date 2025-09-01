@@ -161,7 +161,7 @@ export function rangeFromNode(node: ParserRuleContext) {
 
 export function findTokenAtPosition(
     position: Position,
-    tree: ProgramContext
+    tree: ParserRuleContext
 ): ParserRuleContext | null {
     let foundNode: any = null;
     const visitor = new class extends HiveSqlParserVisitor<any> {

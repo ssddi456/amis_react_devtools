@@ -84,11 +84,7 @@ export const createHiveLs = (
                 // logger('getCtxFromPos text', '-->' + text + '<--');
                 const symbolAndContext = contextManager.getSymbolByPosition(position);
                 if (symbolAndContext) {
-                    return {
-                        foundNode: symbolAndContext.range.context,
-                        context: symbolAndContext.context,
-                        mrScope: symbolAndContext.mrScope
-                    }
+                    return symbolAndContext;
                 }
 
                 const context = contextManager.getContextByPosition(position);
