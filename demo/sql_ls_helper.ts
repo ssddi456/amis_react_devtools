@@ -169,40 +169,38 @@ export function findTokenAtPosition(
             if (isPosInParserRuleContext(position, node)) {
                 foundNode = node;
                 // console.log('visit', JSON.stringify(position), printNode(foundNode));
+                return super.visit(tree);
             }
-            return super.visit(tree);
         }
 
         visitChildren(node: any): any {
             if (isPosInParserRuleContext(position, node)) {
                 foundNode = node;
                 // console.log('visitChildren +', JSON.stringify(position), printNode(foundNode));
+                return super.visitChildren(node);
             }
-            return super.visitChildren(node);
         }
 
         visitTerminal(node: any): any {
             if (isPosInParserRuleContext(position, node)) {
                 foundNode = node;
                 // console.log('visitTerminal +', JSON.stringify(position), printNode(foundNode));
-            } else {
-                // console.log('visitTerminal -', JSON.stringify(position), printNode(node));
+                return super.visitTerminal(node);
             }
-            return super.visitTerminal(node);
         }
 
         visitErrorNode(node: any): any {
             if (isPosInParserRuleContext(position, node)) {
                 foundNode = node;
                 // console.log('visitErrorNode', JSON.stringify(position), printNode(foundNode));
+                return super.visitErrorNode(node);
             }
-            return super.visitErrorNode(node);
         }
     };
 
     visitor.visit(tree);
     if (!foundNode) {
-        console.warn('No node found at position:', JSON.stringify(position), 'tree:', tree);
+        console.warn('No node found at position:', JSON.stringify(position), 'tree:', tree, rangeFromNode(tree));
     } else {
         console.log(
             'Found node at position:', JSON.stringify(position),
