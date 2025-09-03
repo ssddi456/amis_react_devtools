@@ -274,7 +274,7 @@ function getEntityInfoFromSubQuerySource(
     node: ParserRuleContext,
     parent: SubQuerySourceContext,
     context: IdentifierScope,
-    mrScope: MapReduceScope | null
+    mrScope?: MapReduceScope | null
 ) {
     const item = mrScope?.getTableByName(node.getText());
     const tableInfo = item && tableInfoFromNode(item, context);

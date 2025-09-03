@@ -80,8 +80,6 @@ export const createHiveLs = (
         for (let i = 0; i < sqlSlices.length; i++) {
             const slice = sqlSlices[i];
             if (posInRange(position, sliceToRange(slice))) {
-                // const text = paddingSliceText(slice, document.getText());
-                // logger('getCtxFromPos text', '-->' + text + '<--');
                 const symbolAndContext = contextManager.getSymbolByPosition(position);
                 if (symbolAndContext) {
                     return symbolAndContext;

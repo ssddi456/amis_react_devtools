@@ -1,8 +1,7 @@
-import { ParserRuleContext } from "antlr4ng";
+import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { uuidv4 } from "./util";
 import { IdentifierScope } from "./Identifier_scope";
-import { AtomSelectStatementContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { type Position } from "monaco-editor";
+import { AtomSelectStatementContext, HiveSqlParser, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { getOnConditionOfFromClause, isPosInParserRuleContext } from "./sql_ls_helper";
     
 interface TableSource {
@@ -63,7 +62,7 @@ export class MapReduceScope {
     validate() {
         const errors: {
             message: string;
-            context: ParserRuleContext;
+            context: ParserRuleContext | TerminalNode;
             level: 'error' | 'warning';
         }[] = [];
 
@@ -76,11 +75,57 @@ export class MapReduceScope {
                 });
             }
         });
+        // check exportColumns name duplicate
+        const columnNames = new Set<string>();
+        this.exportColumns.forEach(column => {
+            if (columnNames.has(column.exportColumnName)) {
+                errors.push({
+                    message: `Duplicate export column name '${column.exportColumnName}'`,
+                    context: column.reference,
+                    level: 'error'
+                });
+            }
+            columnNames.add(column.exportColumnName);
+        });
+        // check input table alias duplicate
+        const tableNames = new Set<string>();
+        this.inputTable.forEach(table => {
+            if (tableNames.has(table.tableName)) {
+                errors.push({
+                    message: `Duplicate input table alias '${table.tableName}'`,
+                    context: table.reference,
+                    level: 'error'
+                });
+            }
+            tableNames.add(table.tableName);
+        });
+
+        // get group by columns
+        // check if directly export columns is in the group-by columns
+        const groupByColumns = this.getGroupByColumns();
+        this.exportColumns.forEach(column => {
+            if (!groupByColumns.includes(column.referanceColumnName)) {
+                errors.push({
+                    message: `Export column '${column.exportColumnName}' is included in the group-by columns`,
+                    context: column.reference,
+                    level: 'warning'
+                });
+            }
+        });
+
+        // using is not allowed
+        this.context.getTokens(HiveSqlParser.KW_USING).forEach(token => {
+            errors.push({
+                message: `Using 'USING' operator is not allowed`,
+                context: token,
+                level: 'error'
+            });
+        });
 
         return errors;
     }
 
-    getScopeByPosition(position: Position): MapReduceScope | null {
+    getScopeByPosition(position: { lineNumber: number, column: number }): MapReduceScope | null {
         const context = this.context;
         if (context instanceof QueryStatementExpressionContext) {
             return this;
@@ -101,13 +146,18 @@ export class MapReduceScope {
                         const cond = conditions[index];
                         if (isPosInParserRuleContext(position, cond)) {
                             // input
+                            // should create a sub mr scope;
                             return this;
                         }
                     }
                 }
 
+                // console.log('pos not in conditions', (position as any)?.context?.getText(), );
+                // console.log('pos not in conditions', position, );
+                // console.log('pos not in conditions', fromClause, );
+                
                 // input
-                return this.getParentMrScope();
+                return this;
             }
             const whereClause = context.whereClause();
             if (whereClause && isPosInParserRuleContext(position, whereClause)) {
@@ -160,7 +210,13 @@ export class MapReduceScope {
         return this.exportColumns.find(column => column.referanceTableName === tableName && column.referanceColumnName === columnName) || null;
     }
 
+    getGroupByColumns() {
+        const ret: string[] = [];
+        return ret;
+    }
+
     getParentMrScope() {
         return this.identifierScope?.parent?.getMrScope() || null;
     }
+    
 }

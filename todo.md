@@ -2,16 +2,16 @@
     [ ] get database
     [*] get table
     [ ] get column
-        [ ] get star column
+    [ ] get star column
     [ ] get function
     
 1. validate
     [*] check definition
     [ ] group by
     [ ] using
-    [ ] join on
-    [ ] duplicate column/alias
-    [ ] duplicate table/alias
+    [ ] join on scope
+    [*] duplicate column alias
+    [*] duplicate table alias
 
 1. get references
     [ ] get table references
@@ -19,6 +19,7 @@
 
 1. performance
     [ ] validate performance
+        [ ] table info
 
 # 更好的测试方法
 

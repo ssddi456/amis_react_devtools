@@ -93,7 +93,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
         setResult({
             model, positions,
             validationResults,
-            resultItems, 
+            resultItems,
         });
         setResultIdx(0);
     }, [testCase, showDebug]);
@@ -182,7 +182,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                 }}
             >
                 {/* Tab 切换按钮 */}
-                <div 
+                <div
                     style={{
                         marginBottom: '10px',
                         borderBottom: '1px solid #ddd',
@@ -207,33 +207,36 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                 {/* Tab 内容 */}
                 {activeTab === 'results' && (
                     <>
-                        <div
-                            style={{ marginBottom: '10px', display: 'flex', gap: '4px' }}
-                            onScroll={(e) => {
-                                e.stopPropagation()
-                            }}
-                        >
-                            {results.positions.map((_, idx) => {
-                                const result = results.resultItems[idx].hoverResult;
-                                return (
-                                <button
-                                    key={idx}
-                                    style={{
-                                        padding: '4px 8px',
-                                        backgroundColor: idx === resultIdx ? '#007acc' : '#f0f0f0',
-                                        color: idx === resultIdx ? 'white' : '#333',
-                                        border: !result ? '1px solid red' : 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer'
-                                    }}
-                                    onClick={() => setResultIdx(idx)}
-                                >
-                                    {idx + 1}
-                                    <span style={{ marginLeft: '4px', fontSize: '12px', color: 'red' }}>
-                                        {!results.resultItems[idx].hoverResult ? '!' : null}
-                                    </span>
-                                </button>
-                            )})}
+                        <div style={{ width: '100%', overflowX: 'auto' }}>
+                            <div
+                                style={{ marginBottom: '10px', display: 'flex', gap: '4px' }}
+                                onScroll={(e) => {
+                                    e.stopPropagation()
+                                }}
+                            >
+                                {results.positions.map((_, idx) => {
+                                    const result = results.resultItems[idx].hoverResult;
+                                    return (
+                                        <button
+                                            key={idx}
+                                            style={{
+                                                padding: '4px 8px',
+                                                backgroundColor: idx === resultIdx ? '#007acc' : '#f0f0f0',
+                                                color: idx === resultIdx ? 'white' : '#333',
+                                                border: !result ? '1px solid red' : 'none',
+                                                borderRadius: '4px',
+                                                cursor: 'pointer'
+                                            }}
+                                            onClick={() => setResultIdx(idx)}
+                                        >
+                                            {idx + 1}
+                                            <span style={{ marginLeft: '4px', fontSize: '12px', color: 'red' }}>
+                                                {!results.resultItems[idx].hoverResult ? '!' : null}
+                                            </span>
+                                        </button>
+                                    )
+                                })}
+                            </div>
                         </div>
                         <div>
                             <button style={{
@@ -252,15 +255,15 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                             </button>
                         </div>
                         <HoverResults
-                            hoverResults={[currentResultItem.hoverResult]} 
-                            positions={[results.positions[resultIdx]]} 
+                            hoverResults={[currentResultItem.hoverResult]}
+                            positions={[results.positions[resultIdx]]}
                         />
-                        <DefinitionResults 
-                            definitionResults={[currentResultItem.definitionResult]} 
-                            positions={[results.positions[resultIdx]]} 
+                        <DefinitionResults
+                            definitionResults={[currentResultItem.definitionResult]}
+                            positions={[results.positions[resultIdx]]}
                         />
-                        <ReferencesResults 
-                            referencesResults={[currentResultItem.referencesResult]} 
+                        <ReferencesResults
+                            referencesResults={[currentResultItem.referencesResult]}
                             positions={[results.positions[resultIdx]]}
                         />
                     </>
@@ -273,7 +276,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                             style={{ marginBottom: '10px', overflowY: 'auto' }}
                             onScroll={(e) => {
                                 e.stopPropagation()
-                            }}  
+                            }}
                         >
                             <button style={{
                                 padding: '4px 8px',
@@ -290,8 +293,8 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                                 reValidate
                             </button>
                         </div>
-                        <ValidationResults 
-                            validationResults={results.validationResults} 
+                        <ValidationResults
+                            validationResults={results.validationResults}
                         />
                     </>
                 )}

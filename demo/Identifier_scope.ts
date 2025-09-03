@@ -1,4 +1,4 @@
-import { ParserRuleContext } from "antlr4ng";
+import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import { TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { posInRange } from "./ls_helper";
@@ -255,10 +255,7 @@ export class IdentifierScope {
             ret.push({
                 range,
                 context: this,
-                mrScope: this.getMrScope()?.getScopeByPosition({
-                    lineNumber: range.lineNumber,
-                    column: range.column
-                } as Position) || null
+                mrScope: this.getMrScope()?.getScopeByPosition(range) || null
             });
         });
 
@@ -268,7 +265,7 @@ export class IdentifierScope {
     validate() {
         const errors: {
             message: string;
-            context: ParserRuleContext;
+            context: ParserRuleContext | TerminalNode; 
             level: 'error' | 'warning';
         }[] = [];
         this.children.forEach(child => {
@@ -280,7 +277,7 @@ export class IdentifierScope {
             mrErrors.forEach(err => {
                 errors.push({
                     ...err,
-                    context: this.context
+                    context: err.context || this.context
                 });
             });
         }

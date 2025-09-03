@@ -35,7 +35,7 @@ export function wordToRange(slice?: WordPosition): IRange | undefined {
     };
 }
 
-export function isPosInParserRuleContext(position: Position, context: ParserRuleContext | TerminalNode): boolean {
+export function isPosInParserRuleContext(position: { lineNumber: number, column: number }, context: ParserRuleContext | TerminalNode): boolean {
     const lineNumber = position.lineNumber;
     const column = position.column - 1;
 
@@ -146,17 +146,29 @@ export function printNodeTree(node: ParserRuleContext | null, separator = '\n'):
     }).join(separator);
 }
 
-export function rangeFromNode(node: ParserRuleContext) {
-    const ret = {
-        startLineNumber: (node.start?.line || -1),
-        startColumn: (node.start?.column || -1) + 1,
-        endLineNumber: (node.stop?.line || -1),
-        endColumn: (node.stop?.column !== undefined ? (node.stop?.column + (node.stop?.text?.length || 0)) : -1) + 1,
-    };
-    if (node.ruleIndex === HiveSqlParser.RULE_id_) {
-        ret.endColumn = ret.startColumn + (node.getText ? node.getText().length : 0);
+export function rangeFromNode(node: ParserRuleContext | TerminalNode) {
+    if (node instanceof ParserRuleContext) {
+
+        const ret = {
+            startLineNumber: (node.start?.line || -1),
+            startColumn: (node.start?.column || -1) + 1,
+            endLineNumber: (node.stop?.line || -1),
+            endColumn: (node.stop?.column !== undefined ? (node.stop?.column + (node.stop?.text?.length || 0)) : -1) + 1,
+        };
+        if (node.ruleIndex === HiveSqlParser.RULE_id_) {
+            ret.endColumn = ret.startColumn + (node.getText ? node.getText().length : 0);
+        }
+        return ret;
     }
+
+    const ret = {
+        startLineNumber: (node.symbol.line || -1),
+        startColumn: (node.symbol.column || -1) + 1,
+        endLineNumber: (node.symbol.line || -1),
+        endColumn: (node.symbol.column !== undefined ? (node.symbol.column + (node.symbol.text?.length || 0)) : -1) + 1,
+    };
     return ret;
+    
 }
 
 export function findTokenAtPosition(

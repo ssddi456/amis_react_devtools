@@ -359,9 +359,11 @@ export class ContextManager {
         if (symbols) {
             for (let i = 0; i < symbols.length; i++) {
                 const element = symbols[i];
-                if (element.context.containsPosition(position)) {
-                    console.log('Found symbol at position:', JSON.stringify(position), 'Symbol:', rangeFromNode(element.range.context), element);
-                    const foundNode = findTokenAtPosition(position, element.range.context);
+                const foundNode = findTokenAtPosition(position, element.range.context);
+                if (foundNode) {
+                    console.log(
+                        'Found symbol at position:', JSON.stringify(position),
+                            'Symbol:', rangeFromNode(element.range.context), element);
                     return {
                         foundNode,
                         ...element,
@@ -414,10 +416,12 @@ function tableInfoFromSubQuerySource(
     if (!currentContext || !subQuerySource) {
         return null;
     }
-    const name = subQuerySource.id_()?.getText();
+    const name = subQuerySource.id_().getText();
     currentContext.addIdentifier(name || '', subQuerySource, true);
     currentContext.getMrScope()?.addInputTable(name || '', subQuerySource, subQuerySource.id_()!);
-
+    if (name) {
+        currentContext.addHighlightNode(subQuerySource.id_());
+    }
     return subQuerySource;
 }
 
@@ -428,9 +432,12 @@ function tableInfoFromVirtualTableSource(
     if (!currentContext || !virtualTableSource) {
         return null;
     }
-    const name = virtualTableSource.tableAlias()?.getText();
+    const name = virtualTableSource.tableAlias().getText();
     currentContext.addIdentifier(name || '', virtualTableSource, true);
     currentContext.getMrScope()?.addInputTable(name || '', virtualTableSource, virtualTableSource.tableAlias()!);
+    if (name) {
+        currentContext.addHighlightNode(virtualTableSource.tableAlias());
+    }
     return virtualTableSource;
 }
 
@@ -441,9 +448,12 @@ function tableInfoFromCteStatement(
     if (!currentContext || !cteStatement) {
         return null;
     }
-    const name = cteStatement.id_()?.getText();
+    const name = cteStatement.id_().getText();
     currentContext.addIdentifier(name || '', cteStatement, true);
     currentContext.getMrScope()?.addInputTable(name || '', cteStatement, cteStatement.id_()!);
+    if (name) {
+        currentContext.addHighlightNode(cteStatement.id_());
+    }
     return cteStatement;
 }
 
