@@ -1,5 +1,5 @@
 
-import { ParserRuleContext, ParseTree, ParseTreeWalker } from "antlr4ng";
+import { ParserRuleContext, ParseTree, ParseTreeWalker, TerminalNode } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
 import { AtomSelectStatementContext, ColumnNameContext, ColumnNameCreateContext, ConstantContext, CteStatementContext, ExpressionContext, FromClauseContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableAllColumnsContext, TableNameContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
@@ -107,8 +107,6 @@ export class ContextManager {
                     const joinSourceParts = ctx.joinSourcePart();
                     for (let i = 0; i < joinSourceParts.length; i++) {
                         const part = joinSourceParts[i];
-                        const nextOnExpression = getNextOnExpression(children, part);
-                        const nextUsingExpression = getNextUsingExpression(children, part);
                         tableInfoFromTableSource(
                             manager.currentContext,
                             part.tableSource()
@@ -121,6 +119,12 @@ export class ContextManager {
                             manager.currentContext,
                             part.virtualTableSource()
                         );
+
+                        const nextUsing = getNextUsingKeyword(children, part);
+
+                        if (nextUsing) {
+                            manager.rootContext?.addUnsupportedFeature(`Using 'USING' clause is not supported`, nextUsing);
+                        }
                     }
                 }
             }
@@ -487,6 +491,23 @@ function getNextUsingExpression(children: ParseTree[], current: JoinSourcePartCo
         }
         if (isKeyWord(child, 'USING')) {
             return children[i + 1] as ParserRuleContext;
+        }
+    }
+    return null
+}
+
+function getNextUsingKeyword(children: ParseTree[], current: JoinSourcePartContext): TerminalNode | null {
+    const index = children.indexOf(current);
+    if (index === -1 || index === children.length - 1) {
+        return null;
+    }
+    for (let i = index + 1; i < children.length; i++) {
+        const child = children[i];
+        if (child instanceof JoinSourcePartContext) {
+            return null;
+        }
+        if (isKeyWord(child, 'USING')) {
+            return children[i] as TerminalNode;
         }
     }
     return null

@@ -59,6 +59,7 @@ export function ValidationResults({ validationResults }: ValidationResultsProps)
                                                  marker.endColumn !== marker.startColumn ? 
                                                     ` → ${marker.endLineNumber}:${marker.endColumn}` : ''}
                                             </span>
+                                            <SourceLink source={marker.__source} />
                                         </div>
                                         <div style={{ 
                                             fontFamily: 'monospace',

@@ -15,6 +15,11 @@ interface HighlightRange {
     context: ParserRuleContext;
 }
 
+interface UnsupportedFeature {
+    message: string;
+    context: ParserRuleContext | TerminalNode;
+}
+
 export interface SymbolAndContext {
     range: HighlightRange;
     context: IdentifierScope;
@@ -37,7 +42,9 @@ export class IdentifierScope {
     highlightRanges: HighlightRange[] = [];
 
     mrScope: MapReduceScope | null = null;
-    
+
+    unsupportedFeatures: UnsupportedFeature[] = [];
+
     constructor(
         public context: ParserRuleContext,
         public parent: IdentifierScope | null = null
@@ -262,15 +269,31 @@ export class IdentifierScope {
         return ret;
     }
 
+    addUnsupportedFeature(message: string, context: ParserRuleContext | TerminalNode) {
+        this.unsupportedFeatures.push({ message, context });
+    }
+
     validate() {
         const errors: {
             message: string;
             context: ParserRuleContext | TerminalNode; 
             level: 'error' | 'warning';
+            type: string;
         }[] = [];
         this.children.forEach(child => {
             errors.push(...child.validate());
         });
+
+        if (this.unsupportedFeatures.length > 0) {
+            this.unsupportedFeatures.forEach(feature => {
+                errors.push({
+                    message: feature.message,
+                    context: feature.context,
+                    level: 'error',
+                    type: 'unsupported_feature'
+                });
+            });
+        }
 
         if (this.mrScope) {
             const mrErrors = this.mrScope.validate();

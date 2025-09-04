@@ -7,7 +7,7 @@ import amisEditor from "./amis_editor";
 import 'amis/lib/themes/default.css'
 import 'amis/lib/helper.css'
 import { ClickToComponent } from 'click-to-react-component';
-import { sqlTest } from './hiveLsTest';
+import { sqlTest } from './cases';
 import createSqlEditor from './sql_editor';
 import { SqlTestNavigation } from './sql_test_navigation';
 import { SqlTestDag } from './sql_test_dag';

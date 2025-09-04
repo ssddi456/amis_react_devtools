@@ -64,17 +64,9 @@ export class MapReduceScope {
             message: string;
             context: ParserRuleContext | TerminalNode;
             level: 'error' | 'warning';
+            type: string
         }[] = [];
 
-        this.exportColumns.forEach(column => {
-            if (!column.exportColumnName) {
-                errors.push({
-                    message: 'Export column name is missing',
-                    context: column.reference,
-                    level: 'error'
-                });
-            }
-        });
         // check exportColumns name duplicate
         const columnNames = new Set<string>();
         this.exportColumns.forEach(column => {
@@ -82,7 +74,8 @@ export class MapReduceScope {
                 errors.push({
                     message: `Duplicate export column name '${column.exportColumnName}'`,
                     context: column.reference,
-                    level: 'error'
+                    level: 'error',
+                    type: 'duplicate_column'
                 });
             }
             columnNames.add(column.exportColumnName);
@@ -94,7 +87,8 @@ export class MapReduceScope {
                 errors.push({
                     message: `Duplicate input table alias '${table.tableName}'`,
                     context: table.reference,
-                    level: 'error'
+                    level: 'error',
+                    type: 'duplicate_table'
                 });
             }
             tableNames.add(table.tableName);
@@ -103,24 +97,18 @@ export class MapReduceScope {
         // get group by columns
         // check if directly export columns is in the group-by columns
         const groupByColumns = this.getGroupByColumns();
-        this.exportColumns.forEach(column => {
-            if (!groupByColumns.includes(column.referanceColumnName)) {
-                errors.push({
-                    message: `Export column '${column.exportColumnName}' is included in the group-by columns`,
-                    context: column.reference,
-                    level: 'warning'
-                });
-            }
-        });
-
-        // using is not allowed
-        this.context.getTokens(HiveSqlParser.KW_USING).forEach(token => {
-            errors.push({
-                message: `Using 'USING' operator is not allowed`,
-                context: token,
-                level: 'error'
+        if (groupByColumns.length) {
+            this.exportColumns.forEach(column => {
+                if (!groupByColumns.includes(column.referanceColumnName)) {
+                    errors.push({
+                        message: `Export column '${column.exportColumnName}' is not included in the group-by columns`,
+                        context: column.reference,
+                        level: 'warning',
+                        type: 'group_by'
+                    });
+                }
             });
-        });
+        }
 
         return errors;
     }

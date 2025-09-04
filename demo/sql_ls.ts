@@ -138,7 +138,7 @@ export const createHiveLs = (
         },
 
         doValidation(): WithSource<editor.IMarkerData>[] {
-            const validations: editor.IMarkerData[] = [];
+            const validations: WithSource<editor.IMarkerData>[] = [];
 
             const SyntaxErrors = hiveSqlParse.validate(document.getText());
             SyntaxErrors.forEach(err => {
@@ -167,6 +167,7 @@ export const createHiveLs = (
             const errors = contextManager.rootContext?.validate() || [];
             errors.forEach(err => {
                 validations.push({
+                    ...err,
                     severity: MarkerSeverity.Error,
                     ...rangeFromNode(err.context),
                     message: err.message

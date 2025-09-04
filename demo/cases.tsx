@@ -196,7 +196,7 @@ select count(*), count(distinct resblock_id)
         ^         ^     ^         ^
 from rpr.rpr_test_news_record_da
 ;`
-
+,`select * from t1 left join t2 using (house_code, resblock_id)`
 ].map(x => caseFromString(x));
 
 console.log('sql test cases', sqlTest);

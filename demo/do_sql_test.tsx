@@ -148,7 +148,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
         );
     }
 
-    const currentResultItem = results.resultItems[resultIdx];
+    const currentResultItem = results.resultItems?.[resultIdx];
 
     return (
         <div
@@ -254,18 +254,26 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                                 reparse
                             </button>
                         </div>
-                        <HoverResults
-                            hoverResults={[currentResultItem.hoverResult]}
-                            positions={[results.positions[resultIdx]]}
-                        />
-                        <DefinitionResults
-                            definitionResults={[currentResultItem.definitionResult]}
-                            positions={[results.positions[resultIdx]]}
-                        />
-                        <ReferencesResults
-                            referencesResults={[currentResultItem.referencesResult]}
-                            positions={[results.positions[resultIdx]]}
-                        />
+                        {
+                            currentResultItem
+                                ? (
+                                    <>
+                                        <HoverResults
+                                            hoverResults={[currentResultItem.hoverResult]}
+                                            positions={[results.positions[resultIdx]]}
+                                        />
+                                        <DefinitionResults
+                                            definitionResults={[currentResultItem.definitionResult]}
+                                            positions={[results.positions[resultIdx]]}
+                                        />
+                                        <ReferencesResults
+                                            referencesResults={[currentResultItem.referencesResult]}
+                                            positions={[results.positions[resultIdx]]}
+                                        />
+                                    </>
+                                )
+                                : null
+                        }
                     </>
                 )}
 
