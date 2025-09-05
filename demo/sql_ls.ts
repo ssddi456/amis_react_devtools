@@ -184,6 +184,7 @@ export const createHiveLs = (
                 const hoverInfo = getAllEntityInfoFromNode(range.context, context, mrScope, isTest);
                 if (!hoverInfo) {
                     validations.push({
+                        type: 'no_hover_info',
                         severity: MarkerSeverity.Error,
                         startLineNumber: range.lineNumber,
                         startColumn: range.column,
@@ -201,6 +202,7 @@ export const createHiveLs = (
                 ) {
                     const res = formatHoverRes(hoverInfo);
                     validations.push({
+                        ...res,
                         severity: MarkerSeverity.Error,
                         ...rangeFromNode(range.context),
                         message: res.contents[0].value,

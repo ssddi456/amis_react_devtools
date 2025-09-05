@@ -1,10 +1,26 @@
 import { Position } from "monaco-editor";
 import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import { HiveSqlParserVisitor } from "dt-sql-parser";
-import { FromClauseContext, HiveSqlParser, ProgramContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ColumnNameContext, ColumnNamePathContext, CteStatementContext, ExpressionOrDefaultContext, FromClauseContext, HiveSqlParser, Id_Context, JoinSourcePartContext, ProgramContext, RollupOldSyntaxContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { WordPosition } from "dt-sql-parser/dist/parser/common/textAndWord";
 import { IRange } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { matchSubPath } from "./sql_tree_query";
+import { IdentifierScope } from "./Identifier_scope";
+
+export interface TableSource {
+    tableName: string;
+    reference: ParserRuleContext,
+    defineReference: ParserRuleContext
+}
+
+export interface ColumnInfo {
+    exportColumnName: string;
+    referanceTableName: string;
+    referanceColumnName: string;
+    reference: ParserRuleContext;
+    defineReference: ParserRuleContext;
+}
+
 
 export function sliceToRange(slice: {
     readonly startLine: number;
@@ -250,4 +266,194 @@ export function getOnConditionOfFromClause(fromClause: FromClauseContext): Parse
         }
     }
     return ret.length > 0 ? ret : null;
+}
+
+export function getColumnInfoFromNode(sourceColumn: ColumnNameContext | ColumnNamePathContext, alias?: Id_Context): ColumnInfo {
+    if (alias) {
+        return {
+            exportColumnName: alias.getText(),
+            referanceColumnName: columnNameFromColumnPath(sourceColumn),
+            referanceTableName: tableNameFromColumnPath(sourceColumn),
+            reference: sourceColumn,
+            defineReference: alias,
+        }
+    } else {
+        const columnNameText = columnNameFromColumnPath(sourceColumn);
+        return {
+            exportColumnName: columnNameText,
+            referanceColumnName: columnNameText,
+            referanceTableName: tableNameFromColumnPath(sourceColumn),
+            reference: sourceColumn,
+            defineReference: sourceColumn
+        };
+    }
+}
+
+
+export function tableInfoFromTableSource(
+    currentContext: IdentifierScope | null,
+    context: TableSourceContext | null,
+): TableSourceContext | null {
+    if (!currentContext || !context) {
+        return null;
+    }
+
+    const alias = context.id_()?.getText();
+    if (alias) {
+        currentContext.addIdentifier(
+            context.id_()?.getText() || '',
+            context
+        );
+        currentContext.getMrScope()?.addInputTable(alias, context, context.id_()!);
+    } else {
+        const tableName = context.tableOrView()?.getText();
+        currentContext.addReference(tableName, context);
+        currentContext.getMrScope()?.addInputTable(tableName, context, context.tableOrView()!);
+    }
+
+    return context;
+}
+
+export function tableInfoFromSubQuerySource(
+    currentContext: IdentifierScope | null,
+    subQuerySource: SubQuerySourceContext | null,
+): SubQuerySourceContext | null {
+    if (!currentContext || !subQuerySource) {
+        return null;
+    }
+    const name = subQuerySource.id_().getText();
+    currentContext.addIdentifier(name || '', subQuerySource, true);
+    currentContext.getMrScope()?.addInputTable(name || '', subQuerySource, subQuerySource.id_()!);
+    if (name) {
+        currentContext.addHighlightNode(subQuerySource.id_());
+    }
+    return subQuerySource;
+}
+
+export function tableInfoFromVirtualTableSource(
+    currentContext: IdentifierScope | null,
+    virtualTableSource: VirtualTableSourceContext | null,
+): VirtualTableSourceContext | null {
+    if (!currentContext || !virtualTableSource) {
+        return null;
+    }
+    const name = virtualTableSource.tableAlias().getText();
+    currentContext.addIdentifier(name || '', virtualTableSource, true);
+    currentContext.getMrScope()?.addInputTable(name || '', virtualTableSource, virtualTableSource.tableAlias()!);
+    if (name) {
+        currentContext.addHighlightNode(virtualTableSource.tableAlias());
+    }
+    return virtualTableSource;
+}
+
+export function tableInfoFromCteStatement(
+    currentContext: IdentifierScope | null,
+    cteStatement: CteStatementContext | null,
+): CteStatementContext | null {
+    if (!currentContext || !cteStatement) {
+        return null;
+    }
+    const name = cteStatement.id_().getText();
+    currentContext.addIdentifier(name || '', cteStatement, true);
+    currentContext.getMrScope()?.addInputTable(name || '', cteStatement, cteStatement.id_()!);
+    if (name) {
+        currentContext.addHighlightNode(cteStatement.id_());
+    }
+    return cteStatement;
+}
+
+export function getNextOnExpression(children: ParseTree[], current: JoinSourcePartContext): ParserRuleContext | null {
+    const index = children.indexOf(current);
+    if (index === -1 || index === children.length - 1) {
+        return null;
+    }
+    for (let i = index + 1; i < children.length; i++) {
+        const child = children[i];
+        if (child instanceof JoinSourcePartContext) {
+            return null;
+        }
+        if (isKeyWord(child, 'ON')) {
+            return children[i + 1] as ParserRuleContext;
+        }
+    }
+    return null
+}
+
+
+export function getNextUsingExpression(children: ParseTree[], current: JoinSourcePartContext): ParserRuleContext | null {
+    const index = children.indexOf(current);
+    if (index === -1 || index === children.length - 1) {
+        return null;
+    }
+    for (let i = index + 1; i < children.length; i++) {
+        const child = children[i];
+        if (child instanceof JoinSourcePartContext) {
+            return null;
+        }
+        if (isKeyWord(child, 'USING')) {
+            return children[i + 1] as ParserRuleContext;
+        }
+    }
+    return null
+}
+
+export function getNextUsingKeyword(children: ParseTree[], current: JoinSourcePartContext): TerminalNode | null {
+    const index = children.indexOf(current);
+    if (index === -1 || index === children.length - 1) {
+        return null;
+    }
+    for (let i = index + 1; i < children.length; i++) {
+        const child = children[i];
+        if (child instanceof JoinSourcePartContext) {
+            return null;
+        }
+        if (isKeyWord(child, 'USING')) {
+            return children[i] as TerminalNode;
+        }
+    }
+    return null
+}
+
+export function tableNameFromColumnPath(ctx: ColumnNameContext): string {
+    const ids = ctx.poolPath()?.id_();
+    if (ids?.length == 1) {
+        return '';
+    }
+    if ((ids?.length || 0) > 1) {
+        return ids ? ids[ids.length - 2]?.getText() : '';
+    }
+    return '';
+}
+
+export function columnNameFromColumnPath(ctx: ColumnNameContext): string {
+    const ids = ctx.poolPath()?.id_();
+    return ids ? ids[ids.length - 1]?.getText() : '';
+}
+
+export function getColumnNameFromExpressionOrDefault(ctx: ParserRuleContext): ColumnNameContext | ColumnNamePathContext | null {
+    while (ctx.children?.length == 1) {
+        ctx = ctx.children[0] as ParserRuleContext;
+        if (ctx instanceof ColumnNameContext || ctx instanceof ColumnNamePathContext) {
+            return ctx;
+        }
+    }
+    return null
+}
+
+export function getColumnsFromRollupOldSyntax(ctx: RollupOldSyntaxContext): ColumnInfo[] {
+    const columns: ColumnInfo[] = [];
+    const expressions = ctx.expressionsNotInParenthesis().expressionOrDefault();
+    expressions?.forEach((expr) => {
+        const columnName = getColumnNameFromExpressionOrDefault(expr);
+        if (columnName) {
+            const columnInfo = getColumnInfoFromNode(columnName);
+            columns.push(columnInfo);
+        }
+    });
+    return columns;
+}
+
+export function isSameColumnInfo(columnInfo1: ColumnInfo, columnInfo2: ColumnInfo): boolean {
+    return columnInfo1.referanceTableName === columnInfo2.referanceTableName &&
+        columnInfo1.referanceColumnName === columnInfo2.referanceColumnName;
 }

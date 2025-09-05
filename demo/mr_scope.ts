@@ -1,27 +1,15 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { uuidv4 } from "./util";
 import { IdentifierScope } from "./Identifier_scope";
-import { AtomSelectStatementContext, HiveSqlParser, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { getOnConditionOfFromClause, isPosInParserRuleContext } from "./sql_ls_helper";
+import { AtomSelectStatementContext, GroupByClauseContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ColumnInfo, getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getOnConditionOfFromClause, isPosInParserRuleContext, isSameColumnInfo, TableSource } from "./sql_ls_helper";
     
-interface TableSource {
-    tableName: string;
-    reference: ParserRuleContext,
-    defineReference: ParserRuleContext
-}
-
-interface ColumnInfo {
-    exportColumnName: string;
-    referanceTableName: string;
-    referanceColumnName: string;
-    reference: ParserRuleContext;
-    defineReference: ParserRuleContext;
-}
 
 export class MapReduceScope {
     id = uuidv4();
 
     inputTable: Map<string, TableSource> = new Map();
+    inputTables: TableSource[] = [];
 
     exportColumns: ColumnInfo[] = [];
 
@@ -39,11 +27,15 @@ export class MapReduceScope {
     }
 
     addInputTable(name: string, table: ParserRuleContext, defineReference: ParserRuleContext) {
-        this.inputTable.set(name, {
+        const tableInfo = {
             tableName: name,
             reference: table,
-            defineReference,
-        });
+            defineReference
+        };
+        if (!this.inputTable.has(name)) {
+            this.inputTable.set(name, tableInfo);
+        }
+        this.inputTables.push(tableInfo);
     }
 
     getDefaultInputTableName() {
@@ -67,6 +59,7 @@ export class MapReduceScope {
             type: string
         }[] = [];
 
+        const hasMultiInputTable = this.inputTables.length > 1;
         // check exportColumns name duplicate
         const columnNames = new Set<string>();
         this.exportColumns.forEach(column => {
@@ -79,10 +72,20 @@ export class MapReduceScope {
                 });
             }
             columnNames.add(column.exportColumnName);
+
+            if (!column.referanceTableName && hasMultiInputTable) {
+                errors.push({
+                    message: `In multi-input select, export column '${column.exportColumnName}' must specify the referance table name`,
+                    context: column.reference,
+                    level: 'error',
+                    type: 'no_table_ref'
+                });
+            }
         });
         // check input table alias duplicate
         const tableNames = new Set<string>();
-        this.inputTable.forEach(table => {
+        console.log('Input Tables:', this.inputTables);
+        this.inputTables.forEach(table => {
             if (tableNames.has(table.tableName)) {
                 errors.push({
                     message: `Duplicate input table alias '${table.tableName}'`,
@@ -99,7 +102,8 @@ export class MapReduceScope {
         const groupByColumns = this.getGroupByColumns();
         if (groupByColumns.length) {
             this.exportColumns.forEach(column => {
-                if (!groupByColumns.includes(column.referanceColumnName)) {
+                if (!groupByColumns.some(groupByColumn => isSameColumnInfo(groupByColumn, column))) {
+                    // check if same column define
                     errors.push({
                         message: `Export column '${column.exportColumnName}' is not included in the group-by columns`,
                         context: column.reference,
@@ -199,7 +203,22 @@ export class MapReduceScope {
     }
 
     getGroupByColumns() {
-        const ret: string[] = [];
+        const ret: ColumnInfo[] = [];
+        const context = this.context;
+        if (context instanceof AtomSelectStatementContext) {
+            const groupByClause = context.groupByClause();
+            console.log('groupByClause children', groupByClause?.children);
+            const columnName = groupByClause?.columnName();
+            if (columnName) {
+                const columnInfo = getColumnInfoFromNode(columnName);
+                ret.push(columnInfo);
+            }
+            const columnNames = groupByClause?.rollupOldSyntax();
+            if (columnNames) {
+                // get all
+                ret.push(...getColumnsFromRollupOldSyntax(columnNames));
+            }
+        }
         return ret;
     }
 

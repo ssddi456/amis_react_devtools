@@ -197,6 +197,47 @@ select count(*), count(distinct resblock_id)
 from rpr.rpr_test_news_record_da
 ;`
 ,`select * from t1 left join t2 using (house_code, resblock_id)`
+,`select
+  t1.house_code,
+  t1.resblock_id,
+  t1.cityId,
+  count(*)
+from t1
+group by t1.house_code, t1.resblock_id
+`,`select
+  t1.house_code,
+  t1.resblock_id,
+  t1.cityId,
+  count(*)
+from t1
+group by t1.house_code
+`
+,`select
+  t1.house_code,
+  t2.housedel_id as house_code,
+  t1.resblock_id
+from t1
+  left join t2
+    on t1.house_code = t2.house_code
+    and t1.resblock_id = t2.resblock_id
+`
+,`select
+  t1.house_code,
+  t1.housedel_id,
+  t1.resblock_id
+from t1
+  left join t1
+    on t1.house_code = t2.house_code
+    and t1.resblock_id = t2.resblock_id
+`
+,`select
+  t1.house_code,
+  resblock_id
+from t1
+  left join t2
+    on t1.house_code = t2.house_code
+    and t1.resblock_id = t2.resblock_id
+`
 ].map(x => caseFromString(x));
 
 console.log('sql test cases', sqlTest);

@@ -1,9 +1,9 @@
 
-import { ParserRuleContext, ParseTree, ParseTreeWalker, TerminalNode } from "antlr4ng";
+import { ParserRuleContext, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
-import { AtomSelectStatementContext, ColumnNameContext, ColumnNameCreateContext, ConstantContext, CteStatementContext, ExpressionContext, FromClauseContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, JoinSourcePartContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, SelectStmtContext, SubQueryExpressionContext, SubQuerySourceContext, TableAllColumnsContext, TableNameContext, TableSourceContext, VirtualTableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { AtomSelectStatementContext, ColumnNameContext, ColumnNameCreateContext, ConstantContext, ExpressionContext, FromClauseContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, TableNameContext, TableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
-import { findTokenAtPosition, isKeyWord, rangeFromNode } from "./sql_ls_helper";
+import { columnNameFromColumnPath, findTokenAtPosition, getColumnInfoFromNode, getNextUsingKeyword, rangeFromNode, tableInfoFromCteStatement, tableInfoFromSubQuerySource, tableInfoFromTableSource, tableInfoFromVirtualTableSource, tableNameFromColumnPath } from "./sql_ls_helper";
 import { IdentifierScope, SymbolAndContext } from "./Identifier_scope";
 import { MapReduceScope } from "./mr_scope";
 
@@ -247,24 +247,11 @@ export class ContextManager {
                 const sourceColumn = ctx.columnName();
                 if (sourceColumn) {
                     const id = ctx.id_()[0];
+                    const columnInfo = getColumnInfoFromNode(sourceColumn, id);
                     if (id) {
                         context?.addHighlightNode(id);
-                        mrScope?.addExportColumn({
-                            exportColumnName: id.getText(),
-                            referanceColumnName: columnNameFromColumnPath(sourceColumn),
-                            referanceTableName: tableNameFromColumnPath(sourceColumn),
-                            reference: sourceColumn,
-                            defineReference: id,
-                        });
-                    } else {
-                        mrScope?.addExportColumn({
-                            exportColumnName: sourceColumn.getText(),
-                            referanceColumnName: columnNameFromColumnPath(sourceColumn),
-                            referanceTableName: tableNameFromColumnPath(sourceColumn),
-                            reference: sourceColumn,
-                            defineReference: sourceColumn
-                        });
                     }
+                    mrScope?.addExportColumn(columnInfo);
                 }
                 const expression = ctx.expression();
                 if (expression) {
@@ -388,143 +375,3 @@ export const createContextManager = (tree: ProgramContext) => {
     return new ContextManager(tree);
 };
 
-
-function tableInfoFromTableSource(
-    currentContext: IdentifierScope | null,
-    context: TableSourceContext | null,
-): TableSourceContext | null {
-    if (!currentContext || !context) {
-        return null;
-    }
-
-    const alias = context.id_()?.getText();
-    if (alias) {
-        currentContext.addIdentifier(
-            context.id_()?.getText() || '',
-            context
-        );
-        currentContext.getMrScope()?.addInputTable(alias, context, context.id_()!);
-    } else {
-        const tableName = context.tableOrView()?.getText();
-        currentContext.addReference(tableName, context);
-        currentContext.getMrScope()?.addInputTable(tableName, context, context.tableOrView()!);
-    }
-
-    return context;
-}
-
-function tableInfoFromSubQuerySource(
-    currentContext: IdentifierScope | null,
-    subQuerySource: SubQuerySourceContext | null,
-): SubQuerySourceContext | null {
-    if (!currentContext || !subQuerySource) {
-        return null;
-    }
-    const name = subQuerySource.id_().getText();
-    currentContext.addIdentifier(name || '', subQuerySource, true);
-    currentContext.getMrScope()?.addInputTable(name || '', subQuerySource, subQuerySource.id_()!);
-    if (name) {
-        currentContext.addHighlightNode(subQuerySource.id_());
-    }
-    return subQuerySource;
-}
-
-function tableInfoFromVirtualTableSource(
-    currentContext: IdentifierScope | null,
-    virtualTableSource: VirtualTableSourceContext | null,
-): VirtualTableSourceContext | null {
-    if (!currentContext || !virtualTableSource) {
-        return null;
-    }
-    const name = virtualTableSource.tableAlias().getText();
-    currentContext.addIdentifier(name || '', virtualTableSource, true);
-    currentContext.getMrScope()?.addInputTable(name || '', virtualTableSource, virtualTableSource.tableAlias()!);
-    if (name) {
-        currentContext.addHighlightNode(virtualTableSource.tableAlias());
-    }
-    return virtualTableSource;
-}
-
-function tableInfoFromCteStatement(
-    currentContext: IdentifierScope | null,
-    cteStatement: CteStatementContext | null,
-): CteStatementContext | null {
-    if (!currentContext || !cteStatement) {
-        return null;
-    }
-    const name = cteStatement.id_().getText();
-    currentContext.addIdentifier(name || '', cteStatement, true);
-    currentContext.getMrScope()?.addInputTable(name || '', cteStatement, cteStatement.id_()!);
-    if (name) {
-        currentContext.addHighlightNode(cteStatement.id_());
-    }
-    return cteStatement;
-}
-
-function getNextOnExpression(children: ParseTree[], current: JoinSourcePartContext): ParserRuleContext | null {
-    const index = children.indexOf(current);
-    if (index === -1 || index === children.length - 1) {
-        return null;
-    }
-    for (let i = index + 1; i < children.length; i++) {
-        const child = children[i];
-        if (child instanceof JoinSourcePartContext) {
-            return null;
-        }
-        if (isKeyWord(child, 'ON')) {
-            return children[i + 1] as ParserRuleContext;
-        }
-    }
-    return null
-}
-
-
-function getNextUsingExpression(children: ParseTree[], current: JoinSourcePartContext): ParserRuleContext | null {
-    const index = children.indexOf(current);
-    if (index === -1 || index === children.length - 1) {
-        return null;
-    }
-    for (let i = index + 1; i < children.length; i++) {
-        const child = children[i];
-        if (child instanceof JoinSourcePartContext) {
-            return null;
-        }
-        if (isKeyWord(child, 'USING')) {
-            return children[i + 1] as ParserRuleContext;
-        }
-    }
-    return null
-}
-
-function getNextUsingKeyword(children: ParseTree[], current: JoinSourcePartContext): TerminalNode | null {
-    const index = children.indexOf(current);
-    if (index === -1 || index === children.length - 1) {
-        return null;
-    }
-    for (let i = index + 1; i < children.length; i++) {
-        const child = children[i];
-        if (child instanceof JoinSourcePartContext) {
-            return null;
-        }
-        if (isKeyWord(child, 'USING')) {
-            return children[i] as TerminalNode;
-        }
-    }
-    return null
-}
-
-function tableNameFromColumnPath(ctx: ColumnNameContext): string {
-    const ids = ctx.poolPath()?.id_();
-    if (ids?.length == 1) {
-        return '';
-    }
-    if ((ids?.length || 0) > 1) {
-        return ids ? ids[ids.length - 2]?.getText() : '';
-    }
-    return '';
-}
-
-function columnNameFromColumnPath(ctx: ColumnNameContext): string {
-    const ids = ctx.poolPath()?.id_();
-    return ids ? ids[ids.length - 1]?.getText() : '';
-}

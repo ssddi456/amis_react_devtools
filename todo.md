@@ -1,14 +1,14 @@
 1. get definition
     [ ] get database
     [*] get table
-    [ ] get column
+    [*] get column
     [ ] get star column
     [ ] get function
     
 1. validate
     [*] check definition
-    [ ] group by
-    [ ] using
+    [*] group by
+    [*] using
     [ ] join on scope
     [*] duplicate column alias
     [*] duplicate table alias
