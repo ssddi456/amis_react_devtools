@@ -1,7 +1,7 @@
 import { Position } from "monaco-editor";
 import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import { HiveSqlParserVisitor } from "dt-sql-parser";
-import { ColumnNameContext, ColumnNamePathContext, CteStatementContext, ExpressionOrDefaultContext, FromClauseContext, HiveSqlParser, Id_Context, JoinSourcePartContext, ProgramContext, RollupOldSyntaxContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { AtomExpressionContext, ColumnNameContext, ColumnNamePathContext, CteStatementContext, ExpressionContext, ExpressionOrDefaultContext, FromClauseContext, Function_Context, HiveSqlParser, Id_Context, JoinSourcePartContext, ProgramContext, RollupOldSyntaxContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { WordPosition } from "dt-sql-parser/dist/parser/common/textAndWord";
 import { IRange } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { matchSubPath } from "./sql_tree_query";
@@ -456,4 +456,26 @@ export function getColumnsFromRollupOldSyntax(ctx: RollupOldSyntaxContext): Colu
 export function isSameColumnInfo(columnInfo1: ColumnInfo, columnInfo2: ColumnInfo): boolean {
     return columnInfo1.referanceTableName === columnInfo2.referanceTableName &&
         columnInfo1.referanceColumnName === columnInfo2.referanceColumnName;
+}
+
+export function getAtomExpressionFromExpression(ctx: ParserRuleContext): AtomExpressionContext | null {
+    if (!(ctx instanceof ExpressionContext)) {
+        return null;
+    }
+    while (ctx.children?.length == 1) {
+        ctx = ctx.children[0] as ParserRuleContext;
+        if (ctx instanceof AtomExpressionContext) {
+            return ctx;
+        }
+    }
+    return null
+}
+
+export function getFunctionCallFromExpression(ctx: ParserRuleContext): ParserRuleContext | null {
+    const atom = getAtomExpressionFromExpression(ctx);
+    if (!atom) {
+        return null;
+    }
+    const func = atom.function_();
+    return func;
 }

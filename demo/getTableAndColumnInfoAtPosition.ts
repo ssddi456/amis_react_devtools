@@ -249,6 +249,7 @@ function getEntityInfoFromTableName(
     const tableInfo = item && tableInfoFromNode(item, context);
 
     if (!tableInfo) {
+        console.log('tableName', tableName, 'mrScope?.inputTables', mrScope?.inputTables);
         const tableInfo = getTableInfoByName(tableName, undefined, [], null);
 
         if (tableInfo) {

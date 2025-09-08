@@ -204,11 +204,20 @@ from rpr.rpr_test_news_record_da
   count(*)
 from t1
 group by t1.house_code, t1.resblock_id
-`,`select
+`
+,`select
   t1.house_code,
   t1.resblock_id,
   t1.cityId,
   count(*)
+from t1
+group by t1.house_code
+`
+,`select
+  t1.house_code,
+  t1.resblock_id,
+  t1.cityId,
+  count(*) as cnt
 from t1
 group by t1.house_code
 `

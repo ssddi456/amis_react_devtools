@@ -1,14 +1,46 @@
 
 import { ParserRuleContext, ParseTreeWalker } from "antlr4ng";
 import { HiveSqlParserListener } from "dt-sql-parser";
-import { AtomSelectStatementContext, ColumnNameContext, ColumnNameCreateContext, ConstantContext, ExpressionContext, FromClauseContext, FromSourceContext, GroupByClauseContext, HavingClauseContext, JoinSourceContext, ProgramContext, QualifyClauseContext, QueryStatementExpressionContext, SelectClauseContext, SelectItemContext, SelectStatementContext, SelectStatementWithCTEContext, TableNameContext, TableSourceContext, WhereClauseContext, Window_clauseContext, WithClauseContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import {
+    AtomSelectStatementContext,
+    ColumnNameContext,
+    ColumnNameCreateContext,
+    ConstantContext,
+    ExpressionContext,
+    FromClauseContext,
+    FromSourceContext,
+    Function_Context,
+    GroupByClauseContext,
+    HavingClauseContext,
+    JoinSourceContext,
+    ProgramContext,
+    QualifyClauseContext,
+    QueryStatementExpressionContext,
+    SelectClauseContext,
+    SelectItemContext,
+    SelectStatementContext,
+    SelectStatementWithCTEContext,
+    TableNameContext,
+    TableSourceContext,
+    WhereClauseContext,
+    Window_clauseContext,
+    WithClauseContext
+} from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-editor";
-import { columnNameFromColumnPath, findTokenAtPosition, getColumnInfoFromNode, getNextUsingKeyword, rangeFromNode, tableInfoFromCteStatement, tableInfoFromSubQuerySource, tableInfoFromTableSource, tableInfoFromVirtualTableSource, tableNameFromColumnPath } from "./sql_ls_helper";
+import {
+    findTokenAtPosition,
+    getColumnInfoFromNode,
+    getNextUsingKeyword,
+    rangeFromNode,
+    tableInfoFromCteStatement,
+    tableInfoFromSubQuerySource,
+    tableInfoFromTableSource,
+    tableInfoFromVirtualTableSource
+} from "./sql_ls_helper";
 import { IdentifierScope, SymbolAndContext } from "./Identifier_scope";
 import { MapReduceScope } from "./mr_scope";
 
 export class ContextManager {
-    identifierMap: Map<string, IdentifierScope> = new Map();
     rootContext: IdentifierScope | null = null;
     currentContext: IdentifierScope | null = null;
 
@@ -18,10 +50,10 @@ export class ContextManager {
         const manager = this;
         this.rootContext = new IdentifierScope(tree);
         this.currentContext = this.rootContext;
+        const rootContext = this.rootContext;
 
         function enterRule(ctx: ParserRuleContext) {
             const newContext = manager.currentContext!.enterScope(ctx);
-            manager.identifierMap.set(newContext.uuid, newContext);
             manager.currentContext = newContext;
             return newContext;
         }
@@ -277,6 +309,13 @@ export class ContextManager {
                 // });
             };
 
+            enterFunction_? = (ctx: Function_Context) => {
+                // get function name
+                const name = ctx.functionNameForInvoke()?.getText();
+                // collection function names
+
+            }
+
         };
 
         ParseTreeWalker.DEFAULT.walk(listener, tree);
@@ -354,7 +393,7 @@ export class ContextManager {
                 if (foundNode) {
                     console.log(
                         'Found symbol at position:', JSON.stringify(position),
-                            'Symbol:', rangeFromNode(element.range.context), element);
+                        'Symbol:', rangeFromNode(element.range.context), element);
                     return {
                         foundNode,
                         ...element,

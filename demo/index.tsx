@@ -109,8 +109,8 @@ const App = () => {
   return (
     <div className="container">
       <ClickToComponent />
+      {AppComponent}
       {/*
-        {AppComponent}
        */}
       <SqlTestNavigation
         sqlTest={sqlTest}

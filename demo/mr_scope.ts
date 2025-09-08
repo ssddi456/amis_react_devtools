@@ -1,8 +1,8 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { uuidv4 } from "./util";
 import { IdentifierScope } from "./Identifier_scope";
-import { AtomSelectStatementContext, GroupByClauseContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { ColumnInfo, getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getOnConditionOfFromClause, isPosInParserRuleContext, isSameColumnInfo, TableSource } from "./sql_ls_helper";
+import { AtomSelectStatementContext, ExpressionContext, GroupByClauseContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ColumnInfo, getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getFunctionCallFromExpression, getOnConditionOfFromClause, isPosInParserRuleContext, isSameColumnInfo, printNode, TableSource } from "./sql_ls_helper";
     
 
 export class MapReduceScope {
@@ -102,6 +102,12 @@ export class MapReduceScope {
         const groupByColumns = this.getGroupByColumns();
         if (groupByColumns.length) {
             this.exportColumns.forEach(column => {
+                if (column.reference instanceof ExpressionContext) {
+                    const functionCall = getFunctionCallFromExpression(column.reference);
+                    if (functionCall) {
+                        return;
+                    }
+                }
                 if (!groupByColumns.some(groupByColumn => isSameColumnInfo(groupByColumn, column))) {
                     // check if same column define
                     errors.push({
@@ -131,6 +137,13 @@ export class MapReduceScope {
             }
             const fromClause = context.fromClause();
             if (fromClause && isPosInParserRuleContext(position, fromClause)) {
+                const tableView = fromClause.fromSource().joinSource()?.atomjoinSource().tableSource()?.tableOrView();
+                if (tableView) {
+                    if (isPosInParserRuleContext(position, tableView)) {
+                        // input
+                        return this.getParentMrScope();
+                    }
+                }
                 // if in on expression
                 const conditions = getOnConditionOfFromClause(fromClause);
                 if (conditions) {
