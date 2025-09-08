@@ -21,6 +21,9 @@
     [ ] validate performance
         [ ] table info
 
+1. project layout
+    [ ] reorganize project layout
+    
 # 更好的测试方法
 
 * 在需要调试的地方添加断言 or debugger

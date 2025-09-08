@@ -276,8 +276,9 @@ export class IdentifierScope {
     }
 
     async getTableInfoByName(tableName: string, dbName: string | undefined): Promise<TableInfo | null> {
-        if (this.tableSourceManager) {
-            return this.tableSourceManager.getTableInfoByName(tableName, dbName);
+        const tableSourceManager = this.tableSourceManager || this.root?.tableSourceManager;
+        if (tableSourceManager) {
+            return tableSourceManager.getTableInfoByName(tableName, dbName);
         }
         return null;
     }

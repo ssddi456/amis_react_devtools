@@ -6,6 +6,7 @@ import { IdentifierScope } from "./Identifier_scope";
 import { printNode } from './sql_ls_helper';
 import { TextHighlight } from './text_highlight';
 import { MapReduceScope } from './mr_scope';
+import tableSourceManager from './data/example';
 
 interface DisplayContextManagerProps {
     context: IdentifierScope
@@ -143,6 +144,7 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
             const model = testCase.model;
             const contextManager = createHiveLs({
                 model,
+                tableSourceManager,
             }).getContextManager();
 
             return {

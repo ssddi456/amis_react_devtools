@@ -3,6 +3,7 @@ import { LsTestCase, WithSource } from "./ls_helper";
 import { languages, editor } from 'monaco-editor';
 import { createHiveLs } from "./sql_ls";
 import { HoverResults, DefinitionResults, ReferencesResults, ValidationResults } from "./results_components";
+import tableSourceManager from "./data/example";
 
 
 // 创建高亮文本的辅助函数
@@ -81,7 +82,11 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
     useEffect(() => {
         const model = testCase.model;
         const positions = testCase.positions;
-        const hiveLs = createHiveLs({ model, isTest: !!showDebug });
+        const hiveLs = createHiveLs({
+            model,
+            tableSourceManager,
+            isTest: !!showDebug
+        });
         const resultItems = positions.map(async (pos) => {
             const [hoverResult, definitionResult, referencesResult] = await Promise.all([
                 hiveLs.doHover(pos, showDebug),
@@ -109,7 +114,12 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
         Promise.all(results!.resultItems.map(async (item, i) => {
             if (i === idx) {
                 const model = testCase.model;
-                const hiveLs = createHiveLs({ model, isTest: showDebug, noCache: true });
+                const hiveLs = createHiveLs({
+                    model,
+                    tableSourceManager,
+                    isTest: showDebug,
+                    noCache: true
+                });
                 const positions = testCase.positions;
                 const pos = positions[i]; // Get the position of the item
                 // Apply re-parsing logic to the selected item
@@ -135,7 +145,12 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
     }, [results]);
 
     const reValidate = useCallback(() => {
-        createHiveLs({ model: testCase.model, isTest: showDebug, noCache: true }).doValidation().then(validationResults => {
+        createHiveLs({
+            model: testCase.model,
+            tableSourceManager,
+            isTest: showDebug,
+            noCache: true
+        }).doValidation().then(validationResults => {
             setResult(prev => prev ? { ...prev, validationResults } : null);
         });
     }, [results]);

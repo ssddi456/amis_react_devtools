@@ -3,6 +3,7 @@ import { LanguageIdEnum, setupLanguageFeatures, vsPlusTheme } from 'monaco-sql-l
 import 'monaco-sql-languages/esm/languages/hive/hive.contribution';
 import { createHiveLs } from './sql_ls';
 import { DisposableChain, stringFromPos } from './ls_helper';
+import tableSourceManager from './data/example';
 
 // Customize the various tokens style
 editor.defineTheme('sql-dark', vsPlusTheme.darkThemeData);
@@ -26,7 +27,7 @@ const createSqlEditor = (name: string) => ({
         const doValidate = async () => {
             const model = editorInstance.getModel();
             if (model) {
-                const context = createHiveLs({ model });
+                const context = createHiveLs({ model, tableSourceManager, });
                 const errors = await context.doValidation();
                 console.log('validation errors', errors);
                 monaco.editor.setModelMarkers(model, LanguageIdEnum.HIVE, errors.map(err => {
@@ -73,37 +74,36 @@ const createSqlEditor = (name: string) => ({
         //     console.log('markers changed', e, editorInstance.getModel());
         //     console.log('markers changed', markers);
         // }))
-        disposables.add(monaco.languages.registerCompletionItemProvider(LanguageIdEnum.HIVE, {
-            triggerCharacters: ['.', '"', ' '],
-            provideCompletionItems: (model, position) => {
-                const context = createHiveLs({ model });
-                const ret = context.doComplete(position) as undefined;
-                return ret;
-            }
-        }));
+        // disposables.add(monaco.languages.registerCompletionItemProvider(LanguageIdEnum.HIVE, {
+        //     triggerCharacters: ['.', '"', ' '],
+        //     provideCompletionItems: (model, position) => {
+        //         const context = createHiveLs({ model, tableSourceManager, });
+        //         const ret = context.doComplete(position) as undefined;
+        //         return ret;
+        //     }
+        // }));
 
         disposables.add(monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
             provideHover: (model, position) => {
-                const context = createHiveLs({ model });
+                const context = createHiveLs({ model, tableSourceManager, });
                 const ret = context.doHover(position);
                 console.log('hover result', stringFromPos(position), ret);
                 return ret;
             }
         }));
 
-        disposables.add(monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
-            provideHover: (model, position) => {
-                return;
-                const context = createHiveLs({ model });
-                const ret = context.doSyntaxHover(position);
-                console.log('hover syntax result', stringFromPos(position), ret);
-                return ret;
-            }
-        }));
+        // disposables.add(monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
+        //     provideHover: (model, position) => {
+        //         const context = createHiveLs({ model, tableSourceManager, });
+        //         const ret = context.doSyntaxHover(position);
+        //         console.log('hover syntax result', stringFromPos(position), ret);
+        //         return ret;
+        //     }
+        // }));
 
         disposables.add(monaco.languages.registerDefinitionProvider(LanguageIdEnum.HIVE, {
             provideDefinition: (model, position) => {
-                const context = createHiveLs({ model });
+                const context = createHiveLs({ model, tableSourceManager, });
                 const ret = context.doDefinition(position);
                 console.log('definition result', stringFromPos(position), model.uri, ret);
                 return ret;
@@ -112,7 +112,7 @@ const createSqlEditor = (name: string) => ({
 
         disposables.add(monaco.languages.registerReferenceProvider(LanguageIdEnum.HIVE, {
             provideReferences: (model, position) => {
-                const context = createHiveLs({ model });
+                const context = createHiveLs({ model, tableSourceManager, });
                 const ret = context.doReferences(position);
                 console.log('references result', stringFromPos(position), model.uri, ret);
                 return ret;
@@ -121,7 +121,7 @@ const createSqlEditor = (name: string) => ({
 
         disposables.add(monaco.languages.registerDocumentFormattingEditProvider(LanguageIdEnum.HIVE, {
             provideDocumentFormattingEdits: (model, options) => {
-                const context = createHiveLs({ model });
+                const context = createHiveLs({ model, tableSourceManager, });
                 const formatted = context.formatHiveSQL(model.getValue());
                 console.log('document formatting result', model.uri, formatted);
                 return [
