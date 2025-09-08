@@ -31,6 +31,7 @@ import {
     findTokenAtPosition,
     getColumnInfoFromNode,
     getNextUsingKeyword,
+    ITableSourceManager,
     rangeFromNode,
     tableInfoFromCteStatement,
     tableInfoFromSubQuerySource,
@@ -46,11 +47,11 @@ export class ContextManager {
 
     mrScopes: MapReduceScope[] = [];
 
-    constructor(public tree: ProgramContext) {
+    constructor(public tree: ProgramContext, public tableSourceManager?: ITableSourceManager) {
         const manager = this;
-        this.rootContext = new IdentifierScope(tree);
+        this.rootContext = new IdentifierScope(tree, null, null);
+        this.rootContext.tableSourceManager = tableSourceManager;
         this.currentContext = this.rootContext;
-        const rootContext = this.rootContext;
 
         function enterRule(ctx: ParserRuleContext) {
             const newContext = manager.currentContext!.enterScope(ctx);
@@ -410,7 +411,7 @@ export class ContextManager {
 }
 
 
-export const createContextManager = (tree: ProgramContext) => {
-    return new ContextManager(tree);
+export const createContextManager = (tree: ProgramContext, tableSourceManager?: ITableSourceManager) => {
+    return new ContextManager(tree, tableSourceManager);
 };
 

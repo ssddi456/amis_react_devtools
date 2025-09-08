@@ -2,16 +2,17 @@ import { ParserRuleContext } from "antlr4ng";
 import { TableSourceContext, HiveSqlParser, SelectItemContext, FunctionIdentifierContext, ColumnNameContext, ColumnNamePathContext, SubQuerySourceContext, TableNameContext, Id_Context, CteStatementContext, ExpressionContext, TableAllColumnsContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { IdentifierScope } from "./Identifier_scope";
 import { MapReduceScope } from "./mr_scope";
-import { EntityInfo, tableInfoFromNode, getColumnInfoByName, getTableInfoByName } from "./formatHoverRes";
-import { printNodeTree, printNode, rangeFromNode, isKeyWord } from "./sql_ls_helper";
+import { EntityInfo, tableInfoFromNode, getColumnInfoByName, } from "./formatHoverRes";
+import { printNodeTree, printNode, rangeFromNode } from "./sql_ls_helper";
 import { matchType, matchSubPathOneOf, matchSubPath } from "./sql_tree_query";
+import tableData from "./data/example";
 
-export const getEntityInfoAtPosition = (
+export const getEntityInfoAtPosition = async (
     foundNode?: ParserRuleContext | null,
     mrScope: MapReduceScope | null = null,
     context?: IdentifierScope | null,
     isTest?: boolean
-): EntityInfo | null => {
+): Promise<EntityInfo | null> => {
     if (!foundNode || !context || (
         !matchType(foundNode, 'id_')
         && !matchType(foundNode, 'DOT')
@@ -44,7 +45,7 @@ export const getEntityInfoAtPosition = (
     ]);
     if (tableSource) {
         return {
-            ...getEntityInfoFromTableSource(foundNode, tableSource as TableSourceContext, context, mrScope),
+            ...await getEntityInfoFromTableSource(foundNode, tableSource as TableSourceContext, context, mrScope),
             ...commonFields,
         };
     }
@@ -55,7 +56,7 @@ export const getEntityInfoAtPosition = (
     ]);
     if (tableName) {
         return {
-            ...getEntityInfoFromTableName(foundNode, tableName as TableNameContext, context, mrScope),
+            ...await getEntityInfoFromTableName(foundNode, tableName as TableNameContext, context, mrScope),
             ...commonFields,
         };
     }
@@ -64,7 +65,7 @@ export const getEntityInfoAtPosition = (
     const subQuerySourceContext = matchSubPath(foundNode, ['id_', 'subQuerySource']);
     if (subQuerySourceContext) {
         return {
-            ...getEntityInfoFromSubQuerySource(foundNode, subQuerySourceContext as SubQuerySourceContext, context, mrScope),
+            ...await getEntityInfoFromSubQuerySource(foundNode, subQuerySourceContext as SubQuerySourceContext, context, mrScope),
             ...commonFields,
         };
     }
@@ -87,7 +88,7 @@ export const getEntityInfoAtPosition = (
     if (columnName) {
         
         return {
-            ...getEntityInfoFromColumnName(foundNode, columnName as ColumnNameContext | ColumnNamePathContext, context, mrScope),
+            ...await getEntityInfoFromColumnName(foundNode, columnName as ColumnNameContext | ColumnNamePathContext, context, mrScope),
             ...commonFields,
         };
     }
@@ -117,12 +118,12 @@ export const getEntityInfoAtPosition = (
     };
 };
 
-export const getAllEntityInfoFromNode = (
+export const getAllEntityInfoFromNode = async (
     node: ParserRuleContext,
     context: IdentifierScope,
     mrScope: MapReduceScope | null,
     isTest: boolean
-): EntityInfo | null => {
+): Promise<EntityInfo | null> => {
     const ext: string[] = [];
     const pushExt = isTest ? (content: string) => {
         ext.push(content);
@@ -140,35 +141,35 @@ export const getAllEntityInfoFromNode = (
 
     if (node instanceof TableSourceContext) {
         return {
-            ...getEntityInfoFromTableSource(node.tableOrView(), node, context, mrScope),
+            ...await getEntityInfoFromTableSource(node.tableOrView(), node, context, mrScope),
             ...commonFields,
         };
     }
 
     if (node instanceof ColumnNameContext || node instanceof ColumnNamePathContext) {
         return {
-            ...getEntityInfoFromColumnName(node.poolPath()?.id_(0) || node, node, context, mrScope),
+            ...await getEntityInfoFromColumnName(node.poolPath()?.id_(0) || node, node, context, mrScope),
             ...commonFields,
         };
     }
 
     if (node instanceof TableNameContext) {
         return {
-            ...getEntityInfoFromTableName(node, node, context, mrScope),
+            ...await getEntityInfoFromTableName(node, node, context, mrScope),
             ...commonFields,
         };
     }
 
     if (node instanceof SubQuerySourceContext) {
         return {
-            ...getEntityInfoFromSubQuerySource(node, node, context, mrScope),
+            ...await getEntityInfoFromSubQuerySource(node, node, context, mrScope),
             ...commonFields,
         };
     }
 
     if (node instanceof Id_Context) {
         if (node.parent instanceof CteStatementContext) {
-            const tableInfo = tableInfoFromNode(node.parent, context)
+            const tableInfo = await tableInfoFromNode(node.parent, context)
             return {
                 type: 'table' as const,
                 tableInfo,
@@ -215,7 +216,7 @@ export const getAllEntityInfoFromNode = (
     };
 }
 
-function getEntityInfoFromTableSource(
+async function getEntityInfoFromTableSource(
     node: ParserRuleContext,
     parent: TableSourceContext,
     context: IdentifierScope,
@@ -224,7 +225,7 @@ function getEntityInfoFromTableSource(
     const tableName = parent.tableOrView().tableName()?.getText();
     if (tableName) {
         const item = mrScope?.getTableByName(tableName);
-        const tableInfo = item && tableInfoFromNode(item, context);
+        const tableInfo = item && await tableInfoFromNode(item, context);
         if (tableInfo) {
             return {
                 type: 'table' as const,
@@ -238,7 +239,7 @@ function getEntityInfoFromTableSource(
     };
 }
 
-function getEntityInfoFromTableName(
+async function getEntityInfoFromTableName(
     node: ParserRuleContext,
     parent: TableNameContext,
     context: IdentifierScope,
@@ -246,11 +247,10 @@ function getEntityInfoFromTableName(
 ) {
     const tableName = parent.getText();
     const item = mrScope?.getTableByName(tableName);
-    const tableInfo = item && tableInfoFromNode(item, context);
+    const tableInfo = item && await tableInfoFromNode(item, context);
 
     if (!tableInfo) {
-        console.log('tableName', tableName, 'mrScope?.inputTables', mrScope?.inputTables);
-        const tableInfo = getTableInfoByName(tableName, undefined, [], null);
+        const tableInfo = await context.getTableInfoByName(tableName, undefined);
 
         if (tableInfo) {
             return {
@@ -271,14 +271,14 @@ function getEntityInfoFromTableName(
     };
 }
 
-function getEntityInfoFromSubQuerySource(
+async function getEntityInfoFromSubQuerySource(
     node: ParserRuleContext,
     parent: SubQuerySourceContext,
     context: IdentifierScope,
     mrScope?: MapReduceScope | null
 ) {
     const item = mrScope?.getTableByName(node.getText());
-    const tableInfo = item && tableInfoFromNode(item, context);
+    const tableInfo = item && await tableInfoFromNode(item, context);
     if (!tableInfo) {
         return {
             type: 'unknown' as const,
@@ -303,7 +303,7 @@ function tableIdAndColumnNameFromPoolPath(poolPath: ParserRuleContext | null): {
     return { tableId, columnName };
 }
 
-function getEntityInfoFromColumnName(
+async function getEntityInfoFromColumnName(
     node: ParserRuleContext,
     parent: ColumnNameContext | ColumnNamePathContext,
     context: IdentifierScope,
@@ -317,7 +317,7 @@ function getEntityInfoFromColumnName(
     // column_name only
     if (!tableIdExp) {
         const item = mrScope?.getTableByName(mrScope?.getDefaultInputTableName());
-        const tableInfo = item && tableInfoFromNode(item, context);
+        const tableInfo = item && await tableInfoFromNode(item, context);
         if (!tableInfo) {
             return {
                 type: 'noTable' as const,
@@ -340,7 +340,7 @@ function getEntityInfoFromColumnName(
     }
 
     const item = mrScope?.getTableByName(tableIdExp);
-    const tableInfo = item && tableInfoFromNode(item, context);
+    const tableInfo = item && await tableInfoFromNode(item, context);
     console.log('tableIdExp', tableIdExp, 'context', context, 'mrScope', mrScope, 'mrScope?.getTableByName()', mrScope?.getTableByName(tableIdExp), 'item', item);
 
     if (!tableInfo) {

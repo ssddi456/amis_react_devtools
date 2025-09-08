@@ -1,8 +1,7 @@
-import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
+import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
-import { posInRange } from "./ls_helper";
-import { isPosInParserRuleContext, printNode, rangeFromNode, ruleIndexToDisplayName } from "./sql_ls_helper";
+import { isPosInParserRuleContext, ITableSourceManager, printNode, rangeFromNode, ruleIndexToDisplayName, TableInfo } from "./sql_ls_helper";
 import { uuidv4 } from "./util";
 import { MapReduceScope } from "./mr_scope";
 
@@ -45,9 +44,12 @@ export class IdentifierScope {
 
     unsupportedFeatures: UnsupportedFeature[] = [];
 
+    tableSourceManager?: ITableSourceManager;
+
     constructor(
         public context: ParserRuleContext,
-        public parent: IdentifierScope | null = null
+        public parent: IdentifierScope | null = null,
+        public root: IdentifierScope | null = null,
     ) {
     }
 
@@ -113,7 +115,7 @@ export class IdentifierScope {
     }
 
     enterScope(context: ParserRuleContext) {
-        const newScope = new IdentifierScope(context, this);
+        const newScope = new IdentifierScope(context, this, this.root || this);
         this.children.push(newScope);
         return newScope;
     }
@@ -271,6 +273,13 @@ export class IdentifierScope {
 
     addUnsupportedFeature(message: string, context: ParserRuleContext | TerminalNode) {
         this.unsupportedFeatures.push({ message, context });
+    }
+
+    async getTableInfoByName(tableName: string, dbName: string | undefined): Promise<TableInfo | null> {
+        if (this.tableSourceManager) {
+            return this.tableSourceManager.getTableInfoByName(tableName, dbName);
+        }
+        return null;
     }
 
     validate() {

@@ -141,7 +141,9 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
         if (nextProps.sqlTest !== prevState.sqlTest) {
             const testCase = caseFromString(nextProps.sqlTest);
             const model = testCase.model;
-            const contextManager = createHiveLs(model).getContextManager();
+            const contextManager = createHiveLs({
+                model,
+            }).getContextManager();
 
             return {
                 sqlTest: nextProps.sqlTest,

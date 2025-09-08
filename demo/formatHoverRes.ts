@@ -1,21 +1,19 @@
 import { ParserRuleContext, ParseTree } from "antlr4ng";
-import { EntityContext } from "dt-sql-parser";
 import { TableSourceContext, SubQuerySourceContext, VirtualTableSourceContext, CteStatementContext, TableNameContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { AttrName } from "dt-sql-parser/dist/parser/common/entityCollector";
 import { type IRange, languages, Uri } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import tableData from "./data/example";
 import { IdentifierScope } from "./Identifier_scope";
 import { WithSource } from "./ls_helper";
 import { MapReduceScope } from "./mr_scope";
 import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, functionRes, unknownRes } from "./sql_hover_res";
-import { printNode, rangeFromNode, wordToRange } from "./sql_ls_helper";
+import { ExtColumnInfo, printNode, rangeFromNode, TableInfo, } from "./sql_ls_helper";
 import { matchSubPathOneOf, matchSubPath } from "./sql_tree_query";
 
-function tableInfoFromTableSource(
+async function tableInfoFromTableSource(
     tableSource: TableSourceContext | null,
     context: IdentifierScope,
     collection?: TableInfo[]
-): TableInfo | null {
+): Promise<TableInfo | null> {
     if (!tableSource) {
         return null;
     }
@@ -26,7 +24,7 @@ function tableInfoFromTableSource(
         console.warn('No table name found in join source part:', printNode(tableSource));
         return null;
     }
-    const tableInfo = getTableInfoByName(tableName, undefined, [], null);
+    const tableInfo = await context.getTableInfoByName(tableName, undefined);
     if (tableInfo) {
         const ret = {
             db_name: tableInfo.db_name,
@@ -44,6 +42,7 @@ function tableInfoFromTableSource(
     }
     return null;
 }
+
 const localDbId = 'local db';
 export function tableInfoFromSubQuerySource(
     subQuerySource: SubQuerySourceContext,
@@ -136,10 +135,10 @@ function tableInfoFromCteStatement(
     return ret;
 }
 
-export function tableInfoFromNode(
+export async function tableInfoFromNode(
     node: ParserRuleContext | null,
     context: IdentifierScope
-): TableInfo | null {
+): Promise<TableInfo | null> {
     if (!node) {
         return null;
     }
@@ -147,7 +146,7 @@ export function tableInfoFromNode(
 
     const collection: TableInfo[] = [];
     if (node instanceof TableSourceContext) {
-        return tableInfoFromTableSource(node, context, collection);
+        return await tableInfoFromTableSource(node, context, collection);
     } else if (node instanceof SubQuerySourceContext) {
         return tableInfoFromSubQuerySource(node, context, collection);
     } else if (node instanceof VirtualTableSourceContext) {
@@ -161,98 +160,8 @@ export function tableInfoFromNode(
 }
 
 
-export interface TableInfo {
-    db_name: string;
-    table_name: string;
-    alias?: string;
-    table_id: number;
-    description: string;
-    column_list: ColumnInfo[];
-    range?: {
-        startLineNumber: number;
-        startColumn: number;
-        endLineNumber: number;
-        endColumn: number;
-    };
-}
 
-export interface ColumnInfo {
-    column_name: string;
-    data_type_string: string;
-    description: string;
-}
-export function getTableInfoByName(
-    tableName: string,
-    dbName: string | undefined,
-    entities: EntityContext[],
-    extInfos: TableInfo[] | null
-): TableInfo | null {
-    if (!tableName) {
-        return null;
-    }
-    if (!dbName && tableName.indexOf('.') !== -1) {
-        const parts = tableName.split('.');
-        dbName = parts[0];
-        tableName = parts[1];
-        if (!dbName || !tableName) {
-            return null;
-        }
-    }
-    if (dbName) {
-        return tableData.find(t => t.table_name === tableName && t.db_name === dbName) || null;
-    }
-    const tableInfo = tableData.find(t => t.table_name === tableName);
-    if (tableInfo) {
-        return tableInfo;
-    }
-
-    if (extInfos && extInfos.length > 0) {
-        const extTableInfo = extInfos.find(t => t.table_name === tableName || t.alias === tableName);
-        if (extTableInfo) {
-            return extTableInfo;
-        }
-    }
-
-    // if is a entity alias
-    if (!entities || entities.length === 0) {
-        return null;
-    }
-
-    const tableEntity = entities.find(e => e.text === tableName || e[AttrName.alias]?.text === tableName);
-    if (!tableEntity) {
-        return null;
-    }
-    if (tableEntity.text.indexOf('.') !== -1) {
-        const parts = tableEntity.text.split('.');
-        dbName = parts[0];
-        tableName = parts[1];
-        if (!dbName || !tableName) {
-            return null;
-        }
-        const ret = tableData.find(t => t.table_name === parts[1] && t.db_name === parts[0]) || null;
-        if (ret) {
-            return {
-                db_name: ret.db_name,
-                table_name: ret.table_name,
-                alias: tableEntity[AttrName.alias]?.text || '',
-                table_id: ret.table_id,
-                description: ret.description,
-                column_list: ret.column_list,
-                range: wordToRange(tableEntity.position)
-            };
-        }
-    }
-    return {
-        db_name: localDbId,
-        table_name: tableEntity.text,
-        table_id: 0, // 这里没用
-        description: '',
-        column_list: [],
-        range: wordToRange(tableEntity.position)
-    };
-}
-
-export function getColumnInfoByName(tableInfo: TableInfo | null, columnName: string): ColumnInfo | null {
+export function getColumnInfoByName(tableInfo: TableInfo | null, columnName: string): ExtColumnInfo | null {
     if (!tableInfo || !columnName) {
         return null;
     }
@@ -270,7 +179,7 @@ export function getColumnInfoByName(tableInfo: TableInfo | null, columnName: str
 export interface EntityInfo {
     type: 'table' | 'column' | 'unknown' | 'noTable' | 'noColumn' | 'createColumn' | 'function';
     tableInfo?: TableInfo | null;
-    columnInfo?: ColumnInfo | null;
+    columnInfo?: ExtColumnInfo | null;
     text?: string;
     range: IRange;
     ext?: string[];

@@ -2,17 +2,17 @@ import { editor, languages, Position, Uri, MarkerSeverity } from "monaco-editor"
 import { TextDocument } from 'vscode-json-languageservice';
 import { HiveSQL, } from 'dt-sql-parser';
 import { posInRange, WithSource } from "./ls_helper";
-import { TextSlice } from "dt-sql-parser/dist/parser/common/textAndWord";
 import {
     ProgramContext, 
     TableSourceContext,
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ContextManager, createContextManager } from "./context_manager";
-import { printNode, rangeFromNode, sliceToRange, findTokenAtPosition, printNodeTree } from "./sql_ls_helper";
+import { printNode, rangeFromNode, sliceToRange, findTokenAtPosition, printNodeTree, ITableSourceManager } from "./sql_ls_helper";
 import { matchType } from "./sql_tree_query";
 import { formatHiveSQL } from './formatter';
 import { getAllEntityInfoFromNode, getEntityInfoAtPosition } from "./getTableAndColumnInfoAtPosition";
 import { formatHoverRes, tableInfoFromNode, formatDefinitionRes, getIdentifierReferences } from "./formatHoverRes";
+import tableSourceManager from "./data/example";
 
 interface ContextInfos {
     hiveSqlParse: HiveSQL;
@@ -23,7 +23,7 @@ interface ContextInfos {
 
 const contextCache = new Map<string, ContextInfos>();
 
-function getContextWithCache(text: string, noCache: boolean): ContextInfos {
+function getContextWithCache(text: string, noCache: boolean, tableSourceManager?: ITableSourceManager): ContextInfos {
     if (contextCache.has(text) && !noCache) {
         return contextCache.get(text)!;
     }
@@ -31,7 +31,7 @@ function getContextWithCache(text: string, noCache: boolean): ContextInfos {
     const sqlSlices = hiveSqlParse.splitSQLByStatement(text);
     const ctx = hiveSqlParse.createParser(text);
     const tree = ctx.program();
-    const contextManager = createContextManager(tree);
+    const contextManager = createContextManager(tree, tableSourceManager);
     const ret: ContextInfos = {
         hiveSqlParse,
         sqlSlices,
@@ -46,14 +46,20 @@ function getContextWithCache(text: string, noCache: boolean): ContextInfos {
 // hive is from
 // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4
 // https://raw.githubusercontent.com/DTStack/dt-sql-parser/refs/heads/main/src/grammar/hive/HiveSqlParser.g4
-export const createHiveLs = (
+export const createHiveLs = ({
+    model,
+    tableSourceManager,
+    isTest = false,
+    noCache = false
+}: {
     model: {
         uri: { toString: () => string; };
         getValue: () => string;
     },
-    isTest: boolean = false,
-    noCache: boolean = false,
-) => {
+    tableSourceManager?: ITableSourceManager
+    isTest?: boolean,
+    noCache?: boolean,
+}) => {
 
     const document = TextDocument.create(model.uri.toString(), 'hivesql', 0, model.getValue());
     const {
@@ -61,7 +67,7 @@ export const createHiveLs = (
         sqlSlices,
         tree,
         contextManager
-    } = getContextWithCache(document.getText(), noCache);
+    } = getContextWithCache(document.getText(), noCache, tableSourceManager);
 
     const logSource = (arg: any) => {
         if (arg && '__source' in arg) {
@@ -101,17 +107,12 @@ export const createHiveLs = (
     };
 
     return {
-        doComplete: (position: Position) => {
-            const { foundNode, context } = getCtxFromPos(position) || {};
-
-            // how?
-        },
-        doHover: (
+        doHover: async (
             position: Position,
             isTest?: boolean
         ) => {
             const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
-            const hoverInfo = getEntityInfoAtPosition(foundNode, mrScope, context, isTest);
+            const hoverInfo = await getEntityInfoAtPosition(foundNode, mrScope, context, isTest);
             logger('getTableAndColumnInfoAtPosition', hoverInfo);
             logSource(hoverInfo);
             if (!hoverInfo) {
@@ -137,7 +138,7 @@ export const createHiveLs = (
             };
         },
 
-        doValidation(): WithSource<editor.IMarkerData>[] {
+        async doValidation(): Promise<WithSource<editor.IMarkerData>[]> {
             const validations: WithSource<editor.IMarkerData>[] = [];
 
             const SyntaxErrors = hiveSqlParse.validate(document.getText());
@@ -175,13 +176,13 @@ export const createHiveLs = (
             });
 
             const symbols = contextManager.getSymbolsAndContext() || [];
-            symbols.forEach(({ range, mrScope, context }, i) => {
+            await Promise.all(symbols.map(async ({ range, mrScope, context }, i) => {
                 // console.log('doValidation foundNode', range.context?.getText());
                 // const foundNodeText = range.context?.getText() || '';
                 // if (foundNodeText == 'rpr_test_news_record_da') {
                 //     debugger;
                 // }
-                const hoverInfo = getAllEntityInfoFromNode(range.context, context, mrScope, isTest);
+                const hoverInfo = await getAllEntityInfoFromNode(range.context, context, mrScope, isTest);
                 if (!hoverInfo) {
                     validations.push({
                         type: 'no_hover_info',
@@ -208,17 +209,17 @@ export const createHiveLs = (
                         message: res.contents[0].value,
                     });
                 }
-            })
+            }));
             return validations;
         },
 
-        doDefinition: (
+        doDefinition: async (
             position: Position,
             isTest?: boolean
         ) => {
             const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
 
-            const hoverInfo = getEntityInfoAtPosition(foundNode, mrScope, context, isTest);
+            const hoverInfo = await getEntityInfoAtPosition(foundNode, mrScope, context, isTest);
             if (!hoverInfo) {
                 return;
             }

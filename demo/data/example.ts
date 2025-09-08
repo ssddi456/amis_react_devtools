@@ -1,4 +1,44 @@
-export default [
+import { ITableSourceManager, TableInfo } from "../sql_ls_helper";
+
+interface IExampleTableSourceManager extends ITableSourceManager {
+    findTableSource(dbName: string, tableName: string): Promise<TableInfo | null>;
+    findTableSourcesByName(tableName: string): Promise<TableInfo | null>;
+}
+
+const tableSourceManager: IExampleTableSourceManager = {
+    async findTableSource(dbName: string, tableName: string): Promise<TableInfo | null> {
+        const table = tableInfos.find(t => t.table_name === tableName && t.db_name === dbName);
+        return table || null;
+    },
+
+    async findTableSourcesByName(tableName: string): Promise<TableInfo | null> {
+        const tables = tableInfos.find(t => t.table_name === tableName) || null;
+        return tables;
+    },
+
+    async getTableInfoByName(
+        tableName: string,
+        dbName: string | undefined,
+    ): Promise<TableInfo | null> {
+        if (!tableName) {
+            return null;
+        }
+        if (!dbName && tableName.indexOf('.') !== -1) {
+            const parts = tableName.split('.');
+            dbName = parts[0];
+            tableName = parts[1];
+            if (!dbName || !tableName) {
+                return null;
+            }
+        }
+        if (dbName) {
+            return this.findTableSource(dbName, tableName);
+        }
+        return this.findTableSourcesByName(tableName);
+    }
+};
+
+const tableInfos: TableInfo[] = [
     {
         db_name: "rpr",
         table_name: "rpr_test_news_record_di",
@@ -124,3 +164,5 @@ export default [
         ],
     },
 ];
+
+export default tableSourceManager;

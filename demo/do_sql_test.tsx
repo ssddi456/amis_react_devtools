@@ -81,34 +81,47 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
     useEffect(() => {
         const model = testCase.model;
         const positions = testCase.positions;
-        const hiveLs = createHiveLs(model, showDebug);
-        const resultItems = positions.map(pos => {
-            const hoverResult = hiveLs.doHover(pos, showDebug);
-            const definitionResult = hiveLs.doDefinition(pos, showDebug);
-            const referencesResult = hiveLs.doReferences(pos, showDebug);
+        const hiveLs = createHiveLs({ model, isTest: !!showDebug });
+        const resultItems = positions.map(async (pos) => {
+            const [hoverResult, definitionResult, referencesResult] = await Promise.all([
+                hiveLs.doHover(pos, showDebug),
+                hiveLs.doDefinition(pos, showDebug),
+                hiveLs.doReferences(pos, showDebug)
+            ]);
             return { hoverResult, definitionResult, referencesResult };
         });
 
-        const validationResults = hiveLs.doValidation();
-        setResult({
-            model, positions,
-            validationResults,
-            resultItems,
-        });
-        setResultIdx(0);
+        Promise.all([...resultItems, hiveLs.doValidation()]).then(
+            (args: any) => {
+                const validationResults = args.pop();
+                const resultItems = args;
+
+                setResult({
+                    model, positions,
+                    validationResults,
+                    resultItems,
+                });
+                setResultIdx(0);
+            });
     }, [testCase, showDebug]);
 
     const reparse = useCallback((idx: number) => {
-        const resultItems = results!.resultItems.map((item, i) => {
+        Promise.all(results!.resultItems.map(async (item, i) => {
             if (i === idx) {
                 const model = testCase.model;
-                const hiveLs = createHiveLs(model, showDebug, true);
+                const hiveLs = createHiveLs({ model, isTest: showDebug, noCache: true });
                 const positions = testCase.positions;
                 const pos = positions[i]; // Get the position of the item
                 // Apply re-parsing logic to the selected item
-                const hoverResult = hiveLs.doHover(pos, showDebug);
-                const definitionResult = hiveLs.doDefinition(pos, showDebug);
-                const referencesResult = hiveLs.doReferences(pos, showDebug);
+                const [
+                    hoverResult,
+                    definitionResult,
+                    referencesResult,
+                ] = await Promise.all([
+                    hiveLs.doHover(pos, showDebug),
+                    hiveLs.doDefinition(pos, showDebug),
+                    hiveLs.doReferences(pos, showDebug),
+                ]);
                 return {
                     hoverResult,
                     definitionResult,
@@ -116,13 +129,15 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                 };
             }
             return item;
+        })).then(resultItems => {
+            setResult(prev => prev ? { ...prev, resultItems } : null);
         });
-        setResult(prev => prev ? { ...prev, resultItems } : null);
     }, [results]);
 
     const reValidate = useCallback(() => {
-        const validationResults = createHiveLs(testCase.model, showDebug, true).doValidation();
-        setResult(prev => prev ? { ...prev, validationResults } : null);
+        createHiveLs({ model: testCase.model, isTest: showDebug, noCache: true }).doValidation().then(validationResults => {
+            setResult(prev => prev ? { ...prev, validationResults } : null);
+        });
     }, [results]);
     const highlightedText = createHighlightedText(testCase.model.getValue(), testCase.positions);
 

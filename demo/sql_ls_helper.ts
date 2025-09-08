@@ -7,6 +7,31 @@ import { IRange } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { matchSubPath } from "./sql_tree_query";
 import { IdentifierScope } from "./Identifier_scope";
 
+export interface ITableSourceManager {
+    getTableInfoByName(tableName: string, dbName: string | undefined): Promise<TableInfo | null>;
+}
+
+export interface TableInfo {
+    db_name: string;
+    table_name: string;
+    alias?: string;
+    table_id: number;
+    description: string;
+    column_list: ExtColumnInfo[];
+    range?: {
+        startLineNumber: number;
+        startColumn: number;
+        endLineNumber: number;
+        endColumn: number;
+    };
+}
+
+export interface ExtColumnInfo {
+    column_name: string;
+    data_type_string: string;
+    description: string;
+}
+
 export interface TableSource {
     tableName: string;
     reference: ParserRuleContext,
