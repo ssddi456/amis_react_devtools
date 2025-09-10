@@ -1,6 +1,6 @@
 import { ParseTree } from "antlr4ng";
 import type { IRange } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
-import { TableInfo, ColumnInfo } from "./formatHoverRes";
+import { TableInfo, ExtColumnInfo } from "./types";
 
 export const noTableInfoRes = (text: string, range: IRange, ext?: string[]) => {
     const result = {
@@ -29,7 +29,7 @@ export const noColumnInfoRes = (table: TableInfo, columnName: string, range: IRa
     console.log('noColumnInfoRes result:', result);
     return result;
 };
-export const tableAndColumn = (table: TableInfo, column: ColumnInfo, range: IRange, ext?: string[]) => {
+export const tableAndColumn = (table: TableInfo, column: ExtColumnInfo, range: IRange, ext?: string[]) => {
     const result = {
         contents: [
             {

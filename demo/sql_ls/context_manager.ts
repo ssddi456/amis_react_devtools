@@ -31,14 +31,14 @@ import {
     findTokenAtPosition,
     getColumnInfoFromNode,
     getNextUsingKeyword,
-    ITableSourceManager,
     rangeFromNode,
     tableInfoFromCteStatement,
     tableInfoFromSubQuerySource,
     tableInfoFromTableSource,
     tableInfoFromVirtualTableSource
-} from "./sql_ls_helper";
-import { IdentifierScope, SymbolAndContext } from "./Identifier_scope";
+} from "./helpers/table_and_column";
+import { ITableSourceManager } from "./types";
+import { IdentifierScope, SymbolAndContext } from "./identifier_scope";
 import { MapReduceScope } from "./mr_scope";
 
 export class ContextManager {
@@ -409,7 +409,6 @@ export class ContextManager {
         return this.rootContext?.validate() || [];
     }
 }
-
 
 export const createContextManager = (tree: ProgramContext, tableSourceManager?: ITableSourceManager) => {
     return new ContextManager(tree, tableSourceManager);

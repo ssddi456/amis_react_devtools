@@ -1,12 +1,13 @@
+// This file has been moved to ./components/sql_test_dag.tsx and is now removed from the demo directory.
 import React from 'react';
-import { caseFromString, LsTestCase } from './ls_helper';
-import { createHiveLs } from './sql_ls';
-import { ContextManager } from './context_manager';
-import { IdentifierScope } from "./Identifier_scope";
-import { printNode } from './sql_ls_helper';
+import { caseFromString, LsTestCase } from '../tools/tests';
+import { createHiveSqlLanguageService } from '../sql_ls';
+import { ContextManager } from '../sql_ls/context_manager';
+import { IdentifierScope } from "../Identifier_scope";
+import { printNode } from "../sql_ls/helpers/log";
 import { TextHighlight } from './text_highlight';
-import { MapReduceScope } from './mr_scope';
-import tableSourceManager from './data/example';
+import { MapReduceScope } from '../sql_ls/mr_scope';
+import tableSourceManager from '../data/example';
 
 interface DisplayContextManagerProps {
     context: IdentifierScope
@@ -142,7 +143,7 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
         if (nextProps.sqlTest !== prevState.sqlTest) {
             const testCase = caseFromString(nextProps.sqlTest);
             const model = testCase.model;
-            const contextManager = createHiveLs({
+            const contextManager = createHiveSqlLanguageService({
                 model,
                 tableSourceManager,
             }).getContextManager();

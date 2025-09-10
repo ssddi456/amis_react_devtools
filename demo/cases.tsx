@@ -1,4 +1,4 @@
-import { caseFromString } from "./ls_helper";
+import { caseFromString } from './tools/tests';
 
 export const sqlTest = [
     // simple

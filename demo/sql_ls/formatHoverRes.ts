@@ -1,13 +1,15 @@
 import { ParserRuleContext, ParseTree } from "antlr4ng";
 import { TableSourceContext, SubQuerySourceContext, VirtualTableSourceContext, CteStatementContext, TableNameContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { type IRange, languages, Uri } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
-import tableData from "./data/example";
-import { IdentifierScope } from "./Identifier_scope";
-import { WithSource } from "./ls_helper";
+import { IdentifierScope } from "./identifier_scope";
 import { MapReduceScope } from "./mr_scope";
-import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, functionRes, unknownRes } from "./sql_hover_res";
-import { ExtColumnInfo, printNode, rangeFromNode, TableInfo, } from "./sql_ls_helper";
-import { matchSubPathOneOf, matchSubPath } from "./sql_tree_query";
+import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, functionRes, unknownRes } from "./sql_res";
+import { rangeFromNode, } from "./helpers/table_and_column";
+import { ExtColumnInfo, TableInfo } from "./types";
+import { printNode } from "./helpers/log";
+import { matchSubPathOneOf, matchSubPath } from "./helpers/tree_query";
+import { WithSource } from "./util";
+import { localDbId } from "./consts";
 
 async function tableInfoFromTableSource(
     tableSource: TableSourceContext | null,
@@ -43,8 +45,7 @@ async function tableInfoFromTableSource(
     return null;
 }
 
-const localDbId = 'local db';
-export function tableInfoFromSubQuerySource(
+function tableInfoFromSubQuerySource(
     subQuerySource: SubQuerySourceContext,
     context: IdentifierScope,
     collection?: TableInfo[]
@@ -80,6 +81,7 @@ export function tableInfoFromSubQuerySource(
     return ret;
 
 }
+
 function tableInfoFromVirtualTableSource(
     virtualTableSource: VirtualTableSourceContext | null,
     context: IdentifierScope,
@@ -105,6 +107,7 @@ function tableInfoFromVirtualTableSource(
     }
     return ret;
 }
+
 function tableInfoFromCteStatement(
     cteStatement: CteStatementContext | null,
     context: IdentifierScope,
@@ -159,23 +162,6 @@ export async function tableInfoFromNode(
     return collection[0];
 }
 
-
-
-export function getColumnInfoByName(tableInfo: TableInfo | null, columnName: string): ExtColumnInfo | null {
-    if (!tableInfo || !columnName) {
-        return null;
-    }
-    if (tableInfo.db_name == localDbId) {
-        return {
-            column_name: columnName,
-            data_type_string: 'unknown',
-            description: 'unknown column'
-        };
-    }
-    const columnInfo = tableInfo.column_list.find(c => c.column_name === columnName);
-    return columnInfo || null;
-}
-
 export interface EntityInfo {
     type: 'table' | 'column' | 'unknown' | 'noTable' | 'noColumn' | 'createColumn' | 'function';
     tableInfo?: TableInfo | null;
@@ -189,6 +175,7 @@ export interface EntityInfo {
         columnNumber: number;
     };
 }
+
 export const formatHoverRes = (hoverInfo: EntityInfo): WithSource<languages.Hover> => {
     console.log('formatHoverRes', hoverInfo);
     switch (hoverInfo.type) {
@@ -209,6 +196,7 @@ export const formatHoverRes = (hoverInfo: EntityInfo): WithSource<languages.Hove
             return { ...unknownRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
     }
 };
+
 export const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): WithSource<languages.Definition> | undefined => {
     console.log('formatDefinitionRes', uri, hoverInfo);
     if ((hoverInfo.type === 'table' || hoverInfo.type === 'column')
@@ -221,6 +209,7 @@ export const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): WithSource
     }
     return;
 };
+
 export const getIdentifierReferences = (
     foundNode: ParserRuleContext,
     mrScope: MapReduceScope | null | undefined,

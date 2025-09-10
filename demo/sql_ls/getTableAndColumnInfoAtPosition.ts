@@ -1,11 +1,13 @@
 import { ParserRuleContext } from "antlr4ng";
 import { TableSourceContext, HiveSqlParser, SelectItemContext, FunctionIdentifierContext, ColumnNameContext, ColumnNamePathContext, SubQuerySourceContext, TableNameContext, Id_Context, CteStatementContext, ExpressionContext, TableAllColumnsContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { IdentifierScope } from "./Identifier_scope";
+import { IdentifierScope } from "./identifier_scope";
 import { MapReduceScope } from "./mr_scope";
-import { EntityInfo, tableInfoFromNode, getColumnInfoByName, } from "./formatHoverRes";
-import { printNodeTree, printNode, rangeFromNode } from "./sql_ls_helper";
-import { matchType, matchSubPathOneOf, matchSubPath } from "./sql_tree_query";
-import tableData from "./data/example";
+import { EntityInfo, tableInfoFromNode, } from "./formatHoverRes";
+import { rangeFromNode } from "./helpers/table_and_column";
+import { ExtColumnInfo, TableInfo } from "./types";
+import { printNodeTree, printNode } from "./helpers/log";
+import { matchType, matchSubPathOneOf, matchSubPath } from "./helpers/tree_query";
+import { localDbId } from "./consts";
 
 export const getEntityInfoAtPosition = async (
     foundNode?: ParserRuleContext | null,
@@ -370,4 +372,20 @@ function getEntityInfoFromFunction(node: FunctionIdentifierContext) {
         type: 'function' as const,
         text: node.getText(),
     };
+}
+
+
+function getColumnInfoByName(tableInfo: TableInfo | null, columnName: string): ExtColumnInfo | null {
+    if (!tableInfo || !columnName) {
+        return null;
+    }
+    if (tableInfo.db_name == localDbId) {
+        return {
+            column_name: columnName,
+            data_type_string: 'unknown',
+            description: 'unknown column'
+        };
+    }
+    const columnInfo = tableInfo.column_list.find(c => c.column_name === columnName);
+    return columnInfo || null;
 }

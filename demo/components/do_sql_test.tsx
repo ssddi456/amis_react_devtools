@@ -1,9 +1,13 @@
 import { useState, useEffect, ReactElement, useCallback } from "react";
-import { LsTestCase, WithSource } from "./ls_helper";
+import { LsTestCase } from '../tools/tests';
 import { languages, editor } from 'monaco-editor';
-import { createHiveLs } from "./sql_ls";
-import { HoverResults, DefinitionResults, ReferencesResults, ValidationResults } from "./results_components";
-import tableSourceManager from "./data/example";
+import { createHiveSqlLanguageService } from "../sql_ls";
+import tableSourceManager from "../data/example";
+import { DefinitionResults } from "./definition_results";
+import { ReferencesResults } from "./references_results";
+import { ValidationResults } from "./validation_results";
+import { WithSource } from "../sql_ls/util";
+import { HoverResults } from "./hover_results";
 
 
 // 创建高亮文本的辅助函数
@@ -82,7 +86,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
     useEffect(() => {
         const model = testCase.model;
         const positions = testCase.positions;
-        const hiveLs = createHiveLs({
+        const hiveLs = createHiveSqlLanguageService({
             model,
             tableSourceManager,
             isTest: !!showDebug
@@ -114,7 +118,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
         Promise.all(results!.resultItems.map(async (item, i) => {
             if (i === idx) {
                 const model = testCase.model;
-                const hiveLs = createHiveLs({
+                const hiveLs = createHiveSqlLanguageService({
                     model,
                     tableSourceManager,
                     isTest: showDebug,
@@ -145,7 +149,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
     }, [results]);
 
     const reValidate = useCallback(() => {
-        createHiveLs({
+        createHiveSqlLanguageService({
             model: testCase.model,
             tableSourceManager,
             isTest: showDebug,

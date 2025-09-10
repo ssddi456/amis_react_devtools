@@ -1,6 +1,7 @@
+// This file has been moved to ./components/sql_test_navigation.tsx and is now removed from the demo directory.
 import React from 'react';
 import { DoSqlTest } from "./do_sql_test";
-import { LsTestCase } from './ls_helper';
+import { LsTestCase } from '../tools/tests';
 
 interface SqlTestNavigationProps {
     sqlTest: LsTestCase[];

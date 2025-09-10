@@ -1,7 +1,7 @@
 import React from 'react';
 import { editor } from 'monaco-editor';
-import { WithSource } from './ls_helper';
 import { SourceLink } from './source_link';
+import { WithSource } from '../sql_ls/util';
 
 interface ValidationResultsProps {
     validationResults: WithSource<editor.IMarkerData>[] | undefined;

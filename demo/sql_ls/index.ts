@@ -1,18 +1,18 @@
 import { editor, languages, Position, Uri, MarkerSeverity } from "monaco-editor";
-import { TextDocument } from 'vscode-json-languageservice';
 import { HiveSQL, } from 'dt-sql-parser';
-import { posInRange, WithSource } from "./ls_helper";
 import {
     ProgramContext, 
     TableSourceContext,
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ContextManager, createContextManager } from "./context_manager";
-import { printNode, rangeFromNode, sliceToRange, findTokenAtPosition, printNodeTree, ITableSourceManager } from "./sql_ls_helper";
-import { matchType } from "./sql_tree_query";
-import { formatHiveSQL } from './formatter';
+import { rangeFromNode, sliceToRange, findTokenAtPosition } from "./helpers/table_and_column";
+import { ITableSourceManager } from "./types";
+import { printNode, printNodeTree } from "./helpers/log";
+import { matchType } from "./helpers/tree_query";
+import { formatHiveSQL } from '../formatter';
 import { getAllEntityInfoFromNode, getEntityInfoAtPosition } from "./getTableAndColumnInfoAtPosition";
 import { formatHoverRes, tableInfoFromNode, formatDefinitionRes, getIdentifierReferences } from "./formatHoverRes";
-import tableSourceManager from "./data/example";
+import { posInRange, WithSource } from "./util";
 
 interface ContextInfos {
     hiveSqlParse: HiveSQL;
@@ -46,28 +46,27 @@ function getContextWithCache(text: string, noCache: boolean, tableSourceManager?
 // hive is from
 // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4
 // https://raw.githubusercontent.com/DTStack/dt-sql-parser/refs/heads/main/src/grammar/hive/HiveSqlParser.g4
-export const createHiveLs = ({
+export const createHiveSqlLanguageService = ({
     model,
     tableSourceManager,
     isTest = false,
     noCache = false
 }: {
     model: {
-        uri: { toString: () => string; };
         getValue: () => string;
+        uri: { toString: () => string; }
     },
     tableSourceManager?: ITableSourceManager
     isTest?: boolean,
     noCache?: boolean,
 }) => {
-
-    const document = TextDocument.create(model.uri.toString(), 'hivesql', 0, model.getValue());
+    const text = model.getValue();
     const {
         hiveSqlParse,
         sqlSlices,
         tree,
         contextManager
-    } = getContextWithCache(document.getText(), noCache, tableSourceManager);
+    } = getContextWithCache(text, noCache, tableSourceManager);
 
     const logSource = (arg: any) => {
         if (arg && '__source' in arg) {
@@ -141,7 +140,7 @@ export const createHiveLs = ({
         async doValidation(): Promise<WithSource<editor.IMarkerData>[]> {
             const validations: WithSource<editor.IMarkerData>[] = [];
 
-            const SyntaxErrors = hiveSqlParse.validate(document.getText());
+            const SyntaxErrors = hiveSqlParse.validate(text);
             SyntaxErrors.forEach(err => {
                 validations.push({
                     severity: MarkerSeverity.Error,

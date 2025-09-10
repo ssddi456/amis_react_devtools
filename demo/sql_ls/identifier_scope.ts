@@ -1,7 +1,9 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
-import { isPosInParserRuleContext, ITableSourceManager, printNode, rangeFromNode, ruleIndexToDisplayName, TableInfo } from "./sql_ls_helper";
+import { isPosInParserRuleContext, rangeFromNode } from "./helpers/table_and_column";
+import { ITableSourceManager, TableInfo } from "./types";
+import { printNode, ruleIndexToDisplayName } from "./helpers/log";
 import { uuidv4 } from "./util";
 import { MapReduceScope } from "./mr_scope";
 

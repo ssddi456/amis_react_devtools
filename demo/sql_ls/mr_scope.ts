@@ -1,8 +1,9 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
+import { AtomSelectStatementContext, ExpressionContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { uuidv4 } from "./util";
-import { IdentifierScope } from "./Identifier_scope";
-import { AtomSelectStatementContext, ExpressionContext, GroupByClauseContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { ColumnInfo, getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getFunctionCallFromExpression, getOnConditionOfFromClause, isPosInParserRuleContext, isSameColumnInfo, printNode, TableSource } from "./sql_ls_helper";
+import { IdentifierScope } from "./identifier_scope";
+import { getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getFunctionCallFromExpression, getOnConditionOfFromClause, isPosInParserRuleContext, isSameColumnInfo } from "./helpers/table_and_column";
+import { ColumnInfo, TableSource } from "./types";
     
 
 export class MapReduceScope {

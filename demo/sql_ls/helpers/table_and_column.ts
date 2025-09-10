@@ -1,51 +1,11 @@
 import { Position } from "monaco-editor";
 import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import { HiveSqlParserVisitor } from "dt-sql-parser";
-import { AtomExpressionContext, ColumnNameContext, ColumnNamePathContext, CteStatementContext, ExpressionContext, ExpressionOrDefaultContext, FromClauseContext, Function_Context, HiveSqlParser, Id_Context, JoinSourcePartContext, ProgramContext, RollupOldSyntaxContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { WordPosition } from "dt-sql-parser/dist/parser/common/textAndWord";
-import { IRange } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
-import { matchSubPath } from "./sql_tree_query";
-import { IdentifierScope } from "./Identifier_scope";
-
-export interface ITableSourceManager {
-    getTableInfoByName(tableName: string, dbName: string | undefined): Promise<TableInfo | null>;
-}
-
-export interface TableInfo {
-    db_name: string;
-    table_name: string;
-    alias?: string;
-    table_id: number;
-    description: string;
-    column_list: ExtColumnInfo[];
-    range?: {
-        startLineNumber: number;
-        startColumn: number;
-        endLineNumber: number;
-        endColumn: number;
-    };
-}
-
-export interface ExtColumnInfo {
-    column_name: string;
-    data_type_string: string;
-    description: string;
-}
-
-export interface TableSource {
-    tableName: string;
-    reference: ParserRuleContext,
-    defineReference: ParserRuleContext
-}
-
-export interface ColumnInfo {
-    exportColumnName: string;
-    referanceTableName: string;
-    referanceColumnName: string;
-    reference: ParserRuleContext;
-    defineReference: ParserRuleContext;
-}
-
+import { AtomExpressionContext, ColumnNameContext, ColumnNamePathContext, CteStatementContext, ExpressionContext, FromClauseContext, HiveSqlParser, Id_Context, JoinSourcePartContext, RollupOldSyntaxContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { matchSubPath } from "./tree_query";
+import { IdentifierScope } from "../identifier_scope";
+import { printNode } from "./log";
+import { ColumnInfo } from "../types";
 
 export function sliceToRange(slice: {
     readonly startLine: number;
@@ -60,18 +20,6 @@ export function sliceToRange(slice: {
         startLineNumber: slice.startLine,
         startColumn: slice.startColumn,
         endLineNumber: slice.endLine,
-        endColumn: slice.endColumn
-    };
-}
-
-export function wordToRange(slice?: WordPosition): IRange | undefined {
-    if (!slice) {
-        return undefined;
-    }
-    return {
-        startLineNumber: slice.line,
-        startColumn: slice.startColumn,
-        endLineNumber: slice.line,
         endColumn: slice.endColumn
     };
 }
@@ -124,68 +72,6 @@ export function isPosInParserRuleContext(position: { lineNumber: number, column:
     return false;
 }
 
-
-export function ruleIndexToDisplayName(node: ParserRuleContext | TerminalNode): string | undefined {
-    const symbolicNames = HiveSqlParser.symbolicNames;
-    if (node instanceof TerminalNode) {
-        if (node.symbol.type >= 0 && node.symbol.type < symbolicNames.length) {
-            return symbolicNames[node.symbol.type] || `Unknown Symbol: ${node.symbol.type}`;
-        }
-        return node.getText();
-    }
-    const ruleNames = HiveSqlParser.ruleNames;
-    const ruleIndex = node.ruleIndex;
-
-    if (ruleIndex >= 0 && ruleIndex < ruleNames.length) {
-        if (!ruleNames[ruleIndex]) {
-            return `Unknown Rule: ${ruleIndex}`;
-        }
-        return ruleNames[ruleIndex];
-    }
-    return node.getText();
-}
-
-export function printNode(node: ParserRuleContext | TerminalNode | null | undefined): string {
-    if (!node) {
-        return 'null';
-    }
-    if (node instanceof TerminalNode) {
-        return `TerminalNode(${ruleIndexToDisplayName(node)}, ${node.symbol.line}:${node.symbol.column})`;
-    }
-    const range = rangeFromNode(node);
-    const start = `${range.startLineNumber}:${range.startColumn}`;
-    const end = `${range.endLineNumber}:${range.endColumn}`;
-
-    return `Node(${ruleIndexToDisplayName(node)}, ${start} -> ${end})`;
-}
-
-export function printChildren(node: ParserRuleContext | null): string {
-    if (!node) {
-        return 'null';
-    }
-    const children = node.children || [];
-    return `Children: \n${(children as any[]).map(printNode).join(', \n')}`;
-}
-
-export function printNodeTree(node: ParserRuleContext | null, separator = '\n'): string {
-    if (!node) {
-        return 'null';
-    }
-    const result: string[] = [];
-    while (true) {
-        result.push(printNode(node));
-        if (!node.parent) {
-            break;
-        }
-        node = node.parent;
-    }
-    return result.reverse().map((x, i) => {
-        if (i == 0) {
-            return x;
-        }
-        return `  ->${x}`;
-    }).join(separator);
-}
 
 export function rangeFromNode(node: ParserRuleContext | TerminalNode) {
     if (node instanceof ParserRuleContext) {

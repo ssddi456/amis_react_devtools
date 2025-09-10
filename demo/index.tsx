@@ -2,16 +2,15 @@ import React from 'react';
 import { jsxDEV } from "react/jsx-dev-runtime";
 import { render } from 'react-dom';
 import { render as amisRender, SchemaRenderer } from 'amis';
-import { makeEnv } from './helper';
+import { makeEnv } from './tools/amis';
 import amisEditor from "./amis_editor";
 import 'amis/lib/themes/default.css'
 import 'amis/lib/helper.css'
 import { ClickToComponent } from 'click-to-react-component';
 import { sqlTest } from './cases';
 import createSqlEditor from './sql_editor';
-import { SqlTestNavigation } from './sql_test_navigation';
-import { SqlTestDag } from './sql_test_dag';
-
+import { SqlTestNavigation } from './components/sql_test_navigation';
+import { SqlTestDag } from './components/sql_test_dag';
 
 (window as any).MonacoEnvironment = {
   getWorker(workerId: string, label: string) {

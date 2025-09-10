@@ -1,0 +1,7 @@
+{
+    "javascript.updateImportsOnPaste.enabled": true,
+    "javascript.updateImportsOnFileMove.enabled": "always",
+    "typescript.updateImportsOnFileMove.enabled": "always",
+    "typescript.updateImportsOnPaste.enabled": true,
+    "typescript.inlayHints.functionLikeReturnTypes.enabled": true
+}
