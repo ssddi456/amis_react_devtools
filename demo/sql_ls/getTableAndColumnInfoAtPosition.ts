@@ -1,9 +1,9 @@
 import { ParserRuleContext } from "antlr4ng";
-import { TableSourceContext, HiveSqlParser, SelectItemContext, FunctionIdentifierContext, ColumnNameContext, ColumnNamePathContext, SubQuerySourceContext, TableNameContext, Id_Context, CteStatementContext, ExpressionContext, TableAllColumnsContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { TableSourceContext, HiveSqlParser, SelectItemContext, FunctionIdentifierContext, ColumnNameContext, ColumnNamePathContext, SubQuerySourceContext, TableNameContext, Id_Context, CteStatementContext, ExpressionContext, TableAllColumnsContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { IdentifierScope } from "./identifier_scope";
 import { MapReduceScope } from "./mr_scope";
-import { EntityInfo, tableInfoFromNode, } from "./formatHoverRes";
-import { rangeFromNode } from "./helpers/table_and_column";
+import { EntityInfo, EntityInfoType, tableInfoFromNode, } from "./formatHoverRes";
+import { rangeFromNode, tableInfoFromSubQuerySource } from "./helpers/table_and_column";
 import { ExtColumnInfo, TableInfo } from "./types";
 import { printNodeTree, printNode } from "./helpers/log";
 import { matchType, matchSubPathOneOf, matchSubPath } from "./helpers/tree_query";
@@ -74,7 +74,7 @@ export const getEntityInfoAtPosition = async (
 
     if (parent.ruleIndex === HiveSqlParser.RULE_viewName) {
         return {
-            type: 'unknown',
+            type: EntityInfoType.Unknown,
             text: foundNode.getText(),
             ...commonFields,
         };
@@ -100,7 +100,7 @@ export const getEntityInfoAtPosition = async (
         const parent = foundNode.parent! as SelectItemContext;
         // 往前查找 (columnName | expression)
         return {
-            type: 'unknown',
+            type: EntityInfoType.Unknown,
             text: foundNode.getText(),
             ...commonFields,
         };
@@ -114,7 +114,7 @@ export const getEntityInfoAtPosition = async (
     }
 
     return {
-        type: 'unknown',
+        type: EntityInfoType.Unknown,
         text: foundNode.getText(),
         ...commonFields,
     };
@@ -170,17 +170,21 @@ export const getAllEntityInfoFromNode = async (
     }
 
     if (node instanceof Id_Context) {
-        if (node.parent instanceof CteStatementContext) {
+        if (node.parent instanceof CteStatementContext
+            || node.parent instanceof TableSourceContext
+            || node.parent instanceof SubQuerySourceContext
+            || node.parent instanceof VirtualTableSourceContext
+        ) {
             const tableInfo = await tableInfoFromNode(node.parent, context)
             return {
-                type: 'table' as const,
+                type: EntityInfoType.Table,
                 tableInfo,
                 ...commonFields,
             };
         }
         if (node.parent instanceof SelectItemContext) {
             return {
-                type: 'column' as const,
+                type: EntityInfoType.Column,
                 columnInfo: {
                     column_name: node.getText(),
                     data_type_string: '',
@@ -193,7 +197,7 @@ export const getAllEntityInfoFromNode = async (
 
     if (node instanceof ExpressionContext) {
         return {
-            type: 'function' as const,
+            type: EntityInfoType.Function,
             text: node.getText(),
             ...commonFields,
         };
@@ -201,7 +205,7 @@ export const getAllEntityInfoFromNode = async (
 
     if (node instanceof TableAllColumnsContext) {
         return {
-            type: 'column' as const,
+            type: EntityInfoType.Column,
             columnInfo: {
                 column_name: '*',
                 data_type_string: '',
@@ -212,7 +216,7 @@ export const getAllEntityInfoFromNode = async (
     }
 
     return {
-        type: 'unknown' as const,
+        type: EntityInfoType.Unknown,
         text: node.getText(),
         ...commonFields,
     };
@@ -224,19 +228,31 @@ async function getEntityInfoFromTableSource(
     context: IdentifierScope,
     mrScope: MapReduceScope | null
 ) {
-    const tableName = parent.tableOrView().tableName()?.getText();
+    console.group('getEntityInfoFromTableSource');
+    console.log('node', printNode(node));
+    console.log('parent', printNode(parent));
+    console.log('mrScope', mrScope);
+    console.groupEnd();
+
+    let tableName = '';
+    if (node === parent.id_()) {
+        tableName = parent.id_()!.getText();
+    } else if (node === parent.tableOrView()) {
+        tableName = parent.tableOrView().tableName()?.getText() || '';
+    }
+
     if (tableName) {
         const item = mrScope?.getTableByName(tableName);
         const tableInfo = item && await tableInfoFromNode(item, context);
         if (tableInfo) {
             return {
-                type: 'table' as const,
+                type: EntityInfoType.Table,
                 tableInfo,
             };
         }
     }
     return {
-        type: 'noTable' as const,
+        type: EntityInfoType.NoTable,
         text: node.getText(),
     };
 }
@@ -256,19 +272,19 @@ async function getEntityInfoFromTableName(
 
         if (tableInfo) {
             return {
-                type: 'table' as const,
+                type: EntityInfoType.Table,
                 tableInfo,
             };
         }
 
         return {
-            type: 'noTable' as const,
+            type: EntityInfoType.NoTable,
             text: tableName,
         };
     }
 
     return {
-        type: 'table' as const,
+        type: EntityInfoType.Table,
         tableInfo,
     };
 }
@@ -283,13 +299,13 @@ async function getEntityInfoFromSubQuerySource(
     const tableInfo = item && await tableInfoFromNode(item, context);
     if (!tableInfo) {
         return {
-            type: 'unknown' as const,
+            type: EntityInfoType.NoTable,
             text: node.getText(),
         };
     }
 
     return {
-        type: 'table' as const,
+        type: EntityInfoType.Table,
         tableInfo,
     };
 }
@@ -322,20 +338,20 @@ async function getEntityInfoFromColumnName(
         const tableInfo = item && await tableInfoFromNode(item, context);
         if (!tableInfo) {
             return {
-                type: 'noTable' as const,
+                type: EntityInfoType.NoTable,
                 text: printNode(parent),
             };
         }
         const columnInfo = getColumnInfoByName(tableInfo, columnName!);
         if (!columnInfo) {
             return {
-                type: 'noColumn' as const,
+                type: EntityInfoType.NoColumn,
                 tableInfo,
                 text: columnName,
             };
         }
         return {
-            type: 'column' as const,
+            type: EntityInfoType.Column,
             tableInfo,
             columnInfo,
         };
@@ -346,20 +362,20 @@ async function getEntityInfoFromColumnName(
 
     if (!tableInfo) {
         return {
-            type: 'noTable' as const,
+            type: EntityInfoType.NoTable,
             text: tableIdExp,
         };
     }
     const columnInfo = getColumnInfoByName(tableInfo, columnName);
     if (!columnInfo) {
         return {
-            type: 'noColumn' as const,
+            type: EntityInfoType.NoColumn,
             tableInfo,
             text: columnName,
         };
     }
     return {
-        type: 'column' as const,
+        type: EntityInfoType.Column,
         tableInfo,
         columnInfo,
     };
@@ -367,7 +383,7 @@ async function getEntityInfoFromColumnName(
 
 function getEntityInfoFromFunction(node: FunctionIdentifierContext) {
     return {
-        type: 'function' as const,
+        type: EntityInfoType.Function,
         text: node.getText(),
     };
 }

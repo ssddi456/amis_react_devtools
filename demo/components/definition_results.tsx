@@ -4,7 +4,7 @@ import { SourceLink } from './source_link';
 import { WithSource } from '../sql_ls/util';
 
 interface DefinitionResultsProps {
-    definitionResults: Array<WithSource<languages.Definition> | undefined>;
+    definitionResults: Array<WithSource<languages.Definition> | null | undefined>;
     positions: Array<{ lineNumber: number; column: number }>;
 }
 

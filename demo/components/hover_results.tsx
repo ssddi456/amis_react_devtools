@@ -4,7 +4,7 @@ import { SourceLink } from './source_link';
 import { WithSource } from '../sql_ls/util';
 
 interface HoverResultsProps {
-    hoverResults: Array<WithSource<languages.Hover> | undefined>;
+    hoverResults: Array<WithSource<languages.Hover> | null | undefined>;
     positions: Array<{ lineNumber: number; column: number }>;
 }
 

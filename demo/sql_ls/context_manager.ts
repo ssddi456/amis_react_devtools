@@ -31,7 +31,6 @@ import {
     findTokenAtPosition,
     getColumnInfoFromNode,
     getNextUsingKeyword,
-    rangeFromNode,
     tableInfoFromCteStatement,
     tableInfoFromSubQuerySource,
     tableInfoFromTableSource,
@@ -213,9 +212,15 @@ export class ContextManager {
             };
 
             enterTableSource = (ctx: TableSourceContext) => {
-                const tableName = ctx.tableOrView().tableName()?.getText();
-                if (tableName) {
-                    manager.currentContext?.addReference(tableName, ctx);
+                const alias = ctx.id_()?.getText();
+                if (alias) {
+                    manager.currentContext?.addReference(alias, ctx);
+                    manager.currentContext?.addHighlightNode(ctx.id_()!);
+                } else {
+                    const tableName = ctx.tableOrView().tableName()?.getText();
+                    if (tableName) {
+                        manager.currentContext?.addReference(tableName, ctx);
+                    }
                 }
             };
 
@@ -389,6 +394,7 @@ export class ContextManager {
                 const element = symbols[i];
                 const foundNode = findTokenAtPosition(position, element.range.context);
                 if (foundNode) {
+                    console.log('getSymbolByPosition', foundNode.getText(), element);
                     return {
                         foundNode,
                         ...element,
@@ -396,6 +402,7 @@ export class ContextManager {
                 }
             }
         }
+        console.log('getSymbolByPosition not found', position);
         return null;
     }
 

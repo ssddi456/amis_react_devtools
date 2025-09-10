@@ -4,7 +4,7 @@ import { SourceLink } from './source_link';
 import { WithSource } from '../sql_ls/util';
 
 interface ReferencesResultsProps {
-    referencesResults: Array<WithSource<languages.Location[]> | undefined>;
+    referencesResults: Array<WithSource<languages.Location[]> | null | undefined>;
     positions: Array<{ lineNumber: number; column: number }>;
 }
 

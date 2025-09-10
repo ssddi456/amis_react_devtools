@@ -70,13 +70,11 @@ export const createHiveSqlLanguageService = ({
 
     const logSource = (arg: any) => {
         if (arg && '__source' in arg) {
-            const source = arg.__source;
+            const source = (arg as WithSource<{}>).__source!;
             console.log(`vscode://file/${source.fileName}:${source.lineNumber}:${source.columnNumber}`);
         }
     };
     const logger: (...args: any[]) => void = isTest ? console.log : () => { };
-
-    logger('getCtxFromPos foundNode', contextManager.toString());
 
     const getCtxFromPos = (position: Position) => {
         if (!sqlSlices || sqlSlices.length === 0) {
@@ -92,6 +90,7 @@ export const createHiveSqlLanguageService = ({
 
                 const context = contextManager.getContextByPosition(position);
                 const foundNode = findTokenAtPosition(position, tree);
+                logger('foundNode', printNodeTree(foundNode));
                 const mrScope = context?.getMrScope()?.getScopeByPosition(position) || null;
 
                 logger('getCtxFromPos mrScope', '-->', mrScope, '<--');

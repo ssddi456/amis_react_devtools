@@ -3,6 +3,7 @@
     [*] table
     [ ] table alias
     [*] column
+    [ ] column alias
     [ ] star column
     [ ] function
     

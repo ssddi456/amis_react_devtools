@@ -139,7 +139,7 @@ export function findTokenAtPosition(
 
     visitor.visit(tree);
     if (!foundNode) {
-        console.warn('No node found at position:', JSON.stringify(position), 'tree:', tree, rangeFromNode(tree));
+        // console.warn('No node found at position:', JSON.stringify(position), 'tree:', tree, rangeFromNode(tree));
     } else {
         console.log(
             'Found node at position:', JSON.stringify(position),

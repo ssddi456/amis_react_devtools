@@ -77,9 +77,9 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
         positions: LsTestCase['positions'];
         validationResults: WithSource<editor.IMarkerData>[] | undefined;
         resultItems: {
-            hoverResult: (WithSource<languages.Hover> | undefined);
-            definitionResult: (WithSource<languages.Definition> | undefined);
-            referencesResult: (WithSource<languages.Location[]> | undefined);
+            hoverResult: (WithSource<languages.Hover> | null | undefined);
+            definitionResult: (WithSource<languages.Definition> | null | undefined);
+            referencesResult: (WithSource<languages.Location[]> | null | undefined);
         }[]
     } | null>(null);
 

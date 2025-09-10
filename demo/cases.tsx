@@ -5,35 +5,39 @@ export const sqlTest = [
     `
 select * from rpr_test_news_record_di where pt = 1;
                ^
-`,
-    `
+`
+,`
 select * from rpr.rpr_test_news_record_di where data.pt = 1;
                 ^   ^                               ^   ^
 `,
     `
 select * from rpr.rpr_test_news_record_di where data.pt = 1;
                   ^                                   ^  
-`,
-  // simple with alias
-  // simple with alias
-  `select
+`
+// simple with alias
+,`select
   field_2, t.test
     ^      ^ ^
 from rpr_test_news_record_da t
       ^
 where pt = 2;
       ^
-`,
-  // simple with alias
-  // simple with alias
-  `select
+`
+// simple with alias
+,`select
   field_2, t.test
     ^
 from rpr_test_news_record_da t
 where pt = 2;
-`,
-
-    `select
+`
+// simple with alias
+,`select
+  field_2, t.test
+from rpr_test_news_record_da t
+                             ^
+where pt = 2;
+`
+,`select
   t.field_2, t.test,
      ^
   count(*) as cnt
@@ -45,8 +49,8 @@ where pt = 2
 group by
   t.field_2, t.test
      ^       ^
-;`,
-    `select
+;`
+,`select
   t1.house_code, t1.resblock_id, t2.quota_date
   ^   ^                           ^  ^
 from rpr.rpr_test_news_record_di t1
@@ -59,8 +63,8 @@ from rpr.rpr_test_news_record_di t1
         ^  ^             ^     ^
 where t1.pt = 2;
       ^
-`,
-    `
+`
+,`
 with t1 as (
   select
     house_code, resblock_id, resblock_name
@@ -83,8 +87,8 @@ from t1
   on t1.house_code = t2.house_code
   and t1.resblock_id = t2.resblock_id
 ;
-`,
-    `
+`
+,`
 with t1 as (
   select
     t1.house_code, t1.resblock_id, t1.resblock_name, t2.quota_date
@@ -107,7 +111,8 @@ select
   t.house_code, t.resblock_id, t.quota_date
 from t1 t
 ;
-`, `
+`
+,`
 with t1 as (
   select
     t1.house_code, t1.resblock_id, t1.resblock_name, t2.quota_date
@@ -129,7 +134,8 @@ select
   t.house_code, t.resblock_id, t.quota_date
 from t1 t
 ;
-`, `
+`
+,`
 with t1 as (
   select
     t1.house_code, t1.resblock_id, t1.resblock_name, t2.quota_date
@@ -141,7 +147,8 @@ select
 from t1
      ^
 ;
-`, `
+`
+,`
 with t1 as (
   select
     t1.house_code, t1.resblock_id, t1.resblock_name, t2.quota_date
@@ -153,8 +160,8 @@ select
   ^
 from t1 t
 ;
-`,
-    `
+`
+,`
 with t1 as (
   select
     t1.house_code, t1.resblock_id, t1.resblock_name, t2.quota_date
@@ -173,8 +180,8 @@ select
   t.house_code, t.resblock_id, t.quota_date
 from t1 t
 ;
-`,
 `
+,`
 select * from (
     select
     ^
@@ -182,16 +189,16 @@ select * from (
     from rpr.rpr_test_news_record_da
 ) t2
    ^
-;`,
-`
+;`
+,`
 select * from (
     select
         house_code, resblock_id, quota_date
     from rpr.rpr_test_news_record_da
 ) t2
   ^
-;`,
-`
+;`
+,`
 select count(*), count(distinct resblock_id)
         ^         ^     ^         ^
 from rpr.rpr_test_news_record_da

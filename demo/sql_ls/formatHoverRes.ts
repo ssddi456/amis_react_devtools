@@ -155,7 +155,7 @@ export async function tableInfoFromNode(
     return collection[0];
 }
 
-enum EntityInfoType {
+export enum EntityInfoType {
     Table = 'table',
     Column = 'column',
     Unknown = 'unknown',
