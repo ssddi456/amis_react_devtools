@@ -93,10 +93,8 @@ export function matchSubPathOneOf(
     for (const ruleIndex of ruleIndexs) {
         const matched = matchSubPath(node, ruleIndex);
         if (matched) {
-            console.debug(`[Matched ruleIndexs]: ${ruleIndex.join('->')} for node: ${node.getText()}`);
             return matched;
         }
     }
-    console.debug(`[Matched ruleIndexs]: No match for node: ${node.getText()} with ruleIndexs: ${ruleIndexs.map(x => x.join('->')).join(', ')}`);
     return null;
 }
