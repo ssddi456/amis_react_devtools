@@ -172,7 +172,6 @@ export class SqlTestDag extends React.Component<SqlTestDagProps, SqlTestDagState
 
     render() {
         const context = this.getCurrentCaseContextManager();
-        console.log('getCurrentCaseContextManager', context);
         return (
             <div
                 style={{

@@ -343,10 +343,8 @@ async function getEntityInfoFromColumnName(
 
     const item = mrScope?.getTableByName(tableIdExp);
     const tableInfo = item && await tableInfoFromNode(item, context);
-    console.log('tableIdExp', tableIdExp, 'context', context, 'mrScope', mrScope, 'mrScope?.getTableByName()', mrScope?.getTableByName(tableIdExp), 'item', item);
 
     if (!tableInfo) {
-        console.log('No table info found for:', printNode(item));
         return {
             type: 'noTable' as const,
             text: tableIdExp,
@@ -382,8 +380,8 @@ function getColumnInfoByName(tableInfo: TableInfo | null, columnName: string): E
     if (tableInfo.db_name == localDbId) {
         return {
             column_name: columnName,
-            data_type_string: 'unknown',
-            description: 'unknown column'
+            data_type_string: '',
+            description: ''
         };
     }
     const columnInfo = tableInfo.column_list.find(c => c.column_name === columnName);

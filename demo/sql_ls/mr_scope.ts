@@ -85,7 +85,6 @@ export class MapReduceScope {
         });
         // check input table alias duplicate
         const tableNames = new Set<string>();
-        console.log('Input Tables:', this.inputTables);
         this.inputTables.forEach(table => {
             if (tableNames.has(table.tableName)) {
                 errors.push({
@@ -221,7 +220,6 @@ export class MapReduceScope {
         const context = this.context;
         if (context instanceof AtomSelectStatementContext) {
             const groupByClause = context.groupByClause();
-            console.log('groupByClause children', groupByClause?.children);
             const columnName = groupByClause?.columnName();
             if (columnName) {
                 const columnInfo = getColumnInfoFromNode(columnName);

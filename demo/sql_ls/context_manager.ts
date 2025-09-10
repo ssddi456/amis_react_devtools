@@ -352,8 +352,6 @@ export class ContextManager {
                     }
                     checkNodes = child.children;
                     break;
-                } else {
-                    console.log('Not in range', position, child.range);
                 }
             }
             if (!foundNode) {
@@ -373,7 +371,6 @@ export class ContextManager {
     }
 
     getHighlights() {
-        console.log('Getting highlights', this.rootContext);
         return this.rootContext?.getHighlights() || [];
     }
 
@@ -392,9 +389,6 @@ export class ContextManager {
                 const element = symbols[i];
                 const foundNode = findTokenAtPosition(position, element.range.context);
                 if (foundNode) {
-                    console.log(
-                        'Found symbol at position:', JSON.stringify(position),
-                        'Symbol:', rangeFromNode(element.range.context), element);
                     return {
                         foundNode,
                         ...element,

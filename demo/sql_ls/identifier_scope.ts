@@ -137,8 +137,6 @@ export class IdentifierScope {
                 referenceMap.set(name, [...oldRefs, ...refs].filter(ref => ref !== identifier.defineReference));
                 return;
             } else {
-
-                console.log('Reference not found:', name, refs);
                 if (parent) {
                     refs.forEach(ref => {
                         parent.addReference(name, ref);
@@ -226,7 +224,6 @@ export class IdentifierScope {
     }
 
     addHighlightNode(node: ParserRuleContext) {
-        console.log('Adding highlight node:', node);
         const range = rangeFromNode(node);
         this.addHighlight({
             start: node.start?.start || 0,

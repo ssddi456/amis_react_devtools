@@ -118,7 +118,7 @@ export const createHiveSqlLanguageService = ({
                 return;
             }
 
-            return formatHoverRes(hoverInfo);
+            return formatHoverRes(hoverInfo, true);
         },
 
         doSyntaxHover: (
@@ -200,7 +200,7 @@ export const createHiveSqlLanguageService = ({
                     || hoverInfo.type == 'noTable'
                     || hoverInfo.type == 'noColumn'
                 ) {
-                    const res = formatHoverRes(hoverInfo);
+                    const res = formatHoverRes(hoverInfo)!;
                     validations.push({
                         ...res,
                         severity: MarkerSeverity.Error,

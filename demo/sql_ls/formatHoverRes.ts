@@ -21,7 +21,6 @@ async function tableInfoFromTableSource(
     }
     const alias = tableSource?.id_()?.getText();
     const tableName = tableSource?.tableOrView().tableName()?.getText();
-    console.log('collectTableInfo visitJoinSourcePart', printNode(tableSource), 'alias:', alias, 'tableName:', tableName);
     if (!tableName) {
         console.warn('No table name found in join source part:', printNode(tableSource));
         return null;
@@ -57,7 +56,6 @@ function tableInfoFromSubQuerySource(
     const mrScope = context.getMrScope();
 
     const tableQuery = subQuerySource.queryStatementExpression().getText();
-    console.log('collectTableInfo visitJoinSourcePart', printNode(subQuerySource), 'alias:', alias, 'tableName:', tableQuery);
     if (!tableQuery) {
         console.warn('No table name found in sub query source:', printNode(subQuerySource));
         return null;
@@ -91,8 +89,6 @@ function tableInfoFromVirtualTableSource(
         return null;
     }
     const alias = virtualTableSource.tableAlias()?.getText();
-    console.log('collectTableInfo visitVirtualTableSource', printNode(virtualTableSource), 'alias:', alias);
-
     const ret = {
         db_name: localDbId,
         table_name: alias,
@@ -117,7 +113,6 @@ function tableInfoFromCteStatement(
         return null;
     }
     const alias = cteStatement.id_()?.getText();
-    console.log('collectTableInfo visitCteStatement', printNode(cteStatement), 'alias:', alias);
     const mrScope = context.getMrScope();
     const ret = {
         db_name: localDbId,
@@ -145,7 +140,6 @@ export async function tableInfoFromNode(
     if (!node) {
         return null;
     }
-    console.log('tableInfoFromNode find by node', printNode(node));
 
     const collection: TableInfo[] = [];
     if (node instanceof TableSourceContext) {
@@ -157,13 +151,22 @@ export async function tableInfoFromNode(
     } else if (node instanceof CteStatementContext) {
         return tableInfoFromCteStatement(node, context, collection);
     } else {
-        console.log('tableInfoFromNode unknown node type', printNode(node));
     }
     return collection[0];
 }
 
+enum EntityInfoType {
+    Table = 'table',
+    Column = 'column',
+    Unknown = 'unknown',
+    NoTable = 'noTable',
+    NoColumn = 'noColumn',
+    CreateColumn = 'createColumn',
+    Function = 'function',
+}
+
 export interface EntityInfo {
-    type: 'table' | 'column' | 'unknown' | 'noTable' | 'noColumn' | 'createColumn' | 'function';
+    type: EntityInfoType;
     tableInfo?: TableInfo | null;
     columnInfo?: ExtColumnInfo | null;
     text?: string;
@@ -176,29 +179,32 @@ export interface EntityInfo {
     };
 }
 
-export const formatHoverRes = (hoverInfo: EntityInfo): WithSource<languages.Hover> => {
-    console.log('formatHoverRes', hoverInfo);
+const ErrorTypes = new Set([EntityInfoType.Unknown, EntityInfoType.NoTable, EntityInfoType.NoColumn]);
+
+export function formatHoverRes(hoverInfo: EntityInfo, ignoreError = false): WithSource<languages.Hover> | null {
+    if (ignoreError && ErrorTypes.has(hoverInfo.type)) {
+        return null;
+    }
     switch (hoverInfo.type) {
-        case 'table':
+        case EntityInfoType.Table:
             return { ...tableRes(hoverInfo.tableInfo!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
-        case 'column':
+        case EntityInfoType.Column:
             return { ...tableAndColumn(hoverInfo.tableInfo!, hoverInfo.columnInfo!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
-        case 'noTable':
+        case EntityInfoType.NoTable:
             return { ...noTableInfoRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
-        case 'noColumn':
+        case EntityInfoType.NoColumn:
             return { ...noColumnInfoRes(hoverInfo.tableInfo!, hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
-        case 'createColumn':
+        case EntityInfoType.CreateColumn:
             return { ...createColumnRes({ getText: () => hoverInfo.text! } as ParseTree, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
-        case 'function':
+        case EntityInfoType.Function:
             return { ...functionRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
-        case 'unknown':
+        case EntityInfoType.Unknown:
         default:
             return { ...unknownRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
     }
 };
 
 export const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): WithSource<languages.Definition> | undefined => {
-    console.log('formatDefinitionRes', uri, hoverInfo);
     if ((hoverInfo.type === 'table' || hoverInfo.type === 'column')
         && hoverInfo.tableInfo && hoverInfo.tableInfo.range) {
         return {

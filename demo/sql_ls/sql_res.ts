@@ -11,7 +11,6 @@ export const noTableInfoRes = (text: string, range: IRange, ext?: string[]) => {
         ],
         range,
     };
-    console.log('noTableInfoRes result:', result);
     return result;
 };
 export const noColumnInfoRes = (table: TableInfo, columnName: string, range: IRange, ext?: string[]) => {
@@ -26,7 +25,6 @@ export const noColumnInfoRes = (table: TableInfo, columnName: string, range: IRa
         ],
         range,
     };
-    console.log('noColumnInfoRes result:', result);
     return result;
 };
 export const tableAndColumn = (table: TableInfo, column: ExtColumnInfo, range: IRange, ext?: string[]) => {
@@ -44,7 +42,6 @@ export const tableAndColumn = (table: TableInfo, column: ExtColumnInfo, range: I
         ],
         range,
     };
-    console.log('tableAndColumn result:', result);
     return result;
 };
 export const tableRes = (table: TableInfo, range: IRange, ext?: string[]) => {
@@ -60,7 +57,6 @@ export const tableRes = (table: TableInfo, range: IRange, ext?: string[]) => {
         ],
         range,
     };
-    console.log('tableRes result:', result);
     return result;
 };
 export const functionRes = (text: string, range: IRange, ext?: string[]) => {
@@ -75,7 +71,6 @@ export const functionRes = (text: string, range: IRange, ext?: string[]) => {
         ],
         range,
     };
-    console.log('functionRes result:', result);
     return result;
 };
 export const unknownRes = (text: string, range: IRange, ext?: string[]) => {
@@ -90,7 +85,6 @@ export const unknownRes = (text: string, range: IRange, ext?: string[]) => {
         ],
         range,
     };
-    console.log('unknownRes result:', result);
     return result;
 };
 export const createColumnRes = (node: ParseTree, range: IRange, ext?: string[]) => {
@@ -105,6 +99,5 @@ export const createColumnRes = (node: ParseTree, range: IRange, ext?: string[]) 
         ],
         range,
     };
-    console.log('createColumnRes result:', result);
     return result;
 };

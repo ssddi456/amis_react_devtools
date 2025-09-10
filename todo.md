@@ -1,9 +1,10 @@
 1. get definition
-    [ ] get database
-    [*] get table
-    [*] get column
-    [ ] get star column
-    [ ] get function
+    [ ] database
+    [*] table
+    [ ] table alias
+    [*] column
+    [ ] star column
+    [ ] function
     
 1. validate
     [*] check definition
