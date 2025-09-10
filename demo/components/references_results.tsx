@@ -39,9 +39,6 @@ export function ReferencesResults({ referencesResults, positions }: ReferencesRe
                                             Reference {refIndex + 1}:
                                         </p>
                                         <p style={{ margin: 0, fontSize: '12px', color: '#666', paddingLeft: '10px' }}>
-                                            URI: {ref.uri.toString()}
-                                        </p>
-                                        <p style={{ margin: 0, fontSize: '12px', color: '#666', paddingLeft: '10px' }}>
                                             Range: ({ref.range.startLineNumber}:{ref.range.startColumn} {'->'} {ref.range.endLineNumber}:{ref.range.endColumn})
                                         </p>
                                     </div>
@@ -56,8 +53,10 @@ export function ReferencesResults({ referencesResults, positions }: ReferencesRe
                                         color: '#007acc',
                                         fontWeight: 'bolder'
                                     }}
-                                >References Result {index + 1} - No references found</h4>
-                                <p>Position: {positionStr}</p>
+                                >
+                                    References Result {index + 1} pos: {positionStr}
+                                </h4>
+                                <p>No references found</p>
                             </div>
                         )}
                     </div>

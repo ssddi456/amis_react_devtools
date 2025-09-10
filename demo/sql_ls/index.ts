@@ -7,7 +7,7 @@ import {
 import { ContextManager, createContextManager } from "./context_manager";
 import { rangeFromNode, sliceToRange, findTokenAtPosition } from "./helpers/table_and_column";
 import { ITableSourceManager } from "./types";
-import { printNode, printNodeTree } from "./helpers/log";
+import { logSource, printNode, printNodeTree } from "./helpers/log";
 import { matchType } from "./helpers/tree_query";
 import { formatHiveSQL } from '../formatter';
 import { getAllEntityInfoFromNode, getEntityInfoAtPosition } from "./getTableAndColumnInfoAtPosition";
@@ -68,12 +68,7 @@ export const createHiveSqlLanguageService = ({
         contextManager
     } = getContextWithCache(text, noCache, tableSourceManager);
 
-    const logSource = (arg: any) => {
-        if (arg && '__source' in arg) {
-            const source = (arg as WithSource<{}>).__source!;
-            console.log(`vscode://file/${source.fileName}:${source.lineNumber}:${source.columnNumber}`);
-        }
-    };
+
     const logger: (...args: any[]) => void = isTest ? console.log : () => { };
 
     const getCtxFromPos = (position: Position) => {
@@ -110,8 +105,10 @@ export const createHiveSqlLanguageService = ({
             isTest?: boolean
         ) => {
             const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
+            console.group('doHover');
             const hoverInfo = await getEntityInfoAtPosition(foundNode, mrScope, context, isTest);
             logger('getTableAndColumnInfoAtPosition', hoverInfo);
+            console.groupEnd();
             logSource(hoverInfo);
             if (!hoverInfo) {
                 return;
@@ -230,10 +227,7 @@ export const createHiveSqlLanguageService = ({
             isTest?: boolean
         ): WithSource<languages.Location[]> | undefined {
             const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
-            if (!foundNode || !context || (
-                !matchType(foundNode, 'id_')
-                && !matchType(foundNode, 'DOT')
-            )) {
+            if (!foundNode || !context) {
                 return;
             }
 

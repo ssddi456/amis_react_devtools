@@ -5,7 +5,7 @@ import { MapReduceScope } from "./mr_scope";
 import { EntityInfo, EntityInfoType, tableInfoFromNode, } from "./formatHoverRes";
 import { rangeFromNode, tableInfoFromSubQuerySource } from "./helpers/table_and_column";
 import { ExtColumnInfo, TableInfo } from "./types";
-import { printNodeTree, printNode } from "./helpers/log";
+import { printNodeTree, printNode, logSource } from "./helpers/log";
 import { matchType, matchSubPathOneOf, matchSubPath } from "./helpers/tree_query";
 import { localDbId } from "./consts";
 
@@ -72,6 +72,14 @@ export const getEntityInfoAtPosition = async (
         };
     }
 
+    const cteStatement = matchSubPath(foundNode, ['id_', 'cteStatement']);
+    if (cteStatement) {
+        return {
+            ...await getEntityInfoFromCteStatement(foundNode, cteStatement as CteStatementContext, context, mrScope),
+            ...commonFields,
+        }
+    }
+
     if (parent.ruleIndex === HiveSqlParser.RULE_viewName) {
         return {
             type: EntityInfoType.Unknown,
@@ -112,6 +120,8 @@ export const getEntityInfoAtPosition = async (
             ...commonFields,
         };
     }
+
+    logSource({ type: 'node type not match', foundNode });
 
     return {
         type: EntityInfoType.Unknown,
@@ -292,6 +302,27 @@ async function getEntityInfoFromTableName(
 async function getEntityInfoFromSubQuerySource(
     node: ParserRuleContext,
     parent: SubQuerySourceContext,
+    context: IdentifierScope,
+    mrScope?: MapReduceScope | null
+) {
+    const item = mrScope?.getTableByName(node.getText());
+    const tableInfo = item && await tableInfoFromNode(item, context);
+    if (!tableInfo) {
+        return {
+            type: EntityInfoType.NoTable,
+            text: node.getText(),
+        };
+    }
+
+    return {
+        type: EntityInfoType.Table,
+        tableInfo,
+    };
+}
+
+async function getEntityInfoFromCteStatement(
+    node: ParserRuleContext,
+    parent: CteStatementContext,
     context: IdentifierScope,
     mrScope?: MapReduceScope | null
 ) {

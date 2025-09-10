@@ -90,6 +90,7 @@ from t1
 `
 ,`
 with t1 as (
+     ^
   select
     t1.house_code, t1.resblock_id, t1.resblock_name, t2.quota_date
                                                       ^  ^

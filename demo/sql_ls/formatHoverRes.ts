@@ -14,7 +14,6 @@ import { localDbId } from "./consts";
 async function tableInfoFromTableSource(
     tableSource: TableSourceContext | null,
     context: IdentifierScope,
-    collection?: TableInfo[]
 ): Promise<TableInfo | null> {
     if (!tableSource) {
         return null;
@@ -36,9 +35,6 @@ async function tableInfoFromTableSource(
             column_list: tableInfo.column_list,
             range: rangeFromNode(tableSource),
         };
-        if (collection) {
-            collection.push(ret);
-        }
         return ret;
     }
     return null;
@@ -47,7 +43,6 @@ async function tableInfoFromTableSource(
 function tableInfoFromSubQuerySource(
     subQuerySource: SubQuerySourceContext,
     context: IdentifierScope,
-    collection?: TableInfo[]
 ): TableInfo | null {
     if (!subQuerySource) {
         return null;
@@ -73,17 +68,12 @@ function tableInfoFromSubQuerySource(
         })) || [],
         range: rangeFromNode(subQuerySource)
     };
-    if (collection) {
-        collection.push(ret);
-    }
     return ret;
-
 }
 
 function tableInfoFromVirtualTableSource(
     virtualTableSource: VirtualTableSourceContext | null,
     context: IdentifierScope,
-    collection?: TableInfo[]
 ): TableInfo | null {
     if (!virtualTableSource) {
         return null;
@@ -98,16 +88,12 @@ function tableInfoFromVirtualTableSource(
         column_list: [],
         range: rangeFromNode(virtualTableSource)
     };
-    if (collection) {
-        collection.push(ret);
-    }
     return ret;
 }
 
 function tableInfoFromCteStatement(
     cteStatement: CteStatementContext | null,
     context: IdentifierScope,
-    collection?: TableInfo[]
 ): TableInfo | null {
     if (!cteStatement) {
         return null;
@@ -127,9 +113,6 @@ function tableInfoFromCteStatement(
         })) || [],
         range: rangeFromNode(cteStatement)
     };
-    if (collection) {
-        collection.push(ret);
-    }
     return ret;
 }
 
@@ -141,18 +124,17 @@ export async function tableInfoFromNode(
         return null;
     }
 
-    const collection: TableInfo[] = [];
     if (node instanceof TableSourceContext) {
-        return await tableInfoFromTableSource(node, context, collection);
+        return await tableInfoFromTableSource(node, context);
     } else if (node instanceof SubQuerySourceContext) {
-        return tableInfoFromSubQuerySource(node, context, collection);
+        return tableInfoFromSubQuerySource(node, context);
     } else if (node instanceof VirtualTableSourceContext) {
-        return tableInfoFromVirtualTableSource(node, context, collection);
+        return tableInfoFromVirtualTableSource(node, context);
     } else if (node instanceof CteStatementContext) {
-        return tableInfoFromCteStatement(node, context, collection);
-    } else {
+        return tableInfoFromCteStatement(node, context);
     }
-    return collection[0];
+
+    return null;
 }
 
 export enum EntityInfoType {

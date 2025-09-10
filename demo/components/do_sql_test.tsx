@@ -127,15 +127,9 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                 const positions = testCase.positions;
                 const pos = positions[i]; // Get the position of the item
                 // Apply re-parsing logic to the selected item
-                const [
-                    hoverResult,
-                    definitionResult,
-                    referencesResult,
-                ] = await Promise.all([
-                    hiveLs.doHover(pos, showDebug),
-                    hiveLs.doDefinition(pos, showDebug),
-                    hiveLs.doReferences(pos, showDebug),
-                ]);
+                const hoverResult = await hiveLs.doHover(pos, showDebug);
+                const definitionResult = await hiveLs.doDefinition(pos, showDebug);
+                const referencesResult = await hiveLs.doReferences(pos, showDebug);
                 return {
                     hoverResult,
                     definitionResult,

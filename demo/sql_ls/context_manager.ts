@@ -107,8 +107,6 @@ export class ContextManager {
                 const ctes = ctx.cteStatement();
                 ctes.forEach((cte) => {
                     tableInfoFromCteStatement(manager.currentContext, cte);
-
-                    manager.currentContext?.addHighlightNode(cte.id_());
                 });
             };
 
