@@ -342,7 +342,7 @@ async function getEntityInfoFromCteStatement(
 }
 
 
-function tableIdAndColumnNameFromPoolPath(poolPath: ParserRuleContext | null): { tableId: string | undefined; columnName: string } {
+export function tableIdAndColumnNameFromPoolPath(poolPath: ParserRuleContext | null): { tableId: string | undefined; columnName: string } {
     if (!poolPath) {
         return { tableId: undefined, columnName: '' };
     }

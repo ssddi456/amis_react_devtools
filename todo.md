@@ -1,7 +1,7 @@
 1. get definition
     [ ] database
     [*] table
-    [ ] table alias
+    [*] table alias
     [*] column
     [ ] column alias
     [ ] star column
@@ -20,8 +20,8 @@
     [ ] get column references
 
 1. performance
+    [ ] remove log
     [ ] validate performance
-        [ ] table info
 
 1. project layout
     [ ] reorganize project layout

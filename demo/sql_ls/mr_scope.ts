@@ -16,6 +16,8 @@ export class MapReduceScope {
 
     defaultInputTable: ParserRuleContext | null = null;
 
+    tableReferences: Map<string, ParserRuleContext[]> = new Map();
+
     constructor(
         public context: QueryStatementExpressionContext | AtomSelectStatementContext,
         public identifierScope: IdentifierScope
@@ -232,6 +234,22 @@ export class MapReduceScope {
             }
         }
         return ret;
+    }
+
+    addTableReference(name: string, reference: ParserRuleContext) {
+        if (!this.tableReferences.has(name)) {
+            this.tableReferences.set(name, []);
+        }
+        this.tableReferences.get(name)!.push(reference);
+    }
+
+
+    getTableReferencesByName(name: string): ParserRuleContext[] {
+        const references = this.tableReferences.get(name);
+        if (references) {
+            return references;
+        }
+        return [];
     }
 
     getParentMrScope() {

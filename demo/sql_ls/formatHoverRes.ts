@@ -10,6 +10,7 @@ import { printNode } from "./helpers/log";
 import { matchSubPathOneOf, matchSubPath } from "./helpers/tree_query";
 import { WithSource } from "./util";
 import { localDbId } from "./consts";
+import { tableIdAndColumnNameFromPoolPath } from "./getTableAndColumnInfoAtPosition";
 
 async function tableInfoFromTableSource(
     tableSource: TableSourceContext | null,
@@ -213,7 +214,7 @@ export const getIdentifierReferences = (
             if (!alias) {
                 return;
             }
-            return context.getReferencesByName(alias);
+            return mrScope?.getTableReferencesByName(alias);
         }
         return;
     }
@@ -223,7 +224,7 @@ export const getIdentifierReferences = (
     ]) as TableNameContext | null;
     if (foundTableName) {
         const tableName = foundTableName.getText();
-        return context.getReferencesByName(tableName);
+        return mrScope?.getTableReferencesByName(tableName);
     }
 
 
@@ -233,7 +234,7 @@ export const getIdentifierReferences = (
         if (!alias) {
             return;
         }
-        return context.getReferencesByName(alias);
+        return mrScope?.getTableReferencesByName(alias);
     }
 
     const foundVirtualTableSource = matchSubPath(foundNode, ['id_', 'virtualTableSource']) as VirtualTableSourceContext | null;
@@ -242,8 +243,28 @@ export const getIdentifierReferences = (
         if (!alias) {
             return;
         }
-        return context.getReferencesByName(alias);
+        return mrScope?.getTableReferencesByName(alias);
     }
 
+    const foundCteStatement = matchSubPath(foundNode, ['id_', 'cteStatement']) as CteStatementContext | null;
+    if (foundCteStatement) {
+        const alias = foundCteStatement.id_()?.getText();
+        if (!alias) {
+            return;
+        }
+        return mrScope?.getTableReferencesByName(alias);
+    }
+
+    const columnNode = matchSubPathOneOf(foundNode, [
+        ['id_', 'poolPath', 'columnName'],
+        ['id_', 'poolPath', 'columnNamePath'],
+    ]) as ParserRuleContext | null;
+
+    if (columnNode) {
+        const { tableId, columnName } = tableIdAndColumnNameFromPoolPath(foundNode.parent!);
+        if (tableId && foundNode === foundNode.parent!.getChild(0)) {
+            return mrScope?.getTableReferencesByName(tableId);
+        }
+    }
     return;
 };

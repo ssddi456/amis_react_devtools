@@ -192,29 +192,10 @@ export class IdentifierScope {
     }
 
     addReference(name: string, reference: ParserRuleContext) {
-        if (!this.referenceMap.has(name)) {
-            this.referenceMap.set(name, []);
-        }
-        this.referenceMap.get(name)!.push(reference);
+        const mrScope = this.getMrScope();
+        mrScope?.addTableReference(name, reference);
     }
 
-    getScopeByIdentifier(name: string): IdentifierScope | null {
-        if (this.tableIdentifierMap.has(name)) {
-            return this;
-        }
-        if (this.parent) {
-            return this.parent.getScopeByIdentifier(name);
-        }
-        return null;
-    }
-
-    getReferencesByName(name: string): ParserRuleContext[] {
-        const references = this.referenceMap.get(name);
-        if (references) {
-            return references;
-        }
-        return [];
-    }
 
     addHighlight(range: HighlightRange) {
         if (range.start === range.end) {

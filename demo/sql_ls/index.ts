@@ -145,21 +145,6 @@ export const createHiveSqlLanguageService = ({
                 })
             });
 
-            contextManager.rootContext?.referenceNotFound.forEach(refs => {
-                if (
-                    !(refs[0] instanceof TableSourceContext) ||
-                    !tableInfoFromNode(refs[0], contextManager.rootContext!)
-                ) {
-                    refs.forEach(ref => {
-                        validations.push({
-                            severity: MarkerSeverity.Error,
-                            ...rangeFromNode(ref),
-                            message: `Reference not found: ${ref.getText()}`,
-                        });
-                    });
-                }
-            });
-
             const errors = contextManager.rootContext?.validate() || [];
             errors.forEach(err => {
                 validations.push({
@@ -230,8 +215,11 @@ export const createHiveSqlLanguageService = ({
             if (!foundNode || !context) {
                 return;
             }
-
+            console.group('doReferences');
+            console.log('foundNode', printNodeTree(foundNode));
+            console.log('mrScope', mrScope);
             const references = getIdentifierReferences(foundNode, mrScope, context);
+            console.groupEnd();
             if (!references || references.length === 0) {
                 return;
             }
