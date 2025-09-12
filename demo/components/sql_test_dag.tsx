@@ -3,11 +3,11 @@ import React from 'react';
 import { caseFromString, LsTestCase } from '../tools/tests';
 import { createHiveSqlLanguageService } from '../sql_ls';
 import { ContextManager } from '../sql_ls/context_manager';
-import { IdentifierScope } from "../Identifier_scope";
 import { printNode } from "../sql_ls/helpers/log";
 import { TextHighlight } from './text_highlight';
 import { MapReduceScope } from '../sql_ls/mr_scope';
 import tableSourceManager from '../data/example';
+import { IdentifierScope } from '../sql_ls/identifier_scope';
 
 interface DisplayContextManagerProps {
     context: IdentifierScope
@@ -16,21 +16,61 @@ interface DisplayContextManagerProps {
 class DisplayMRScope extends React.Component<{ mrScope: MapReduceScope }> {
     render() {
         const { mrScope } = this.props;
+
+        const inputTableKeys = Array.from(mrScope.inputTable.keys());
+        const tableDefinitionsKeys = Array.from(mrScope.tableDefinitions.keys());
+        const exportColumns = mrScope.exportColumns;
+        const tableReferenceKeys = Array.from(mrScope.tableReferences.keys());
+        
         return (
             <div>
-                <h4>MapReduce Scope</h4>
+                <div>MapReduce Scope [{mrScope.mrOrder}]</div>
                 <div>
-                    <h5>Input Tables</h5>
-                    {Array.from(mrScope.inputTable.keys()).map(name => (
-                        <div key={name} style={{ paddingLeft: 12 }}>
-                            {name}
-                        </div>
-                    ))}
-                    <h5>Export Columns</h5>
-                    {mrScope.exportColumns.map((col, i) => (
+                    {inputTableKeys.length !== 0 ? <div>inputTable</div> : null}
+                    {inputTableKeys.map(name => {
+                        const inputTable = mrScope.inputTable.get(name);
+                        if (!inputTable) {
+                            return null;
+                        }
+                        return (
+                            <div key={name} style={{ paddingLeft: 12 }}>
+                                {name} -&gt; {printNode(inputTable!.reference)}
+                            </div>
+                        );
+                    })}
+                    {tableDefinitionsKeys.length !== 0 ? <div>tableDefinitions</div> : null}
+                    {tableDefinitionsKeys.map(name => {
+                        const tableDef = mrScope.tableDefinitions.get(name);
+                        if (!tableDef) {
+                            return null;
+                        }
+                        return (
+                            <div key={name} style={{ paddingLeft: 12 }}>
+                                {name} -&gt; {printNode(tableDef!.reference)}
+                            </div>
+                        );
+                    })}
+                    {exportColumns.length !== 0 ? <div>exportColumns</div> : null}
+                    {exportColumns.map((col, i) => (
                         <div key={i} style={{ paddingLeft: 12 }}>
                             {col.exportColumnName} -&gt; {col.referanceTableName || mrScope.getDefaultInputTableName()} . {col.referanceColumnName}
                         </div>
+                    ))}
+                    {tableReferenceKeys.length !== 0 ? <div>tableReferences</div> : null}
+                    {tableReferenceKeys.map(name => (
+                        <div key={name}>
+                            <div key={name} style={{ paddingLeft: 12 }}>
+                                {name}
+                            </div>
+                            <div style={{ paddingLeft: 24 }}>
+                                {Array.from(mrScope.tableReferences.get(name) || []).map((col, i) => (
+                                    <div key={i}>
+                                        {printNode(col)}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                     ))}
                 </div>
             </div>
@@ -41,6 +81,7 @@ class DisplayMRScope extends React.Component<{ mrScope: MapReduceScope }> {
 class DisplayContextManager extends React.Component<DisplayContextManagerProps> {
     render() {
         const context = this.props.context;
+        console.log('DisplayContextManager', context);
         const mrScope = context.mrScope;
         const tableIdentifierMap = Array.from(context.tableIdentifierMap.keys());
         const tableCount = tableIdentifierMap.length;
@@ -48,55 +89,92 @@ class DisplayContextManager extends React.Component<DisplayContextManagerProps> 
         const referenceCount = referenceMap.length;
         const referenceNotFound = Array.from(context.referenceNotFound.keys());
         const referenceNotFoundCount = referenceNotFound.length;
+        const highlights = context.highlightRanges;
 
         return (
             <>
-                {mrScope && <DisplayMRScope mrScope={mrScope} />}
                 <div
                     style={{
-                        marginTop: 12
+                        marginTop: 2,
+                        display: 'flex',
+                        padding: 4,
+                        gap: 4,
+                        background: '#f0f0f0',
                     }}
                 >
-                    <h5>{printNode(context.context)} {context.uuid}</h5>
-                    {tableCount ? <div>table declare</div> : null}
-                    {
-                        tableIdentifierMap.map((table) => {
-                            return (
-                                <div
-                                    key={table}
-                                    style={{
-                                        paddingLeft: 12,
-                                    }}
-                                >
-                                    <h4>{table}</h4>
-                                </div>
-                            );
-                        })
-                    }
-                    {referenceCount ? <h4>references</h4> : null}
-                    {
-                        referenceMap.map((name) => {
-                            return (
-                                <div key={name}>{name}</div>
-                            );
-                        })
-                    }
-                    {referenceNotFoundCount ? <h4>external reference</h4> : null}
-                    {
-                        referenceNotFound.map((name) => {
-                            return (
-                                <div key={name}>{name}</div>
-                            )
-                        })
-                    }
+                    <div
+                        style={{
+                            flex: 1,
+                        }}
+                    >
+                        <div
+                            style={{ borderBottom: '1px solid #ccc', marginBottom: 4 }}
+                        >
+                            {printNode(context.context)} (c: {context.children.length})
+                        </div>
+                        {tableCount ? <div>tableIdentifierMap</div> : null}
+                        {
+                            tableIdentifierMap.map((table) => {
+                                return (
+                                    <div
+                                        key={table}
+                                        style={{
+                                            paddingLeft: 12,
+                                        }}
+                                    >
+                                        {table}
+                                    </div>
+                                );
+                            })
+                        }
+                        {referenceCount ? <div>referenceMap</div> : null}
+                        {
+                            referenceMap.map((name) => {
+                                return (
+                                    <div key={name} style={{ paddingLeft: 12 }}>
+                                        {name}
+                                    </div>
+                                );
+                            })
+                        }
+                        {referenceNotFoundCount ? <div>referenceNotFound</div> : null}
+                        {
+                            referenceNotFound.map((name) => {
+                                return (
+                                    <div key={name} style={{ paddingLeft: 12 }}>
+                                        {name}
+                                    </div>
+                                )
+                            })
+                        }
+                        {highlights.length ? <div>highlights</div> : null}
+                        {
+                            highlights.map((range, i) => {
+                                return (
+                                    <div key={i} style={{ paddingLeft: 12 }}>
+                                        {printNode(range.context)}
+                                    </div>
+                                );
+                            })
+                        }
+                    </div>
+                    <div
+                        style={{
+                            flex: 1,
+                            paddingLeft: 4,
+                            borderLeft: '1px solid #ccc',
+                        }}
+                    >
+                        {mrScope && <DisplayMRScope mrScope={mrScope} />}
+                    </div>
                 </div>
                 {
                     context.children.length > 0
                         ? (
                             <div
                                 style={{
-                                    marginLeft: 20,
-                                    marginTop: 8
+                                    marginLeft: 18,
+                                    marginTop: 4
                                 }}
                             >
                                 {context.children.map(x => {

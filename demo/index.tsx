@@ -105,6 +105,8 @@ const AppComponent = amisRender(
 );
 
 const App = () => {
+  const [sqlTestIdx, setSqlTestIdx] = React.useState(0);
+
   return (
     <div className="container">
       <ClickToComponent />
@@ -113,9 +115,10 @@ const App = () => {
        */}
       <SqlTestNavigation
         sqlTest={sqlTest}
+        onChange={setSqlTestIdx}
       />
       <SqlTestDag
-        sqlTest={sqlTest[15].model.getValue()}
+        sqlTest={sqlTest[sqlTestIdx].model.getValue()}
       />
     </div>
   );

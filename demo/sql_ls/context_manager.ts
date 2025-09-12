@@ -39,12 +39,15 @@ import {
 import { ITableSourceManager } from "./types";
 import { IdentifierScope, SymbolAndContext } from "./identifier_scope";
 import { MapReduceScope } from "./mr_scope";
+import { printNode } from "./helpers/log";
 
 export class ContextManager {
     rootContext: IdentifierScope | null = null;
     currentContext: IdentifierScope | null = null;
 
     mrScopes: MapReduceScope[] = [];
+
+    mrScopeGraph: Map<string, string[]> = new Map();
 
     constructor(public tree: ProgramContext, public tableSourceManager?: ITableSourceManager) {
         const manager = this;
@@ -53,6 +56,7 @@ export class ContextManager {
         this.currentContext = this.rootContext;
 
         function enterRule(ctx: ParserRuleContext) {
+            console.log('enterRule', printNode(ctx));
             const newContext = manager.currentContext!.enterScope(ctx);
             manager.currentContext = newContext;
             return newContext;
@@ -65,7 +69,7 @@ export class ContextManager {
         }
 
         function enterTable(ctx: QueryStatementExpressionContext | AtomSelectStatementContext, identifierScope: IdentifierScope) {
-            const mrScope = new MapReduceScope(ctx, identifierScope);
+            const mrScope = new MapReduceScope(ctx, identifierScope, manager.mrScopes.length);
             manager.mrScopes.push(mrScope);
             identifierScope.mrScope = mrScope;
         }
@@ -212,43 +216,15 @@ export class ContextManager {
             enterTableSource = (ctx: TableSourceContext) => {
                 const alias = ctx.id_()?.getText();
                 if (alias) {
-                    manager.currentContext?.addReference(alias, ctx);
                     manager.currentContext?.addHighlightNode(ctx.id_()!);
-                } else {
-                    const tableName = ctx.tableOrView().tableName()?.getText();
-                    if (tableName) {
-                        manager.currentContext?.addReference(tableName, ctx);
-                    }
                 }
             };
 
             enterColumnName = (ctx: ColumnNameContext) => {
-                const context = manager.currentContext;
-                const mrScope = context?.getMrScope();
-
-                const ids = ctx.poolPath()?.id_();
-                if (ids?.length == 1) {
-                    // Single identifier, likely a column name
-                    // do nothing
-                } else if (ids?.length == 2) {
-                    // Two identifiers, likely a table.column name
-                    const tableName = ids[0].getText();
-                    // TODO: 需要先记下来，在exit scope时清理引用
-                    manager.currentContext?.addReference(tableName, ctx);
-                }
                 manager.currentContext?.addHighlightNode(ctx);
             };
 
             enterColumnNamePath = (ctx: ColumnNameContext) => {
-                const ids = ctx.poolPath()?.id_();
-                if (ids?.length == 1) {
-                    // Single identifier, likely a column name
-                    // do nothing
-                } else if (ids?.length == 2) {
-                    // Two identifiers, likely a table.column name
-                    const tableName = ids[0].getText();
-                    manager.currentContext?.addReference(tableName, ctx);
-                }
                 manager.currentContext?.addHighlightNode(ctx);
             };
 
@@ -325,9 +301,9 @@ export class ContextManager {
         ParseTreeWalker.DEFAULT.walk(listener, tree);
         console.assert(this.currentContext === this.rootContext, 'Context manager did not exit all scopes correctly');
         this.rootContext.collectScope();
+
+        this.createMrScopeGraph();
     }
-
-
 
     getContextByPosition(position: Position): IdentifierScope | null {
         if (!this.rootContext) {
@@ -402,6 +378,22 @@ export class ContextManager {
         }
         console.log('getSymbolByPosition not found', position);
         return null;
+    }
+
+    createMrScopeGraph() {
+        this.mrScopes.forEach((mrScope) => {
+            const id = mrScope.id;
+            const children = mrScope.getChildScopes();
+            const deps = children.map(x => x.id);
+
+            if (mrScope.inputTables.length > 0) {
+                // try to find input from other mrScopes
+                mrScope.inputTables.forEach(input => {
+                    
+                });
+            }
+            this.mrScopeGraph.set(id, deps);
+        });
     }
 
     validate() {

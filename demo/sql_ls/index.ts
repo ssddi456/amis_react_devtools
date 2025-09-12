@@ -1,17 +1,16 @@
 import { editor, languages, Position, Uri, MarkerSeverity } from "monaco-editor";
 import { HiveSQL, } from 'dt-sql-parser';
 import {
-    ProgramContext, 
-    TableSourceContext,
+    ProgramContext,
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ContextManager, createContextManager } from "./context_manager";
 import { rangeFromNode, sliceToRange, findTokenAtPosition } from "./helpers/table_and_column";
 import { ITableSourceManager } from "./types";
 import { logSource, printNode, printNodeTree } from "./helpers/log";
-import { matchType } from "./helpers/tree_query";
 import { formatHiveSQL } from '../formatter';
-import { getAllEntityInfoFromNode, getEntityInfoAtPosition } from "./getTableAndColumnInfoAtPosition";
-import { formatHoverRes, tableInfoFromNode, formatDefinitionRes, getIdentifierReferences } from "./formatHoverRes";
+import { getAllEntityInfoFromNode, getEntityInfoAtPosition } from "./helpers/getTableAndColumnInfoAtPosition";
+import { formatHoverRes, formatDefinitionRes } from "./formatHoverRes";
+import { getIdentifierReferences } from "./helpers/getIdentifierReferences";
 import { posInRange, WithSource } from "./util";
 
 interface ContextInfos {
@@ -120,11 +119,11 @@ export const createHiveSqlLanguageService = ({
         doSyntaxHover: (
             position: Position,
         ): languages.Hover | undefined => {
-            const { foundNode, context } = getCtxFromPos(position) || {};
+            const { foundNode } = getCtxFromPos(position) || {};
             if (!foundNode) {
                 return;
             }
-            const text = printNodeTree(foundNode, '\n\n');
+            const text = printNodeTree(foundNode, '\n');
             const range = rangeFromNode(foundNode);
 
             return {
@@ -209,14 +208,12 @@ export const createHiveSqlLanguageService = ({
 
         doReferences(
             position: Position,
-            isTest?: boolean
         ): WithSource<languages.Location[]> | undefined {
             const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
             if (!foundNode || !context) {
                 return;
             }
             console.group('doReferences');
-            console.log('foundNode', printNodeTree(foundNode));
             console.log('mrScope', mrScope);
             const references = getIdentifierReferences(foundNode, mrScope, context);
             console.groupEnd();

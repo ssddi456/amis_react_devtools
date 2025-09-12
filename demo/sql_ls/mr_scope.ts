@@ -3,7 +3,7 @@ import { AtomSelectStatementContext, ExpressionContext, QueryStatementExpression
 import { uuidv4 } from "./util";
 import { IdentifierScope } from "./identifier_scope";
 import { getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getFunctionCallFromExpression, getOnConditionOfFromClause, isPosInParserRuleContext, isSameColumnInfo } from "./helpers/table_and_column";
-import { ColumnInfo, TableSource } from "./types";
+import { ColumnInfo, tableReferenceContext, TableSource } from "./types";
     
 
 export class MapReduceScope {
@@ -11,6 +11,9 @@ export class MapReduceScope {
 
     inputTable: Map<string, TableSource> = new Map();
     inputTables: TableSource[] = [];
+
+    tableDefinitions: Map<string, TableSource> = new Map();
+    tableDefinitionList: TableSource[] = [];
 
     exportColumns: ColumnInfo[] = [];
 
@@ -20,7 +23,8 @@ export class MapReduceScope {
 
     constructor(
         public context: QueryStatementExpressionContext | AtomSelectStatementContext,
-        public identifierScope: IdentifierScope
+        public identifierScope: IdentifierScope,
+        public mrOrder: number,
     ) {
         
     }
@@ -29,8 +33,8 @@ export class MapReduceScope {
         this.defaultInputTable = table;
     }
 
-    addInputTable(name: string, table: ParserRuleContext, defineReference: ParserRuleContext) {
-        const tableInfo = {
+    addInputTable(name: string, table: tableReferenceContext, defineReference: ParserRuleContext) {
+        const tableInfo: TableSource = {
             tableName: name,
             reference: table,
             defineReference
@@ -39,6 +43,18 @@ export class MapReduceScope {
             this.inputTable.set(name, tableInfo);
         }
         this.inputTables.push(tableInfo);
+    }
+
+    addTableDefinition(name: string, table: tableReferenceContext, defineReference: ParserRuleContext) {
+        const tableInfo: TableSource = {
+            tableName: name,
+            reference: table,
+            defineReference
+        };
+        if (!this.tableDefinitions.has(name)) {
+            this.tableDefinitions.set(name, tableInfo);
+        }
+        this.tableDefinitionList.push(tableInfo);
     }
 
     getDefaultInputTableName() {
@@ -190,6 +206,22 @@ export class MapReduceScope {
         return null;
     }
 
+    getTableScopeByName(name: string): MapReduceScope | undefined {
+        const tableInfo = this.inputTable.get(name);
+        if (tableInfo) {
+            return this;
+        }
+        const tableDef = this.tableDefinitions.get(name);
+        if (tableDef) {
+            return this;
+        }
+        const parentMrScope = this.getParentMrScope();
+        if (parentMrScope) {
+            return parentMrScope.getTableScopeByName(name);
+        }
+        return undefined;
+    }
+
     getTableByName(name: string): ParserRuleContext | undefined {
         const tableInfo = this.inputTable.get(name);
         const reference = tableInfo?.reference;
@@ -202,6 +234,10 @@ export class MapReduceScope {
                     return parentRef;
                 }
             }
+        }
+        const tableDef = this.tableDefinitions.get(name);
+        if (tableDef) {
+            return tableDef.reference;
         }
         return reference;
     }
@@ -255,5 +291,19 @@ export class MapReduceScope {
     getParentMrScope() {
         return this.identifierScope?.parent?.getMrScope() || null;
     }
-    
+
+    getChildScopes(): MapReduceScope[] {
+        const scopes: MapReduceScope[] = [];
+        const identifierScopes = [...this.identifierScope.children];
+        while (identifierScopes.length) {
+            const identifierScope = identifierScopes.shift()!;
+            if (identifierScope.mrScope && identifierScope.mrScope !== this) {
+                scopes.push(identifierScope.mrScope);
+            } else {
+                identifierScopes.push(...identifierScope.children);
+            }
+        }
+        return scopes;
+    }
+
 }

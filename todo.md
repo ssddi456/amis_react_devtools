@@ -16,16 +16,18 @@
     [*] duplicate table alias
 
 1. get references
-    [ ] get table references
-    [ ] get column references
+    [*] get table references
+    [*] get column references
 
 1. performance
-    [ ] remove log
+    [*] remove log
     [ ] validate performance
 
 1. project layout
-    [ ] reorganize project layout
-    
+    [*] reorganize project layout
+
+1. table graph
+    [ ] get table graph from sql
 # 更好的测试方法
 
 * 在需要调试的地方添加断言 or debugger

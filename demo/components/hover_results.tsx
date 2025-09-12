@@ -5,15 +5,12 @@ import { WithSource } from '../sql_ls/util';
 
 interface HoverResultsProps {
     hoverResults: Array<WithSource<languages.Hover> | null | undefined>;
-    positions: Array<{ lineNumber: number; column: number }>;
 }
 
-export function HoverResults({ hoverResults, positions }: HoverResultsProps) {
+export function HoverResults({ hoverResults }: HoverResultsProps) {
     return (
         <div>
             {hoverResults.map((res, index) => {
-                const positionStr = `(${positions[index].lineNumber}:${positions[index].column})`;
-                
                 return (
                     <div key={index} style={{ marginBottom: '15px' }}>
                         {res ? (
@@ -26,8 +23,6 @@ export function HoverResults({ hoverResults, positions }: HoverResultsProps) {
                                         fontWeight: 'bolder'
                                     }}
                                 >Hover Result {index + 1}
-                                    &nbsp;
-                                    pos: {positionStr}
                                     &nbsp;
                                     range: {`(${res.range?.startLineNumber}:${res.range?.startColumn} -> ${res.range?.endLineNumber}:${res.range?.endColumn})`}
                                     &nbsp;
@@ -51,8 +46,9 @@ export function HoverResults({ hoverResults, positions }: HoverResultsProps) {
                                         color: '#333',
                                         fontWeight: 'bolder'
                                     }}
-                                >Hover Result {index + 1} - No result</h4>
-                                <p>Position: {positionStr}</p>
+                                >Hover Result {index + 1}
+                                </h4>
+                                <div>No hover result</div>
                             </div>
                         )}
                     </div>

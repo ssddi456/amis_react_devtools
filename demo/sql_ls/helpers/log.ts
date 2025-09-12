@@ -28,13 +28,13 @@ export function printNode(node: ParserRuleContext | TerminalNode | null | undefi
         return 'null';
     }
     if (node instanceof TerminalNode) {
-        return `TerminalNode(${ruleIndexToDisplayName(node)}, ${node.symbol.line}:${node.symbol.column})`;
+        return `TN(${ruleIndexToDisplayName(node)}, ${node.symbol.line}:${node.symbol.column})`;
     }
     const range = rangeFromNode(node);
     const start = `${range.startLineNumber}:${range.startColumn}`;
     const end = `${range.endLineNumber}:${range.endColumn}`;
 
-    return `Node(${ruleIndexToDisplayName(node)}, ${start} -> ${end})`;
+    return `N(${ruleIndexToDisplayName(node)}, ${start} -> ${end})`;
 }
 
 export function printChildren(node: ParserRuleContext | null): string {

@@ -1,13 +1,13 @@
 import { ParserRuleContext } from "antlr4ng";
-import { TableSourceContext, HiveSqlParser, SelectItemContext, FunctionIdentifierContext, ColumnNameContext, ColumnNamePathContext, SubQuerySourceContext, TableNameContext, Id_Context, CteStatementContext, ExpressionContext, TableAllColumnsContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { IdentifierScope } from "./identifier_scope";
-import { MapReduceScope } from "./mr_scope";
-import { EntityInfo, EntityInfoType, tableInfoFromNode, } from "./formatHoverRes";
-import { rangeFromNode, tableInfoFromSubQuerySource } from "./helpers/table_and_column";
-import { ExtColumnInfo, TableInfo } from "./types";
-import { printNodeTree, printNode, logSource } from "./helpers/log";
-import { matchType, matchSubPathOneOf, matchSubPath } from "./helpers/tree_query";
-import { localDbId } from "./consts";
+import { TableSourceContext, HiveSqlParser, SelectItemContext, FunctionIdentifierContext, ColumnNameContext, ColumnNamePathContext, SubQuerySourceContext, TableNameContext, Id_Context, CteStatementContext, ExpressionContext, TableAllColumnsContext, VirtualTableSourceContext, PoolPathContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { IdentifierScope } from "../identifier_scope";
+import { MapReduceScope } from "../mr_scope";
+import { EntityInfo, EntityInfoType, tableInfoFromNode, } from "../formatHoverRes";
+import { rangeFromNode, tableIdAndColumnNameFromPoolPath, tableInfoFromSubQuerySource } from "./table_and_column";
+import { ExtColumnInfo, TableInfo } from "../types";
+import { printNodeTree, printNode, logSource } from "./log";
+import { matchType, matchSubPathOneOf, matchSubPath } from "./tree_query";
+import { localDbId } from "../consts";
 
 export const getEntityInfoAtPosition = async (
     foundNode?: ParserRuleContext | null,
@@ -29,7 +29,6 @@ export const getEntityInfoAtPosition = async (
     const pushExt = isTest ? (content: string) => {
         ext.push(content);
     } : () => { };
-    pushExt(printNodeTree(foundNode));
     const logger = isTest ? console.log : () => { };
     const allIdentifiers = context.getAllIdentifiers() || {};
 
@@ -96,7 +95,6 @@ export const getEntityInfoAtPosition = async (
         ['DOT', 'poolPath', 'columnNamePath']
     ])
     if (columnName) {
-        
         return {
             ...await getEntityInfoFromColumnName(foundNode, columnName as ColumnNameContext | ColumnNamePathContext, context, mrScope),
             ...commonFields,
@@ -342,23 +340,12 @@ async function getEntityInfoFromCteStatement(
 }
 
 
-export function tableIdAndColumnNameFromPoolPath(poolPath: ParserRuleContext | null): { tableId: string | undefined; columnName: string } {
-    if (!poolPath) {
-        return { tableId: undefined, columnName: '' };
-    }
-    const segs = poolPath.children?.map(c => c.getText()) || [];
-    const tableId = segs.length === 1 ? undefined : segs[0];
-    const columnName = segs.length === 1 ? segs[0] : segs[2];
-    return { tableId, columnName };
-}
-
 async function getEntityInfoFromColumnName(
     node: ParserRuleContext,
     parent: ColumnNameContext | ColumnNamePathContext,
     context: IdentifierScope,
     mrScope: MapReduceScope | null
 ) {
-
     const poolPath = parent.poolPath();
     // 只支持 table_name.column_name or column_name for now
     const { tableId: tableIdExp, columnName } = tableIdAndColumnNameFromPoolPath(poolPath);
@@ -390,10 +377,17 @@ async function getEntityInfoFromColumnName(
 
     const item = mrScope?.getTableByName(tableIdExp);
     const tableInfo = item && await tableInfoFromNode(item, context);
-
     if (!tableInfo) {
         return {
             type: EntityInfoType.NoTable,
+            text: tableIdExp,
+        };
+    }
+    const tableId = parent.poolPath()?.id_(0);
+    if (node == tableId) {
+        return {
+            type: EntityInfoType.Table,
+            tableInfo,
             text: tableIdExp,
         };
     }

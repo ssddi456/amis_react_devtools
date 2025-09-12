@@ -78,6 +78,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
         validationResults: WithSource<editor.IMarkerData>[] | undefined;
         resultItems: {
             hoverResult: (WithSource<languages.Hover> | null | undefined);
+            syntaxHoverResult: (WithSource<languages.Hover> | null | undefined);
             definitionResult: (WithSource<languages.Definition> | null | undefined);
             referencesResult: (WithSource<languages.Location[]> | null | undefined);
         }[]
@@ -92,12 +93,13 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
             isTest: !!showDebug
         });
         const resultItems = positions.map(async (pos) => {
-            const [hoverResult, definitionResult, referencesResult] = await Promise.all([
+            const [hoverResult, syntaxHoverResult, definitionResult, referencesResult] = await Promise.all([
                 hiveLs.doHover(pos, showDebug),
+                hiveLs.doSyntaxHover(pos),
                 hiveLs.doDefinition(pos, showDebug),
-                hiveLs.doReferences(pos, showDebug)
+                hiveLs.doReferences(pos)
             ]);
-            return { hoverResult, definitionResult, referencesResult };
+            return { hoverResult, syntaxHoverResult, definitionResult, referencesResult };
         });
 
         Promise.all([...resultItems, hiveLs.doValidation()]).then(
@@ -114,7 +116,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
             });
     }, [testCase, showDebug]);
 
-    const reparse = useCallback((idx: number) => {
+    const reparse = useCallback((idx: number, type?: 'hover' | 'definition' | 'references') => {
         Promise.all(results!.resultItems.map(async (item, i) => {
             if (i === idx) {
                 const model = testCase.model;
@@ -127,11 +129,21 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                 const positions = testCase.positions;
                 const pos = positions[i]; // Get the position of the item
                 // Apply re-parsing logic to the selected item
-                const hoverResult = await hiveLs.doHover(pos, showDebug);
-                const definitionResult = await hiveLs.doDefinition(pos, showDebug);
-                const referencesResult = await hiveLs.doReferences(pos, showDebug);
+                const hoverResult = (type === 'hover' || type === undefined)
+                    ? await hiveLs.doHover(pos, showDebug)
+                    : item.hoverResult;
+                const syntaxHoverResult = (type === 'hover' || type === undefined)
+                    ? await hiveLs.doSyntaxHover(pos)
+                    : item.syntaxHoverResult;
+                const definitionResult = (type === 'definition' || type === undefined)
+                    ? await hiveLs.doDefinition(pos, showDebug)
+                    : item.definitionResult;
+                const referencesResult = (type === 'references' || type === undefined)
+                    ? await hiveLs.doReferences(pos)
+                    : item.referencesResult;
                 return {
                     hoverResult,
+                    syntaxHoverResult,
                     definitionResult,
                     referencesResult
                 };
@@ -233,7 +245,7 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                 </div>
 
                 {/* Tab 内容 */}
-                {activeTab === 'results' && (
+                {(activeTab === 'results' && currentResultItem) ? (
                     <>
                         <div style={{ width: '100%', overflowX: 'auto' }}>
                             <div
@@ -266,7 +278,16 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                                 })}
                             </div>
                         </div>
-                        <div>
+                        <div
+                            style={{
+                                display: 'flex',
+                                gap: '2px',
+                                justifyContent: 'flex-start',
+                                marginBottom: '10px',
+                                overflowY: 'auto'
+                            }}
+                        >
+                            <span>reparse</span>
                             <button style={{
                                 padding: '4px 8px',
                                 backgroundColor: '#007acc',
@@ -279,8 +300,67 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                                     reparse(resultIdx);
                                 }}
                             >
-                                reparse
+                                all
                             </button>
+                            <button style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#007acc',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                            }}
+                                onClick={() => {
+                                    reparse(resultIdx, 'hover');
+                                }}
+                            >
+                                hover
+                            </button>
+                            <button style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#007acc',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                            }}
+                                onClick={() => {
+                                    reparse(resultIdx, 'definition');
+                                }}
+                            >
+                                definition
+                            </button>
+                            <button style={{
+                                padding: '4px 8px',
+                                backgroundColor: '#007acc',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                            }}
+                                onClick={() => {
+                                    reparse(resultIdx, 'references');
+                                }}
+                            >
+                                references
+                            </button>
+                        </div>
+                        <div>
+                            <pre>
+                                position:
+                                {testCase.positions?.[resultIdx]?.lineNumber}:{testCase.positions?.[resultIdx]?.column}
+                            </pre>
+                            <pre>
+                                {currentResultItem?.syntaxHoverResult?.contents.map((content, index) => (
+                                    <div key={index}>
+                                        {typeof content === 'string' ? (
+                                            <div>{content}</div>
+                                        ) : (
+                                            content.value
+                                        )}
+                                    </div>
+                                ))}
+                            </pre>
                         </div>
                         {
                             currentResultItem
@@ -288,21 +368,22 @@ export function DoSqlTest({ case: testCase, showDebug }: { case: LsTestCase; sho
                                     <>
                                         <HoverResults
                                             hoverResults={[currentResultItem.hoverResult]}
-                                            positions={[results.positions[resultIdx]]}
                                         />
                                         <DefinitionResults
                                             definitionResults={[currentResultItem.definitionResult]}
-                                            positions={[results.positions[resultIdx]]}
                                         />
                                         <ReferencesResults
                                             referencesResults={[currentResultItem.referencesResult]}
-                                            positions={[results.positions[resultIdx]]}
                                         />
                                     </>
                                 )
                                 : null
                         }
                     </>
+                ): (
+                    <div>
+                        no results
+                    </div>
                 )}
 
 

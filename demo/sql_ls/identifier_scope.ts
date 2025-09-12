@@ -1,7 +1,7 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
-import { isPosInParserRuleContext, rangeFromNode } from "./helpers/table_and_column";
+import { getTableNameFromContext, isPosInParserRuleContext, rangeFromNode } from "./helpers/table_and_column";
 import { ITableSourceManager, TableInfo } from "./types";
 import { printNode, ruleIndexToDisplayName } from "./helpers/log";
 import { uuidv4 } from "./util";
@@ -123,29 +123,24 @@ export class IdentifierScope {
     }
 
     collectScope() {
+        console.group(`IdentifierScope.collectScope`);
         this.children.forEach((child) => {
             child.collectScope();
         });
 
-        const mrScope = this.getMrScope();
-        const parent = this.parent;
-        this.referenceMap.forEach((refs, name) => {
-            const identifier = mrScope?.inputTable.get(name);
-            if (identifier) {
-                const referenceMap = mrScope!.identifierScope.referenceMap;
-                const oldRefs = referenceMap.get(name) || [];
-                referenceMap.set(name, [...oldRefs, ...refs].filter(ref => ref !== identifier.defineReference));
-                return;
-            } else {
-                if (parent) {
-                    refs.forEach(ref => {
-                        parent.addReference(name, ref);
-                    });
+        this.highlightRanges.forEach(range => {
+            const context = range.context;
+
+            const {tableId, dbName} = getTableNameFromContext(context);
+            console.log(`IdentifierScope.collectScope: context=${printNode(context)}, tableId=${tableId}, dbName=${dbName}`);
+            if (tableId) {
+                const mrScope = this.getMrScope()?.getTableScopeByName(tableId);
+                if (mrScope) {
+                    mrScope.addTableReference(tableId, context);
                 }
-    
-                this.referenceNotFound.set(name, refs);
             }
         });
+        console.groupEnd();
     }
 
     lookupDefinition(name: string): ParserRuleContext | null {
@@ -171,6 +166,22 @@ export class IdentifierScope {
         return identifier;
     }
 
+    getDefinitionScope(name: string): MapReduceScope | null {
+        const identifier = this.tableIdentifierMap.get(name);
+        if (!identifier) {
+            if (this.parent) {
+                return this.parent.getDefinitionScope(name);
+            }
+            const missingRef = this.referenceNotFound.get(name);
+            if (missingRef) {
+                this.getMrScope();
+            }
+            return this.root?.getMrScope() || null;
+        }
+        
+        return this.getMrScope();
+    }
+
     containsPosition(position: Position): boolean {
         if (!this.range) {
             return false;
@@ -190,12 +201,6 @@ export class IdentifierScope {
         });
         return result.join('\n');
     }
-
-    addReference(name: string, reference: ParserRuleContext) {
-        const mrScope = this.getMrScope();
-        mrScope?.addTableReference(name, reference);
-    }
-
 
     addHighlight(range: HighlightRange) {
         if (range.start === range.end) {

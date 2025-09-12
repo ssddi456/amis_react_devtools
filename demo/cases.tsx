@@ -204,7 +204,8 @@ select count(*), count(distinct resblock_id)
         ^         ^     ^         ^
 from rpr.rpr_test_news_record_da
 ;`
-,`select * from t1 left join t2 using (house_code, resblock_id)`
+,`select * from t1 left join t2 using (house_code, resblock_id)
+`
 ,`select
   t1.house_code,
   t1.resblock_id,

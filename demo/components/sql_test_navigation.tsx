@@ -1,10 +1,11 @@
 // This file has been moved to ./components/sql_test_navigation.tsx and is now removed from the demo directory.
-import React from 'react';
+import React, { useEffect } from 'react';
 import { DoSqlTest } from "./do_sql_test";
 import { LsTestCase } from '../tools/tests';
 
 interface SqlTestNavigationProps {
     sqlTest: LsTestCase[];
+    onChange: (index: number) => void;
 }
 
 
@@ -41,6 +42,7 @@ const saveStorageSettings = (settings: AppSettings) => {
 
 export const SqlTestNavigation: React.FC<SqlTestNavigationProps> = ({
     sqlTest,
+    onChange,
 }) => {
     const initialSettings = getStorageSettings();
     const [caseIndex, setCaseIndex] = React.useState(initialSettings.caseIndex);
@@ -50,6 +52,7 @@ export const SqlTestNavigation: React.FC<SqlTestNavigationProps> = ({
     const changeCase = (index: number) => {
         const newIndex = Math.max(0, Math.min(maxIndex, index));
         setCaseIndex(newIndex);
+        onChange(newIndex);
         saveStorageSettings({ caseIndex: newIndex, showDebug });
     };
 
@@ -57,6 +60,12 @@ export const SqlTestNavigation: React.FC<SqlTestNavigationProps> = ({
         setShowDebug(checked);
         saveStorageSettings({ caseIndex, showDebug: checked });
     };
+
+    useEffect(() => {
+        setTimeout(() => {
+            onChange(caseIndex);
+        });
+    }, []);
 
     return (
         <div>

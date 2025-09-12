@@ -5,15 +5,12 @@ import { WithSource } from '../sql_ls/util';
 
 interface DefinitionResultsProps {
     definitionResults: Array<WithSource<languages.Definition> | null | undefined>;
-    positions: Array<{ lineNumber: number; column: number }>;
 }
 
-export function DefinitionResults({ definitionResults, positions }: DefinitionResultsProps) {
+export function DefinitionResults({ definitionResults }: DefinitionResultsProps) {
     return (
         <div>
-            {definitionResults.map((defRes, index) => {
-                const positionStr = `(${positions[index].lineNumber}:${positions[index].column})`;
-                
+            {definitionResults.map((defRes, index) => {                
                 return (
                     <div key={index} style={{ marginBottom: '15px' }}>
                         {defRes ? (
@@ -26,8 +23,6 @@ export function DefinitionResults({ definitionResults, positions }: DefinitionRe
                                         fontWeight: 'bolder'
                                     }}
                                 >Definition Result {index + 1}
-                                    &nbsp;
-                                    pos: {positionStr}
                                     &nbsp;
                                     <SourceLink source={defRes.__source} />
                                 </h4>
@@ -62,8 +57,8 @@ export function DefinitionResults({ definitionResults, positions }: DefinitionRe
                                         color: '#666',
                                         fontWeight: 'bolder'
                                     }}
-                                >Definition Result {index + 1} - No result</h4>
-                                <p>Position: {positionStr}</p>
+                                >Definition Result {index + 1}</h4>
+                                <div>No definition found</div>
                             </div>
                         )}
                     </div>

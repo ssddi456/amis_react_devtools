@@ -1,10 +1,10 @@
 import { Position } from "monaco-editor";
 import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import { HiveSqlParserVisitor } from "dt-sql-parser";
-import { AtomExpressionContext, ColumnNameContext, ColumnNamePathContext, CteStatementContext, ExpressionContext, FromClauseContext, HiveSqlParser, Id_Context, JoinSourcePartContext, RollupOldSyntaxContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { matchSubPath } from "./tree_query";
+import { AtomExpressionContext, ColumnNameContext, ColumnNamePathContext, CteStatementContext, ExpressionContext, FromClauseContext, HiveSqlParser, Id_Context, JoinSourcePartContext, PoolPathContext, RollupOldSyntaxContext, SubQuerySourceContext, TableNameContext, TableSourceContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { matchSubPath, matchSubPathOneOf } from "./tree_query";
 import { IdentifierScope } from "../identifier_scope";
-import { printNode } from "./log";
+import { printNode, printNodeTree } from "./log";
 import { ColumnInfo } from "../types";
 
 export function sliceToRange(slice: {
@@ -37,7 +37,7 @@ export function isPosInParserRuleContext(position: { lineNumber: number, column:
         }
         if (context.symbol.line === lineNumber) {
             if (context.symbol.column <= column
-                && context.symbol.column + (context.symbol.text || '').length > column
+                && context.symbol.column + (context.symbol.text || '').length >= column
             ) {
                 return true;
             }
@@ -54,7 +54,7 @@ export function isPosInParserRuleContext(position: { lineNumber: number, column:
     let endLine = endToken.line;
     let endColumn = endToken.column + (endToken.text?.length || 0);
 
-    if (lineNumber === startLine && column >= startColumn && lineNumber === endLine && column < endColumn) {
+    if (lineNumber === startLine && column >= startColumn && lineNumber === endLine && column <= endColumn) {
         return true;
     }
 
@@ -62,11 +62,11 @@ export function isPosInParserRuleContext(position: { lineNumber: number, column:
         return true;
     }
 
-    if (lineNumber !== startLine && lineNumber === endLine && column < endColumn) {
+    if (lineNumber !== startLine && lineNumber === endLine && column <= endColumn) {
         return true;
     }
 
-    if (lineNumber > startLine && lineNumber < endLine) {
+    if (lineNumber > startLine && lineNumber <= endLine) {
         return true;
     }
     return false;
@@ -141,10 +141,10 @@ export function findTokenAtPosition(
     if (!foundNode) {
         // console.warn('No node found at position:', JSON.stringify(position), 'tree:', tree, rangeFromNode(tree));
     } else {
-        console.log(
-            'Found node at position:', JSON.stringify(position),
-            'Node:', printNode(foundNode),
-        );
+        // console.log(
+        //     'Found node at position:', JSON.stringify(position),
+        //     'Node:', printNode(foundNode),
+        // );
     }
     return foundNode;
 }
@@ -218,7 +218,6 @@ export function tableInfoFromTableSource(
         currentContext.getMrScope()?.addInputTable(alias, context, context.id_()!);
     } else {
         const tableName = context.tableOrView()?.getText();
-        currentContext.addReference(tableName, context);
         currentContext.getMrScope()?.addInputTable(tableName, context, context.tableOrView()!);
     }
 
@@ -235,9 +234,8 @@ export function tableInfoFromSubQuerySource(
     const name = subQuerySource.id_().getText();
     currentContext.addIdentifier(name || '', subQuerySource, true);
     currentContext.getMrScope()?.addInputTable(name || '', subQuerySource, subQuerySource.id_()!);
-    if (name) {
-        currentContext.addHighlightNode(subQuerySource.id_());
-    }
+    currentContext.addHighlightNode(subQuerySource.id_());
+
     return subQuerySource;
 }
 
@@ -251,9 +249,8 @@ export function tableInfoFromVirtualTableSource(
     const name = virtualTableSource.tableAlias().getText();
     currentContext.addIdentifier(name || '', virtualTableSource, true);
     currentContext.getMrScope()?.addInputTable(name || '', virtualTableSource, virtualTableSource.tableAlias()!);
-    if (name) {
-        currentContext.addHighlightNode(virtualTableSource.tableAlias());
-    }
+    currentContext.addHighlightNode(virtualTableSource.tableAlias());
+
     return virtualTableSource;
 }
 
@@ -266,10 +263,9 @@ export function tableInfoFromCteStatement(
     }
     const name = cteStatement.id_().getText();
     currentContext.addIdentifier(name || '', cteStatement, true);
-    currentContext.getMrScope()?.addInputTable(name || '', cteStatement, cteStatement.id_()!);
-    if (name) {
-        currentContext.addHighlightNode(cteStatement.id_());
-    }
+    currentContext.getMrScope()?.addTableDefinition(name || '', cteStatement, cteStatement.id_()!);
+    currentContext.addHighlightNode(cteStatement.id_());
+
     return cteStatement;
 }
 
@@ -389,4 +385,67 @@ export function getFunctionCallFromExpression(ctx: ParserRuleContext): ParserRul
     }
     const func = atom.function_();
     return func;
+}
+
+export function tableIdAndColumnNameFromPoolPath(poolPath: PoolPathContext | null): { tableId: string | undefined; columnName: string } {
+    if (!poolPath) {
+        return { tableId: undefined, columnName: '' };
+    }
+    const segs = poolPath.children?.map(c => c.getText()) || [];
+    const tableId = segs.length === 1 ? undefined : segs[0];
+    const columnName = segs.length === 1 ? segs[0] : segs[2];
+    return { tableId, columnName };
+}
+
+export function getTableNameFromTableName(context: TableNameContext | null): { tableId: string, dbName?: string } {
+    if (!context) {
+        return { tableId: '', dbName: undefined };
+    }
+
+    const segs = context.children?.map(c => c.getText()) || [];
+    const tableId = segs.length === 1 ? segs[0] : segs[2] ;
+    const dbName = segs.length === 1 ? undefined : segs[2];
+    return { tableId, dbName };
+}
+
+export function getTableNameFromContext(context: ParserRuleContext): { tableId: string, dbName?: string } {
+    if (context instanceof TableSourceContext) {
+        const tableOrView = context.tableOrView();
+        if (!tableOrView) {
+            return { tableId: '', dbName: undefined };
+        }
+        const tableName = tableOrView.tableName();
+        if (!tableName) {
+            return { tableId: '', dbName: undefined };
+        }
+        return getTableNameFromTableName(tableName);
+    }
+
+    if (context instanceof ColumnNameContext || context instanceof ColumnNamePathContext) {
+        const { tableId } = tableIdAndColumnNameFromPoolPath(context.poolPath());
+        return { tableId: tableId || '', dbName: undefined };
+    }
+
+    if (context instanceof TableNameContext) {
+        return getTableNameFromTableName(context);
+    }
+
+
+    if (context instanceof VirtualTableSourceContext) {
+        const tableAlias = context.tableAlias();
+        if (!tableAlias) {
+            return { tableId: '', dbName: undefined };
+        }
+        return { tableId: tableAlias.getText(), dbName: undefined };
+    }
+
+    if (matchSubPathOneOf(context, [
+        ['id_', 'subQuerySource'],
+        ['id_', 'cteStatement'],
+        ['id_', 'tableSource']
+    ])) {
+        return { tableId: context.getText(), dbName: undefined };
+    }
+
+    return { tableId: '', dbName: undefined };
 }

@@ -9,7 +9,7 @@ export function posInRange(pos: { lineNumber: number; column: number; }, range: 
     return pos.lineNumber >= range.startLineNumber &&
         pos.lineNumber <= range.endLineNumber &&
         (pos.lineNumber > range.startLineNumber || pos.column >= range.startColumn) &&
-        (pos.lineNumber < range.endLineNumber || pos.column <= range.endColumn);
+        (pos.lineNumber < range.endLineNumber || pos.column <= range.endColumn + 1);
 }
 
 export type WithSource<T> = T & {

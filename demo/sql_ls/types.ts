@@ -1,4 +1,5 @@
 import { ParserRuleContext } from "antlr4ng";
+import { CteStatementContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 
 
 export interface ITableSourceManager {
@@ -26,9 +27,11 @@ export interface ExtColumnInfo {
     description: string;
 }
 
+export type tableReferenceContext = TableSourceContext | CteStatementContext | VirtualTableSourceContext | SubQuerySourceContext;
+
 export interface TableSource {
     tableName: string;
-    reference: ParserRuleContext;
+    reference: tableReferenceContext;
     defineReference: ParserRuleContext;
 }
 

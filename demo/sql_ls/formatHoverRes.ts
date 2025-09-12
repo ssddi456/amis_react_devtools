@@ -1,16 +1,13 @@
 import { ParserRuleContext, ParseTree } from "antlr4ng";
-import { TableSourceContext, SubQuerySourceContext, VirtualTableSourceContext, CteStatementContext, TableNameContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { TableSourceContext, SubQuerySourceContext, VirtualTableSourceContext, CteStatementContext, PoolPathContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { type IRange, languages, Uri } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { IdentifierScope } from "./identifier_scope";
-import { MapReduceScope } from "./mr_scope";
 import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, functionRes, unknownRes } from "./sql_res";
-import { rangeFromNode, } from "./helpers/table_and_column";
+import { rangeFromNode, tableIdAndColumnNameFromPoolPath, } from "./helpers/table_and_column";
 import { ExtColumnInfo, TableInfo } from "./types";
 import { printNode } from "./helpers/log";
-import { matchSubPathOneOf, matchSubPath } from "./helpers/tree_query";
 import { WithSource } from "./util";
 import { localDbId } from "./consts";
-import { tableIdAndColumnNameFromPoolPath } from "./getTableAndColumnInfoAtPosition";
 
 async function tableInfoFromTableSource(
     tableSource: TableSourceContext | null,
@@ -199,72 +196,4 @@ export const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): WithSource
     return;
 };
 
-export const getIdentifierReferences = (
-    foundNode: ParserRuleContext,
-    mrScope: MapReduceScope | null | undefined,
-    context: IdentifierScope
-): ParserRuleContext[] | undefined => {
-    const foundTableSource = matchSubPathOneOf(foundNode, [
-        ['id_', 'tableSource'],
-        ['DOT', 'tableSource'],
-    ]) as TableSourceContext | null;
-    if (foundTableSource) {
-        if (foundTableSource.id_()) {
-            const alias = foundTableSource.id_()?.getText();
-            if (!alias) {
-                return;
-            }
-            return mrScope?.getTableReferencesByName(alias);
-        }
-        return;
-    }
 
-    const foundTableName = matchSubPathOneOf(foundNode, [
-        ['id_', 'tableName'],
-    ]) as TableNameContext | null;
-    if (foundTableName) {
-        const tableName = foundTableName.getText();
-        return mrScope?.getTableReferencesByName(tableName);
-    }
-
-
-    const foundSubQuerySource = matchSubPath(foundNode, ['id_', 'subQuerySource']) as SubQuerySourceContext | null;
-    if (foundSubQuerySource) {
-        const alias = foundSubQuerySource.id_()?.getText();
-        if (!alias) {
-            return;
-        }
-        return mrScope?.getTableReferencesByName(alias);
-    }
-
-    const foundVirtualTableSource = matchSubPath(foundNode, ['id_', 'virtualTableSource']) as VirtualTableSourceContext | null;
-    if (foundVirtualTableSource) {
-        const alias = foundVirtualTableSource.tableAlias()?.getText();
-        if (!alias) {
-            return;
-        }
-        return mrScope?.getTableReferencesByName(alias);
-    }
-
-    const foundCteStatement = matchSubPath(foundNode, ['id_', 'cteStatement']) as CteStatementContext | null;
-    if (foundCteStatement) {
-        const alias = foundCteStatement.id_()?.getText();
-        if (!alias) {
-            return;
-        }
-        return mrScope?.getTableReferencesByName(alias);
-    }
-
-    const columnNode = matchSubPathOneOf(foundNode, [
-        ['id_', 'poolPath', 'columnName'],
-        ['id_', 'poolPath', 'columnNamePath'],
-    ]) as ParserRuleContext | null;
-
-    if (columnNode) {
-        const { tableId, columnName } = tableIdAndColumnNameFromPoolPath(foundNode.parent!);
-        if (tableId && foundNode === foundNode.parent!.getChild(0)) {
-            return mrScope?.getTableReferencesByName(tableId);
-        }
-    }
-    return;
-};

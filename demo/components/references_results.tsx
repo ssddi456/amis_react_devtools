@@ -5,15 +5,12 @@ import { WithSource } from '../sql_ls/util';
 
 interface ReferencesResultsProps {
     referencesResults: Array<WithSource<languages.Location[]> | null | undefined>;
-    positions: Array<{ lineNumber: number; column: number }>;
 }
 
-export function ReferencesResults({ referencesResults, positions }: ReferencesResultsProps) {
+export function ReferencesResults({ referencesResults }: ReferencesResultsProps) {
     return (
         <div>
-            {referencesResults.map((refRes, index) => {
-                const positionStr = `(${positions[index].lineNumber}:${positions[index].column})`;
-                
+            {referencesResults.map((refRes, index) => {                
                 return (
                     <div key={index} style={{ marginBottom: '15px' }}>
                         {refRes && refRes.length > 0 ? (
@@ -26,8 +23,6 @@ export function ReferencesResults({ referencesResults, positions }: ReferencesRe
                                         fontWeight: 'bolder'
                                     }}
                                 >References Result {index + 1}
-                                    &nbsp;
-                                    pos: {positionStr}
                                     &nbsp;
                                     count: {refRes.length}
                                     &nbsp;
@@ -54,7 +49,7 @@ export function ReferencesResults({ referencesResults, positions }: ReferencesRe
                                         fontWeight: 'bolder'
                                     }}
                                 >
-                                    References Result {index + 1} pos: {positionStr}
+                                    References Result {index + 1}
                                 </h4>
                                 <p>No references found</p>
                             </div>
