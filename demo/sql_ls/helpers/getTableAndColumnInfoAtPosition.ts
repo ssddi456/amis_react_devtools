@@ -3,7 +3,8 @@ import { TableSourceContext, HiveSqlParser, SelectItemContext, FunctionIdentifie
 import { IdentifierScope } from "../identifier_scope";
 import { MapReduceScope } from "../mr_scope";
 import { EntityInfo, EntityInfoType, tableInfoFromNode, } from "../formatHoverRes";
-import { rangeFromNode, tableIdAndColumnNameFromPoolPath, tableInfoFromSubQuerySource } from "./table_and_column";
+import { tableIdAndColumnNameFromPoolPath, tableInfoFromSubQuerySource } from "./table_and_column";
+import { rangeFromNode } from "./pos";
 import { ExtColumnInfo, TableInfo } from "../types";
 import { printNodeTree, printNode, logSource } from "./log";
 import { matchType, matchSubPathOneOf, matchSubPath } from "./tree_query";

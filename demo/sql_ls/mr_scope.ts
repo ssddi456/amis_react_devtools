@@ -1,8 +1,9 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { AtomSelectStatementContext, ExpressionContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { uuidv4 } from "./util";
+import { uuidv4 } from "./helpers/util";
 import { IdentifierScope } from "./identifier_scope";
-import { getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getFunctionCallFromExpression, getOnConditionOfFromClause, isPosInParserRuleContext, isSameColumnInfo } from "./helpers/table_and_column";
+import { getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getFunctionCallFromExpression, getOnConditionOfFromClause, isSameColumnInfo } from "./helpers/table_and_column";
+import { isPosInParserRuleContext } from "./helpers/pos";
 import { ColumnInfo, tableReferenceContext, TableSource } from "./types";
     
 

@@ -6,6 +6,7 @@ import {
     ColumnNameContext,
     ColumnNameCreateContext,
     ConstantContext,
+    CteStatementContext,
     ExpressionContext,
     FromClauseContext,
     FromSourceContext,
@@ -20,8 +21,10 @@ import {
     SelectItemContext,
     SelectStatementContext,
     SelectStatementWithCTEContext,
+    SubQuerySourceContext,
     TableNameContext,
     TableSourceContext,
+    VirtualTableSourceContext,
     WhereClauseContext,
     Window_clauseContext,
     WithClauseContext
@@ -40,6 +43,9 @@ import { ITableSourceManager } from "./types";
 import { IdentifierScope, SymbolAndContext } from "./identifier_scope";
 import { MapReduceScope } from "./mr_scope";
 import { printNode } from "./helpers/log";
+import { getAllEntityInfoFromNode } from "./helpers/getTableAndColumnInfoAtPosition";
+import { formatHoverRes } from "./formatHoverRes";
+import { Pos, positionFromNode } from "./helpers/pos";
 
 export class ContextManager {
     rootContext: IdentifierScope | null = null;
@@ -361,7 +367,7 @@ export class ContextManager {
         return this._symbolsCache;
     }
 
-    getSymbolByPosition(position: Position): SymbolAndContext & { foundNode: ParserRuleContext | null } | null {
+    getSymbolByPosition(position: Pos): SymbolAndContext & { foundNode: ParserRuleContext | null } | null {
         const symbols = this.getSymbolsAndContext();
         if (symbols) {
             for (let i = 0; i < symbols.length; i++) {
@@ -389,15 +395,70 @@ export class ContextManager {
             if (mrScope.inputTables.length > 0) {
                 // try to find input from other mrScopes
                 mrScope.inputTables.forEach(input => {
-                    
+                    const context = input.reference;
+
+                    let posRef: ParserRuleContext | null = null;
+                    if (context instanceof TableSourceContext) {
+                        posRef = context;
+                    } else if (context instanceof VirtualTableSourceContext) {
+                        posRef = context.tableAlias();
+                    } else if (context instanceof SubQuerySourceContext) {
+                        posRef = context.id_();
+                    } else if (context instanceof CteStatementContext) {
+                        posRef = context.id_();
+                    }
+
+                    if (!posRef) {
+                        console.log('createMrScopeGraph: cannot find position reference for input table', input);
+                        return;
+                    }
+                    const pos = positionFromNode(posRef);
+                    const { mrScope: refMrScope } = this.getSymbolByPosition(pos) || {};
+                    if (refMrScope && !deps.includes(refMrScope.id)) {
+                        if (refMrScope.id === mrScope.id) {
+                            console.log('createMrScopeGraph: skip self reference', input, posRef, pos);
+                            return;
+                        }
+                        deps.push(refMrScope.id);
+                    }
                 });
             }
             this.mrScopeGraph.set(id, deps);
         });
     }
 
-    validate() {
-        return this.rootContext?.validate() || [];
+    async validate(isTest: boolean = false) {
+        const errors = this.rootContext?.validate() || [];
+
+
+        const symbols = this.getSymbolsAndContext() || [];
+        await Promise.all(symbols.map(async ({ range, mrScope, context }, i) => {
+            const hoverInfo = await getAllEntityInfoFromNode(range.context, context, mrScope, isTest);
+            if (!hoverInfo) {
+                errors.push({
+                    type: 'no_hover_info',
+                    level: 'error',
+                    message: `Reference not found: ${printNode(range.context)}`,
+                    context: range.context,
+                });
+                return;
+            }
+
+            if (
+                hoverInfo.type == 'unknown'
+                || hoverInfo.type == 'noTable'
+                || hoverInfo.type == 'noColumn'
+            ) {
+                const res = formatHoverRes(hoverInfo)!;
+                errors.push({
+                    type: 'no_hover_info',
+                    level: 'error',
+                    context: range.context,
+                    message: res.contents[0].value,
+                });
+            }
+        }));
+        return errors;
     }
 }
 

@@ -3,6 +3,7 @@ import { getLanguageService } from 'vscode-json-languageservice';
 import { TextDocument } from 'vscode-json-languageservice';
 import * as lsTypes from 'vscode-languageserver-types';
 import { toRange, posToPosition } from "./ls_helper";
+import { Pos } from "./sql_ls/helpers/pos";
 
 const amisSchema = require("amis/schema.json");
 
@@ -172,16 +173,10 @@ export const getJSONType = (model: editor.ITextModel) => {
     });
 
     return {
-        doComplete: (position: {
-            lineNumber: number;
-            column: number;
-        }) => {
+        doComplete: (position: Pos) => {
             return jsonls.doComplete(document, posToPosition(position), jsonDocument);
         },
-        doHover: (position: {
-            lineNumber: number;
-            column: number;
-        }) => {
+        doHover: (position: Pos) => {
             return jsonls.doHover(document, posToPosition(position), jsonDocument);
         },
     };

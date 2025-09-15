@@ -1,105 +1,13 @@
-import { Position } from "monaco-editor";
 import { ParserRuleContext, ParseTree, TerminalNode } from "antlr4ng";
 import { HiveSqlParserVisitor } from "dt-sql-parser";
 import { AtomExpressionContext, ColumnNameContext, ColumnNamePathContext, CteStatementContext, ExpressionContext, FromClauseContext, HiveSqlParser, Id_Context, JoinSourcePartContext, PoolPathContext, RollupOldSyntaxContext, SubQuerySourceContext, TableNameContext, TableSourceContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { matchSubPath, matchSubPathOneOf } from "./tree_query";
+import { matchSubPathOneOf } from "./tree_query";
 import { IdentifierScope } from "../identifier_scope";
-import { printNode, printNodeTree } from "./log";
 import { ColumnInfo } from "../types";
-
-export function sliceToRange(slice: {
-    readonly startLine: number;
-    /** end at ..n */
-    readonly endLine: number;
-    /** start at 1 */
-    readonly startColumn: number;
-    /** end at ..n + 1 */
-    readonly endColumn: number;
-}) {
-    return {
-        startLineNumber: slice.startLine,
-        startColumn: slice.startColumn,
-        endLineNumber: slice.endLine,
-        endColumn: slice.endColumn
-    };
-}
-
-export function isPosInParserRuleContext(position: { lineNumber: number, column: number }, context: ParserRuleContext | TerminalNode): boolean {
-    const lineNumber = position.lineNumber;
-    const column = position.column - 1;
-
-    if (context instanceof TerminalNode) {
-        if (context.symbol.type === HiveSqlParser.Identifier) {
-            return false;
-        }
-        if (matchSubPath(context, ['*', 'id_'])) {
-            return false;
-        }
-        if (context.symbol.line === lineNumber) {
-            if (context.symbol.column <= column
-                && context.symbol.column + (context.symbol.text || '').length >= column
-            ) {
-                return true;
-            }
-        }
-        return false;
-    }
-    const startToken = context.start;
-    const endToken = context.stop;
-    if (!startToken || !endToken) {
-        return false;
-    }
-    let startLine = startToken.line;
-    let startColumn = startToken.column;
-    let endLine = endToken.line;
-    let endColumn = endToken.column + (endToken.text?.length || 0);
-
-    if (lineNumber === startLine && column >= startColumn && lineNumber === endLine && column <= endColumn) {
-        return true;
-    }
-
-    if (lineNumber === startLine && lineNumber !== endLine && column >= startColumn) {
-        return true;
-    }
-
-    if (lineNumber !== startLine && lineNumber === endLine && column <= endColumn) {
-        return true;
-    }
-
-    if (lineNumber > startLine && lineNumber <= endLine) {
-        return true;
-    }
-    return false;
-}
-
-
-export function rangeFromNode(node: ParserRuleContext | TerminalNode) {
-    if (node instanceof ParserRuleContext) {
-
-        const ret = {
-            startLineNumber: (node.start?.line || -1),
-            startColumn: (node.start?.column || -1) + 1,
-            endLineNumber: (node.stop?.line || -1),
-            endColumn: (node.stop?.column !== undefined ? (node.stop?.column + (node.stop?.text?.length || 0)) : -1) + 1,
-        };
-        if (node.ruleIndex === HiveSqlParser.RULE_id_) {
-            ret.endColumn = ret.startColumn + (node.getText ? node.getText().length : 0);
-        }
-        return ret;
-    }
-
-    const ret = {
-        startLineNumber: (node.symbol.line || -1),
-        startColumn: (node.symbol.column || -1) + 1,
-        endLineNumber: (node.symbol.line || -1),
-        endColumn: (node.symbol.column !== undefined ? (node.symbol.column + (node.symbol.text?.length || 0)) : -1) + 1,
-    };
-    return ret;
-    
-}
+import { isPosInParserRuleContext, Pos } from "./pos";
 
 export function findTokenAtPosition(
-    position: Position,
+    position: Pos,
     tree: ParserRuleContext
 ): ParserRuleContext | null {
     let foundNode: any = null;

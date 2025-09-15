@@ -3,10 +3,11 @@ import { TableSourceContext, SubQuerySourceContext, VirtualTableSourceContext, C
 import { type IRange, languages, Uri } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { IdentifierScope } from "./identifier_scope";
 import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, functionRes, unknownRes } from "./sql_res";
-import { rangeFromNode, tableIdAndColumnNameFromPoolPath, } from "./helpers/table_and_column";
+import { tableIdAndColumnNameFromPoolPath, } from "./helpers/table_and_column";
+import { rangeFromNode } from "./helpers/pos";
 import { ExtColumnInfo, TableInfo } from "./types";
 import { printNode } from "./helpers/log";
-import { WithSource } from "./util";
+import { WithSource } from "./helpers/util";
 import { localDbId } from "./consts";
 
 async function tableInfoFromTableSource(

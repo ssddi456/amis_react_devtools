@@ -1,0 +1,31 @@
+import { ParserRuleContext } from "antlr4ng";
+import { tableReferenceContext } from "../types";
+import { CteStatementContext, VirtualTableSourceContext, SubQuerySourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { TableSourceContext } from "dt-sql-parser/dist/lib/mysql/MySqlParser";
+
+export function uuidv4() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+
+export type WithSource<T> = T & {
+    __source?: {
+        fileName: string;
+        lineNumber: number;
+        columnNumber: number;
+    };
+};
+
+export function isTableReferenceContext(ctx: ParserRuleContext): ctx is tableReferenceContext {
+    if (ctx instanceof TableSourceContext
+        || ctx instanceof CteStatementContext
+        || ctx instanceof VirtualTableSourceContext
+        || ctx instanceof SubQuerySourceContext
+    ) {
+        return true;
+    }
+    return false;
+}

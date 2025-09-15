@@ -1,7 +1,7 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { HiveSqlParser } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { rangeFromNode } from "./table_and_column";
-import type { WithSource } from "../util";
+import { rangeFromNode } from "./pos";
+import type { WithSource } from "./util";
 
 export function ruleIndexToDisplayName(node: ParserRuleContext | TerminalNode): string | undefined {
     const symbolicNames = HiveSqlParser.symbolicNames;

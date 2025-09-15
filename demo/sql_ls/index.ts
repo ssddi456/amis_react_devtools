@@ -4,14 +4,15 @@ import {
     ProgramContext,
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ContextManager, createContextManager } from "./context_manager";
-import { rangeFromNode, sliceToRange, findTokenAtPosition } from "./helpers/table_and_column";
+import { findTokenAtPosition } from "./helpers/table_and_column";
+import { posInRange, rangeFromNode, sliceToRange } from "./helpers/pos";
 import { ITableSourceManager } from "./types";
-import { logSource, printNode, printNodeTree } from "./helpers/log";
+import { logSource, printNodeTree } from "./helpers/log";
 import { formatHiveSQL } from '../formatter';
-import { getAllEntityInfoFromNode, getEntityInfoAtPosition } from "./helpers/getTableAndColumnInfoAtPosition";
+import { getEntityInfoAtPosition } from "./helpers/getTableAndColumnInfoAtPosition";
 import { formatHoverRes, formatDefinitionRes } from "./formatHoverRes";
 import { getIdentifierReferences } from "./helpers/getIdentifierReferences";
-import { posInRange, WithSource } from "./util";
+import { WithSource } from "./helpers/util";
 
 interface ContextInfos {
     hiveSqlParse: HiveSQL;
@@ -144,7 +145,7 @@ export const createHiveSqlLanguageService = ({
                 })
             });
 
-            const errors = contextManager.rootContext?.validate() || [];
+            const errors = await contextManager.validate(isTest) || [];
             errors.forEach(err => {
                 validations.push({
                     ...err,
@@ -154,41 +155,6 @@ export const createHiveSqlLanguageService = ({
                 })
             });
 
-            const symbols = contextManager.getSymbolsAndContext() || [];
-            await Promise.all(symbols.map(async ({ range, mrScope, context }, i) => {
-                // console.log('doValidation foundNode', range.context?.getText());
-                // const foundNodeText = range.context?.getText() || '';
-                // if (foundNodeText == 'rpr_test_news_record_da') {
-                //     debugger;
-                // }
-                const hoverInfo = await getAllEntityInfoFromNode(range.context, context, mrScope, isTest);
-                if (!hoverInfo) {
-                    validations.push({
-                        type: 'no_hover_info',
-                        severity: MarkerSeverity.Error,
-                        startLineNumber: range.lineNumber,
-                        startColumn: range.column,
-                        endLineNumber: range.lineNumber,
-                        endColumn: range.column + (range.end - range.start),
-                        message: `Reference not found: ${printNode(range.context)}`,
-                    });
-                    return;
-                }
-
-                if (
-                    hoverInfo.type == 'unknown'
-                    || hoverInfo.type == 'noTable'
-                    || hoverInfo.type == 'noColumn'
-                ) {
-                    const res = formatHoverRes(hoverInfo)!;
-                    validations.push({
-                        ...res,
-                        severity: MarkerSeverity.Error,
-                        ...rangeFromNode(range.context),
-                        message: res.contents[0].value,
-                    });
-                }
-            }));
             return validations;
         },
 
