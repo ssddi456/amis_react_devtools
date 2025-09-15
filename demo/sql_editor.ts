@@ -16,6 +16,16 @@ setupLanguageFeatures(LanguageIdEnum.HIVE, {
     diagnostics: false,
 });
 
+const debounce = (func: (...args: any[]) => void, wait: number) => {
+    let timeout: ReturnType<typeof setTimeout> | null;
+    return (...args: any[]) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(() => {
+            func(...args);
+        }, wait);
+    };
+};
+
 const createSqlEditor = (name: string) => ({
     "type": "editor",
     "name": name,
@@ -24,7 +34,7 @@ const createSqlEditor = (name: string) => ({
     allowFullscreen: true,
     "editorDidMount": (editorInstance: editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
         monaco.editor.setTheme('sql-light');
-        const doValidate = async () => {
+        const doValidate = debounce(async () => {
             const model = editorInstance.getModel();
             if (model) {
                 const context = createHiveSqlLanguageService({ model, tableSourceManager, });
@@ -41,7 +51,7 @@ const createSqlEditor = (name: string) => ({
                     };
                 }));
             }
-        }
+        }, 300);
 
         const disposables = new DisposableChain();
 

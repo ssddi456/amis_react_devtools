@@ -1,7 +1,9 @@
 {
   "dependencies": {
+    "@dagrejs/dagre": "^1.1.5",
     "@rspack/cli": "^1.4.7",
     "@swc/core": "^1.12.14",
+    "@xyflow/react": "^12.8.4",
     "amis": "^6.12.0",
     "click-to-react-component": "^1.1.2",
     "dt-sql-parser": "^4.3.1",

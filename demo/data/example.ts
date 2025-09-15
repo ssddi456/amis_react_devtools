@@ -137,7 +137,7 @@ const tableInfos: TableInfo[] = [
     },
     {
         db_name: "rpr",
-        table_name: "rpr_test_quota_similar_house_region_da",
+        table_name: "rpr_test_quota_similar_da",
         table_id: 3,
         description: "测试表3",
         column_list: [
@@ -163,6 +163,34 @@ const tableInfos: TableInfo[] = [
             },
         ],
     },
+    {
+        db_name: 'rpr',
+        table_name: 'rpr_news_record_da',
+        table_id: 4,
+        description: '测试表4',
+        column_list: [
+            {
+                column_name: "house_code",
+                data_type_string: "string",
+                description: "房源编码",
+            },
+            {
+                column_name: "news_time",
+                data_type_string: "string",
+                description: "时间",
+            },
+            {
+                column_name: "news_type",
+                data_type_string: "string",
+                description: "类型",
+            },
+            {
+                column_name: "pt",
+                data_type_string: "string",
+                description: "分区标识",
+            },
+        ]
+    }
 ];
 
 export default tableSourceManager;

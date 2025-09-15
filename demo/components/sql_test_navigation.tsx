@@ -68,46 +68,46 @@ export const SqlTestNavigation: React.FC<SqlTestNavigationProps> = ({
     }, []);
 
     return (
-        <div>
-            <h3>All tests</h3>
-            <div style={{ margin: '10px 0', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-                <div
-                    style={{ flex: 0 }}
+        <div
+            style={{ margin: '10px 0', height: '100vh', display: 'flex', flexDirection: 'column' }}
+        >
+            <h3 style={{ flex: 0 }}>All tests</h3>
+            <div
+                style={{ flex: 0 }}
+            >
+                <button
+                    onClick={() => changeCase(caseIndex - 1)}
+                    disabled={caseIndex <= 0}
                 >
-                    <button
-                        onClick={() => changeCase(caseIndex - 1)}
-                        disabled={caseIndex <= 0}
-                    >
-                        Previous
-                    </button>
-                    <span style={{ margin: '0 10px' }}>
-                        Case {caseIndex + 1} of {maxIndex + 1}
-                    </span>
-                    <button
-                        onClick={() => changeCase(caseIndex + 1)}
-                        disabled={caseIndex >= maxIndex}
-                    >
-                        Next
-                    </button>
-                    <label style={{ marginLeft: '20px' }}>
-                        <input
-                            type="checkbox"
-                            checked={showDebug}
-                            onChange={(e) => toggleShowDebug(e.target.checked)}
-                        />
-                        <span style={{ marginLeft: '5px' }}>Show Debug</span>
-                    </label>
-                    <a href='https://dtstack.github.io/monaco-sql-languages/' target='_blank' rel='noopener noreferrer'>ast parser</a>
-                </div>
-                <div
-                    style={{
-                        flex: 1,
-                        overflowY: 'auto',
-                        backgroundColor: '#f5f5f5',
-                    }}
+                    Previous
+                </button>
+                <span style={{ margin: '0 10px' }}>
+                    Case {caseIndex + 1} of {maxIndex + 1}
+                </span>
+                <button
+                    onClick={() => changeCase(caseIndex + 1)}
+                    disabled={caseIndex >= maxIndex}
                 >
-                    <DoSqlTest case={sqlTest[caseIndex]} key={caseIndex} showDebug={showDebug} />
-                </div>
+                    Next
+                </button>
+                <label style={{ marginLeft: '20px' }}>
+                    <input
+                        type="checkbox"
+                        checked={showDebug}
+                        onChange={(e) => toggleShowDebug(e.target.checked)}
+                    />
+                    <span style={{ marginLeft: '5px' }}>Show Debug</span>
+                </label>
+                <a href='https://dtstack.github.io/monaco-sql-languages/' target='_blank' rel='noopener noreferrer'>ast parser</a>
+            </div>
+            <div
+                style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    backgroundColor: '#f5f5f5',
+                }}
+            >
+                <DoSqlTest case={sqlTest[caseIndex]} key={caseIndex} showDebug={showDebug} />
             </div>
         </div>
     );

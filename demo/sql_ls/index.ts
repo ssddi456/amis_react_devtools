@@ -8,7 +8,7 @@ import { findTokenAtPosition } from "./helpers/table_and_column";
 import { posInRange, rangeFromNode, sliceToRange } from "./helpers/pos";
 import { ITableSourceManager } from "./types";
 import { logSource, printNodeTree } from "./helpers/log";
-import { formatHiveSQL } from '../formatter';
+import { formatHiveSQL } from './formatter';
 import { getEntityInfoAtPosition } from "./helpers/getTableAndColumnInfoAtPosition";
 import { formatHoverRes, formatDefinitionRes } from "./formatHoverRes";
 import { getIdentifierReferences } from "./helpers/getIdentifierReferences";

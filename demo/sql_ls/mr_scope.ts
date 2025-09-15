@@ -223,7 +223,7 @@ export class MapReduceScope {
         return undefined;
     }
 
-    getTableByName(name: string): ParserRuleContext | undefined {
+    getTableByName(name: string): tableReferenceContext | undefined {
         const tableInfo = this.inputTable.get(name);
         const reference = tableInfo?.reference;
         if (reference) {

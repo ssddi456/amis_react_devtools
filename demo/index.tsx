@@ -10,6 +10,7 @@ import { ClickToComponent } from 'click-to-react-component';
 import { sqlTest } from './cases';
 import createSqlEditor from './sql_editor';
 import { SqlTestNavigation } from './components/sql_test_navigation';
+import { SqlTestVis } from './components/sql_test_vis';
 import { SqlTestDag } from './components/sql_test_dag';
 
 (window as any).MonacoEnvironment = {
@@ -18,6 +19,7 @@ import { SqlTestDag } from './components/sql_test_dag';
       return new Worker(
         new URL(
           "monaco-editor/esm/vs/language/json/json.worker",
+          // @ts-ignore
           import.meta.url
         )
       );
@@ -26,6 +28,7 @@ import { SqlTestDag } from './components/sql_test_dag';
       return new Worker(
         new URL(
           "monaco-sql-languages/esm/languages/hive/hive.worker",
+          // @ts-ignore
           import.meta.url
         )
       );
@@ -106,6 +109,7 @@ const AppComponent = amisRender(
 
 const App = () => {
   const [sqlTestIdx, setSqlTestIdx] = React.useState(0);
+  const [viewMode, setViewMode] = React.useState<'context' | 'dag'>('context');
 
   return (
     <div className="container">
@@ -113,13 +117,56 @@ const App = () => {
       {AppComponent}
       {/*
        */}
-      <SqlTestNavigation
-        sqlTest={sqlTest}
-        onChange={setSqlTestIdx}
-      />
-      <SqlTestDag
-        sqlTest={sqlTest[sqlTestIdx].model.getValue()}
-      />
+      <div style={{ padding: '16px', borderBottom: '1px solid #e1e1e1' }}>
+        <SqlTestNavigation
+          sqlTest={sqlTest}
+          onChange={setSqlTestIdx}
+        />
+      </div>
+      <div
+        style={{ margin: '10px 0', height: '100vh', display: 'flex', flexDirection: 'column' }}
+      >
+        <div style={{ flex: 0 }}>
+          <button
+            onClick={() => setViewMode('context')}
+            style={{
+              padding: '8px 16px',
+              marginRight: '8px',
+              border: '1px solid #0078d4',
+              backgroundColor: viewMode === 'context' ? '#0078d4' : 'white',
+              color: viewMode === 'context' ? 'white' : '#0078d4',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+            }}
+          >
+            Context View
+          </button>
+          <button
+            onClick={() => setViewMode('dag')}
+            style={{
+              padding: '8px 16px',
+              border: '1px solid #0078d4',
+              backgroundColor: viewMode === 'dag' ? '#0078d4' : 'white',
+              color: viewMode === 'dag' ? 'white' : '#0078d4',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '14px',
+            }}
+          >
+            DAG View
+          </button>
+        </div>
+          {viewMode === 'context' ? (
+            <SqlTestVis
+              sqlTest={sqlTest[sqlTestIdx].model.getValue()}
+            />
+          ) : (
+            <SqlTestDag
+              sqlTest={sqlTest[sqlTestIdx].model.getValue()}
+            />
+          )}
+      </div>
     </div>
   );
 }

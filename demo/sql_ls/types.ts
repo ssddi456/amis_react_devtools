@@ -42,3 +42,13 @@ export interface ColumnInfo {
     reference: ParserRuleContext;
     defineReference: ParserRuleContext;
 }
+
+export type tableDefType = 'local' | 'external';
+
+export interface MrScopeNodeData {
+    id: string;
+    type: tableDefType;
+    label: string;
+    description?: string;
+    onNodeSizeChange?: (nodeId: string, size: { width: number; height: number }) => void;
+}

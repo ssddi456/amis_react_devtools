@@ -34,12 +34,13 @@ import {
     findTokenAtPosition,
     getColumnInfoFromNode,
     getNextUsingKeyword,
+    getTableNameFromContext,
     tableInfoFromCteStatement,
     tableInfoFromSubQuerySource,
     tableInfoFromTableSource,
     tableInfoFromVirtualTableSource
 } from "./helpers/table_and_column";
-import { ITableSourceManager } from "./types";
+import { ITableSourceManager, MrScopeNodeData, tableDefType } from "./types";
 import { IdentifierScope, SymbolAndContext } from "./identifier_scope";
 import { MapReduceScope } from "./mr_scope";
 import { printNode } from "./helpers/log";
@@ -53,7 +54,7 @@ export class ContextManager {
 
     mrScopes: MapReduceScope[] = [];
 
-    mrScopeGraph: Map<string, string[]> = new Map();
+    mrScopeGraph: Map<string, { deps: string[], type: tableDefType }> = new Map();
 
     constructor(public tree: ProgramContext, public tableSourceManager?: ITableSourceManager) {
         const manager = this;
@@ -386,10 +387,20 @@ export class ContextManager {
         return null;
     }
 
+    getMrScopeByQueryStatement(ctx: QueryStatementExpressionContext | AtomSelectStatementContext): MapReduceScope | null {
+        const mrScope = this.mrScopes.find(mr => mr.context === ctx);
+        return mrScope || null;
+    }
+
     createMrScopeGraph() {
         this.mrScopes.forEach((mrScope) => {
+            if (mrScope.mrOrder === 0) {
+                return;
+            }
+            console.group(`createMrScopeGraph: mrScope [${mrScope.mrOrder}] ${mrScope.id} ` );
             const id = mrScope.id;
             const children = mrScope.getChildScopes();
+            console.log('children', children.map(x => x.id));
             const deps = children.map(x => x.id);
 
             if (mrScope.inputTables.length > 0) {
@@ -409,22 +420,82 @@ export class ContextManager {
                     }
 
                     if (!posRef) {
-                        console.log('createMrScopeGraph: cannot find position reference for input table', input);
                         return;
                     }
+
                     const pos = positionFromNode(posRef);
-                    const { mrScope: refMrScope } = this.getSymbolByPosition(pos) || {};
-                    if (refMrScope && !deps.includes(refMrScope.id)) {
-                        if (refMrScope.id === mrScope.id) {
-                            console.log('createMrScopeGraph: skip self reference', input, posRef, pos);
+                    const { context: refContext } = this.getSymbolByPosition(pos) || {};
+                    const defineScope = refContext?.getDefinitionScope(input.tableName);
+                    if (defineScope) {
+                        // get real define
+                        const tableDef = defineScope.getTableByName(input.tableName);
+                        if (tableDef instanceof CteStatementContext) {
+                            const mrOfDef = this.getMrScopeByQueryStatement(tableDef.queryStatementExpression());
+                            if (mrOfDef && mrOfDef.id !== id && !deps.includes(mrOfDef.id)) {
+                                console.log(`createMrScopeGraph: found local table ${input.tableName} | mrScope ${mrOfDef.mrOrder}`);
+                                deps.push(mrOfDef.id);
+                            }
                             return;
                         }
-                        deps.push(refMrScope.id);
+
+                        if (tableDef instanceof TableSourceContext) {
+                            console.log(`createMrScopeGraph: found external table ${input.tableName} | mrScope ${mrScope.mrOrder}`);
+                            const tableInfo = getTableNameFromContext(tableDef);
+                            this.mrScopeGraph.set(tableInfo.tableId, { deps: [], type: 'external' });
+                            deps.push(tableInfo.tableId);
+                            return;
+                        }
+
+                        if (deps.includes(defineScope.id)) {
+                            console.log(`createMrScopeGraph: found input table ${input.tableName} from mrScope ${defineScope.mrOrder} (already in deps)`);
+                        } else {
+                            deps.push(defineScope.id);
+                        }
+                    } else {
+                        this.mrScopeGraph.set(input.tableName, { deps: [], type: 'external' });
+                        deps.push(input.tableName);
                     }
                 });
             }
-            this.mrScopeGraph.set(id, deps);
+            console.log('deps', deps);
+            console.groupEnd();
+            this.mrScopeGraph.set(id, {deps, type: 'local'});
         });
+    }
+
+    getMrScopeGraphNodeAndEdges(): {
+        nodes: { id: string; data: MrScopeNodeData; position: { x: number; y: number } }[];
+        edges: { id: string; from: string; to: string }[];
+    } {
+        const nodes = this.mrScopes.filter(mr => mr.mrOrder > 0).map(mr => ({
+            id: mr.id, data: {
+                id: mr.id,
+                type: 'local' as tableDefType,
+                label: `order: ${mr.mrOrder}`,
+                description: '',
+            }, position: { x: 0, y: 0 } }));
+        const edges: { id: string; from: string; to: string }[] = [];
+        this.mrScopeGraph.forEach(({type, deps}, id) => {
+            if (type === 'external') {
+                nodes.push({ id, data: {
+                    id,
+                    type: 'external' as tableDefType,
+                    label: id,
+                    description: '',
+                }, position: { x: 0, y: 0 } });
+                return;
+            }
+
+            deps.forEach(dep => {
+                edges.push({ id: `${dep}->${id}`, from: dep, to: id });
+            });
+        });
+        return { nodes, edges };
+    }
+
+    getMrScopeById(id: string): MapReduceScope | null {
+        const mrScope = this.mrScopes.find(mr => mr.id === id);
+        return mrScope || null;
     }
 
     async validate(isTest: boolean = false) {
