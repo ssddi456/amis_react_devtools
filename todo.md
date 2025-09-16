@@ -26,6 +26,7 @@
 
 1. project layout
     [*] reorganize project layout
+    [ ] split as a monorepo
 
 1. table graph
     [ ] get table graph from sql
