@@ -267,6 +267,26 @@ t2 as (
     *
   from t1
 )
+insert into rpr.rpr_test_da
+select
+  t1.house_code, t1.resblock_id, t2.quota_date
+from t1
+  left join t2
+    on t1.house_code = t2.house_code
+    and t1.resblock_id = t2.resblock_id
+;
+`
+,`
+with t1 as (
+  select
+    house_code, resblock_id, quota_date
+  from rpr.rpr_test_quota_similar_da
+),
+t2 as (
+  select
+    *
+  from t1
+)
 select
   t1.house_code, t1.resblock_id, t2.quota_date
 from t1

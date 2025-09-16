@@ -33,6 +33,10 @@
     [ ] get table graph from sql
     [*] visualize table relationships
 
+1. cases
+    [ ] more cases
+    [ ] expected result
+
 # 更好的测试方法
 
 * 在需要调试的地方添加断言 or debugger
