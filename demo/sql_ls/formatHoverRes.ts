@@ -1,9 +1,8 @@
 import { ParserRuleContext, ParseTree } from "antlr4ng";
-import { TableSourceContext, SubQuerySourceContext, VirtualTableSourceContext, CteStatementContext, PoolPathContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { TableSourceContext, SubQuerySourceContext, VirtualTableSourceContext, CteStatementContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { type IRange, languages, Uri } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { IdentifierScope } from "./identifier_scope";
 import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, functionRes, unknownRes } from "./sql_res";
-import { tableIdAndColumnNameFromPoolPath, } from "./helpers/table_and_column";
 import { rangeFromNode } from "./helpers/pos";
 import { ExtColumnInfo, TableInfo } from "./types";
 import { printNode } from "./helpers/log";
@@ -23,20 +22,27 @@ async function tableInfoFromTableSource(
         console.warn('No table name found in join source part:', printNode(tableSource));
         return null;
     }
-    const tableInfo = await context.getTableInfoByName(tableName, undefined);
-    if (tableInfo) {
-        const ret = {
-            db_name: tableInfo.db_name,
-            table_name: tableInfo.table_name,
-            alias: alias,
-            table_id: tableInfo.table_id,
-            description: tableInfo.description,
-            column_list: tableInfo.column_list,
-            range: rangeFromNode(tableSource),
-        };
-        return ret;
+
+    const tableId = context.lookupDefinition(tableName);
+    console.log('tableInfoFromTableSource tableId', tableId, tableName, tableSource);
+    if (tableId === null) {
+        const tableInfo = await context.getForeignTableInfoByName(tableName, undefined);
+        if (tableInfo) {
+            const ret = {
+                db_name: tableInfo.db_name,
+                table_name: tableInfo.table_name,
+                alias: alias,
+                table_id: tableInfo.table_id,
+                description: tableInfo.description,
+                column_list: tableInfo.column_list,
+                range: rangeFromNode(tableSource),
+            };
+            return ret;
+        }
+        return null;
     }
-    return null;
+
+    return tableInfoFromNode(tableId, context);
 }
 
 function tableInfoFromSubQuerySource(

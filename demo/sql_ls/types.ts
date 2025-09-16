@@ -37,8 +37,8 @@ export interface TableSource {
 
 export interface ColumnInfo {
     exportColumnName: string;
-    referanceTableName: string;
-    referanceColumnName: string;
+    referenceTableName: string;
+    referenceColumnName: string;
     reference: ParserRuleContext;
     defineReference: ParserRuleContext;
 }
@@ -47,6 +47,7 @@ export type tableDefType = 'local' | 'external';
 
 export interface MrScopeNodeData {
     id: string;
+    deps: string[];
     type: tableDefType;
     label: string;
     description?: string;

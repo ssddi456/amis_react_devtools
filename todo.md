@@ -17,7 +17,8 @@
 
 1. get references
     [*] get table references
-    [*] get column references
+    [*] get direct column references
+    [ ] get column references in expression references
 
 1. performance
     [*] remove log
@@ -28,6 +29,8 @@
 
 1. table graph
     [ ] get table graph from sql
+    [*] visualize table relationships
+
 # 更好的测试方法
 
 * 在需要调试的地方添加断言 or debugger

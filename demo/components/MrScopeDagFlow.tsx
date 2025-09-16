@@ -21,9 +21,11 @@ import '@xyflow/react/dist/style.css';
 import { MrScopeNodeData } from '../sql_ls/types';
 import { useContextManager } from './ContextManagerContext';
 import { DisplayMRScope } from './DisplayMRScope';
-
+import './MrScopeDagFlow.css';
+import { SourceLink } from './source_link';
+import { WithSource } from '../sql_ls/helpers/util';
 // 自定义节点类型
-const MrScopeNode = ({ data, id }: { data: MrScopeNodeData; id: string }) => {
+const MrScopeNode = ({ data, id }: { data: WithSource<MrScopeNodeData>; id: string }) => {
     const { contextManager } = useContextManager();
     const nodeRef = useRef<HTMLDivElement>(null);
 
@@ -56,15 +58,42 @@ const MrScopeNode = ({ data, id }: { data: MrScopeNodeData; id: string }) => {
                 cursor: 'pointer',
             }}
         > 
-            <Handle type="target" position={Position.Top} />
+            {
+                data.deps.map((depId, index) => {
+                    // Keep position as Top but use style to spread handlers evenly
+                    const totalHandlers = data.deps.length;
+                    const spacing = 100 / (totalHandlers + 1); // Percentage spacing
+                    const leftOffset = spacing * (index + 1);
+                    
+                    return (
+                        <Handle 
+                            type="target" 
+                            position={Position.Top} 
+                            id={depId} 
+                            key={depId}
+                            style={{
+                                left: `${leftOffset}%`,
+                                transform: 'translateX(-50%)', // Center the handle
+                                background: '#0078d4',
+                                border: '2px solid #fff',
+                                width: '8px',
+                                height: '8px'
+                            }}
+                        />
+                    );
+                })
+            }
             {mrScope 
                 ? (
                     <DisplayMRScope mrScope={mrScope!} />
                 )
                 : (
-                    <div style={{ color: '#a19f9d', fontStyle: 'italic' }}>{data.label}</div>
+                    <div style={{ color: '#a19f9d', fontStyle: 'italic' }}>
+                        {data.label}
+                        {/* <SourceLink source={data?.__source} /> */}
+                    </div>
                 )}
-            <Handle type="source" position={Position.Bottom} />
+                <Handle type="source" position={Position.Bottom} id="input" />
         </div>
     );
 };
@@ -121,7 +150,13 @@ interface MrScopeDagFlowProps {
         position: { x: number; y: number };
         measured?: { width: number; height: number };
     }>;
-    edges: Array<{ id: string; from: string; to: string }>;
+    edges: Array<{
+        id: string;
+        from: string;
+        to: string;
+        sourceHandle: string;
+        targetHandle: string;
+    }>;
 }
 
 export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNodes, edges: initialEdges }) => {
@@ -163,6 +198,8 @@ export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNo
             id: edge.id,
             source: edge.from,
             target: edge.to,
+            sourceHandle: edge.sourceHandle,
+            targetHandle: edge.targetHandle,
             type: 'smoothstep',
             style: {
                 stroke: '#0078d4',

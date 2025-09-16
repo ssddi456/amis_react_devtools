@@ -91,8 +91,8 @@ export function getColumnInfoFromNode(sourceColumn: ColumnNameContext | ColumnNa
     if (alias) {
         return {
             exportColumnName: alias.getText(),
-            referanceColumnName: columnNameFromColumnPath(sourceColumn),
-            referanceTableName: tableNameFromColumnPath(sourceColumn),
+            referenceColumnName: columnNameFromColumnPath(sourceColumn),
+            referenceTableName: tableNameFromColumnPath(sourceColumn),
             reference: sourceColumn,
             defineReference: alias,
         }
@@ -100,8 +100,8 @@ export function getColumnInfoFromNode(sourceColumn: ColumnNameContext | ColumnNa
         const columnNameText = columnNameFromColumnPath(sourceColumn);
         return {
             exportColumnName: columnNameText,
-            referanceColumnName: columnNameText,
-            referanceTableName: tableNameFromColumnPath(sourceColumn),
+            referenceColumnName: columnNameText,
+            referenceTableName: tableNameFromColumnPath(sourceColumn),
             reference: sourceColumn,
             defineReference: sourceColumn
         };
@@ -269,8 +269,8 @@ export function getColumnsFromRollupOldSyntax(ctx: RollupOldSyntaxContext): Colu
 }
 
 export function isSameColumnInfo(columnInfo1: ColumnInfo, columnInfo2: ColumnInfo): boolean {
-    return columnInfo1.referanceTableName === columnInfo2.referanceTableName &&
-        columnInfo1.referanceColumnName === columnInfo2.referanceColumnName;
+    return columnInfo1.referenceTableName === columnInfo2.referenceTableName &&
+        columnInfo1.referenceColumnName === columnInfo2.referenceColumnName;
 }
 
 export function getAtomExpressionFromExpression(ctx: ParserRuleContext): AtomExpressionContext | null {

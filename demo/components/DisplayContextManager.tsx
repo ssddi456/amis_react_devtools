@@ -85,7 +85,7 @@ export class DisplayContextManager extends React.Component<DisplayContextManager
                             borderLeft: '1px solid #ccc',
                         }}
                     >
-                        {mrScope && <DisplayMRScope mrScope={mrScope} />}
+                        {mrScope && <DisplayMRScope mrScope={mrScope} showDebug />}
                     </div>
                 </div>
                 {context.children.length > 0

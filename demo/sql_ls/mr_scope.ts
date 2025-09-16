@@ -2,9 +2,10 @@ import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { AtomSelectStatementContext, ExpressionContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { uuidv4 } from "./helpers/util";
 import { IdentifierScope } from "./identifier_scope";
-import { getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getFunctionCallFromExpression, getOnConditionOfFromClause, isSameColumnInfo } from "./helpers/table_and_column";
+import { getAtomExpressionFromExpression, getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getFunctionCallFromExpression, getOnConditionOfFromClause, isSameColumnInfo } from "./helpers/table_and_column";
 import { isPosInParserRuleContext } from "./helpers/pos";
 import { ColumnInfo, tableReferenceContext, TableSource } from "./types";
+import { printNode, printNodeTree } from "./helpers/log";
     
 
 export class MapReduceScope {
@@ -93,7 +94,7 @@ export class MapReduceScope {
             }
             columnNames.add(column.exportColumnName);
 
-            if (!column.referanceTableName && hasMultiInputTable) {
+            if (!column.referenceTableName && hasMultiInputTable) {
                 errors.push({
                     message: `In multi-input select, export column '${column.exportColumnName}' must specify the referance table name`,
                     context: column.reference,
@@ -122,15 +123,19 @@ export class MapReduceScope {
         if (groupByColumns.length) {
             this.exportColumns.forEach(column => {
                 if (column.reference instanceof ExpressionContext) {
-                    const functionCall = getFunctionCallFromExpression(column.reference);
-                    if (functionCall) {
+                    const atom = getAtomExpressionFromExpression(column.reference);
+                    if (atom?.function_()
+                        || atom?.constant() 
+                        || atom?.intervalExpression()
+                    ) {
                         return;
                     }
                 }
+                // TODO: better export column reference dependances check
                 if (!groupByColumns.some(groupByColumn => isSameColumnInfo(groupByColumn, column))) {
                     // check if same column define
                     errors.push({
-                        message: `Export column '${column.exportColumnName}' is not included in the group-by columns`,
+                        message: `Export column '${column.referenceColumnName}' is not included in the group-by columns`,
                         context: column.reference,
                         level: 'warning',
                         type: 'group_by'
@@ -223,6 +228,10 @@ export class MapReduceScope {
         return undefined;
     }
 
+    /**
+     * get table defined in sql, like cte or sub query or virtual table by name.
+     * will not get table defined in outside scope.
+     */
     getTableByName(name: string): tableReferenceContext | undefined {
         const tableInfo = this.inputTable.get(name);
         const reference = tableInfo?.reference;
@@ -251,7 +260,7 @@ export class MapReduceScope {
         if (!table) {
             return null;
         }
-        return this.exportColumns.find(column => column.referanceTableName === tableName && column.referanceColumnName === columnName) || null;
+        return this.exportColumns.find(column => column.referenceTableName === tableName && column.referenceColumnName === columnName) || null;
     }
 
     getGroupByColumns() {

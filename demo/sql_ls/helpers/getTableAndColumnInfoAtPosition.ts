@@ -273,28 +273,35 @@ async function getEntityInfoFromTableName(
     mrScope: MapReduceScope | null
 ) {
     const tableName = parent.getText();
-    const item = mrScope?.getTableByName(tableName);
+    const defScope = context.getDefinitionScope(tableName);
+    const item = defScope?.getTableByName(tableName);
     const tableInfo = item && await tableInfoFromNode(item, context);
 
-    if (!tableInfo) {
-        const tableInfo = await context.getTableInfoByName(tableName, undefined);
-
-        if (tableInfo) {
-            return {
-                type: EntityInfoType.Table,
-                tableInfo,
-            };
-        }
-
+    if (tableInfo) {
         return {
-            type: EntityInfoType.NoTable,
-            text: tableName,
+            type: EntityInfoType.Table,
+            tableInfo,
         };
     }
 
+    const foreignTableInfo = await context.getForeignTableInfoByName(tableName, undefined);
+
+    if (foreignTableInfo) {
+        return {
+            type: EntityInfoType.Table,
+            tableInfo: foreignTableInfo,
+        };
+    }
+
+    console.log('getEntityInfoFromTableName no table info found for', tableName, item, mrScope);
+    // if (tableName === 't1') {
+    //     debugger;
+    //     mrScope?.getTableByName(tableName);
+    // }
+
     return {
-        type: EntityInfoType.Table,
-        tableInfo,
+        type: EntityInfoType.NoTable,
+        text: tableName,
     };
 }
 
@@ -354,7 +361,13 @@ async function getEntityInfoFromColumnName(
     // column_name only
     if (!tableIdExp) {
         const item = mrScope?.getTableByName(mrScope?.getDefaultInputTableName());
-        const tableInfo = item && await tableInfoFromNode(item, context);
+        if (!item) {
+            return {
+                type: EntityInfoType.NoTable,
+                text: printNode(parent),
+            };
+        }
+        const tableInfo = await tableInfoFromNode(item, context);
         if (!tableInfo) {
             return {
                 type: EntityInfoType.NoTable,

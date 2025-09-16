@@ -1,69 +1,258 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
+import { ParseTree } from 'antlr4ng';
 import { printNode } from '../sql_ls/helpers/log';
 import { MapReduceScope } from '../sql_ls/mr_scope';
+import { getFormattedSqlFromNode } from '../sql_ls/helpers/formater';
 
-export class DisplayMRScope extends React.Component<{ mrScope: MapReduceScope; }> {
+interface DisplayMRScopeProps {
+    mrScope: MapReduceScope;
+    showDebug?: boolean;
+}
+
+interface ContextMenuState {
+    isVisible: boolean;
+    x: number;
+    y: number;
+    showDebug: boolean;
+    targetNode: ParseTree | null;
+    sql: string;
+}
+
+export class DisplayMRScope extends React.Component<DisplayMRScopeProps, ContextMenuState> {
+    constructor(props: DisplayMRScopeProps) {
+        super(props);
+        this.state = {
+            isVisible: false,
+            x: 0,
+            y: 0,
+            showDebug: props.showDebug ?? false,
+            targetNode: props.mrScope.context,
+            sql: props.mrScope.context ? getFormattedSqlFromNode(props.mrScope.context) : ''
+        };
+    }
+
+    componentDidMount() {
+        document.addEventListener('click', this.hideContextMenu);
+        document.addEventListener('contextmenu', this.hideContextMenu);
+    }
+
+    componentWillUnmount() {
+        document.removeEventListener('click', this.hideContextMenu);
+        document.removeEventListener('contextmenu', this.hideContextMenu);
+    }
+
+    hideContextMenu = () => {
+        this.setState({ isVisible: false });
+    };
+
+    showContextMenu = (event: React.MouseEvent) => {
+        event.preventDefault();
+        setTimeout(() => {
+            this.setState({
+                isVisible: true,
+                x: event.clientX,
+                y: event.clientY,
+            });
+        }, 0);
+    };
+
+    copyFormattedSql = () => {
+        if (this.state.targetNode) {
+            try {
+                const formattedSql = this.state.sql;
+                navigator.clipboard.writeText(formattedSql).catch(err => {
+                    console.error('Failed to copy SQL:', err);
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = formattedSql;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                });
+            } catch (error) {
+                console.error('Error formatting SQL:', error);
+            }
+        }
+        this.hideContextMenu();
+    };
+
+    renderNodeWithContextMenu = (node: ParseTree, content: React.ReactNode) => {
+        return (
+            <span
+                style={{ cursor: 'context-menu' }}
+            >
+                {content}
+            </span>
+        );
+    };
+
+    renderInputTables = (mrScope: MapReduceScope) => {
+        const inputTableKeys = Array.from(mrScope.inputTable.keys());
+        if (inputTableKeys.length === 0) {
+            return null;
+        }
+
+        return (
+            <>
+                <div>inputTable</div>
+                {inputTableKeys.map(name => {
+                    const inputTable = mrScope.inputTable.get(name);
+                    if (!inputTable) {
+                        return null;
+                    }
+                    return (
+                        <div key={name} style={{ paddingLeft: 12 }}>
+                            {name} -&gt; {printNode(inputTable!.reference)}
+                        </div>
+                    );
+                })}
+            </>
+        );
+    };
+
+    renderTableDefinitions = (mrScope: MapReduceScope) => {
+        const tableDefinitionsKeys = Array.from(mrScope.tableDefinitions.keys());
+        if (tableDefinitionsKeys.length === 0) {
+            return null;
+        }
+
+        return (
+            <>
+                <div>tableDefinitions</div>
+                {tableDefinitionsKeys.map(name => {
+                    const tableDef = mrScope.tableDefinitions.get(name);
+                    if (!tableDef) {
+                        return null;
+                    }
+                    return (
+                        <div key={name} style={{ paddingLeft: 12 }}>
+                            {name} -&gt; {printNode(tableDef!.reference)}
+                        </div>
+                    );
+                })}
+            </>
+        );
+    };
+
+    renderExportColumns = (mrScope: MapReduceScope) => {
+        const exportColumns = mrScope.exportColumns;
+        if (exportColumns.length === 0) {
+            return null;
+        }
+
+        return (
+            <>
+                <div>exportColumns</div>
+                {exportColumns.map((col, i) => (
+                    <div key={i} style={{ paddingLeft: 12 }}>
+                        {col.exportColumnName} -&gt; {col.referenceTableName || mrScope.getDefaultInputTableName()} . {col.referenceColumnName}
+                    </div>
+                ))}
+            </>
+        );
+    };
+
+    renderTableReferences = (mrScope: MapReduceScope) => {
+        const tableReferenceKeys = Array.from(mrScope.tableReferences.keys());
+        if (tableReferenceKeys.length === 0) {
+            return null;
+        }
+
+        return (
+            <>
+                <div>tableReferences</div>
+                {tableReferenceKeys.map(name => (
+                    <div key={name}>
+                        <div key={name} style={{ paddingLeft: 12 }}>
+                            {name}
+                        </div>
+                        <div style={{ paddingLeft: 24 }}>
+                            {Array.from(mrScope.tableReferences.get(name) || []).map((col, i) => (
+                                <div key={i}>
+                                    {this.renderNodeWithContextMenu(col, printNode(col))}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </>
+        );
+    };
+
+    renderContextMenu = () => {
+        if (!this.state.isVisible) {
+            return null;
+        }
+
+        return createPortal(
+            <div
+                style={{
+                    position: 'fixed',
+                    top: this.state.y,
+                    left: this.state.x,
+                    backgroundColor: 'white',
+                    border: '1px solid #ccc',
+                    borderRadius: '4px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    zIndex: 1000,
+                    minWidth: '150px'
+                }}
+                onClick={e => e.stopPropagation()}
+            >
+                <div
+                    style={{
+                        padding: '8px 12px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #eee'
+                    }}
+                    onClick={this.copyFormattedSql}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'white'}
+                >
+                    Copy SQL from node
+                </div>
+            </div>,
+            document.body
+        );
+    };
+
+    renderSql() {
+        const sql = this.state.sql || '';
+        return (
+            <pre
+                style={{ overflowX: 'auto', maxWidth: '100%' }}
+            >
+                {sql}
+            </pre>
+        );
+    }
+
     render() {
         const { mrScope } = this.props;
 
-        const inputTableKeys = Array.from(mrScope.inputTable.keys());
-        const tableDefinitionsKeys = Array.from(mrScope.tableDefinitions.keys());
-        const exportColumns = mrScope.exportColumns;
-        const tableReferenceKeys = Array.from(mrScope.tableReferences.keys());
-
         return (
-            <div>
+            <div onContextMenu={(e) => this.showContextMenu(e)}>
                 <div>MapReduce Scope [{mrScope.mrOrder}]</div>
-                <div>id: {mrScope.id}</div>
                 <div>{printNode(mrScope.context)}</div>
-                <div>
-                    {inputTableKeys.length !== 0 ? <div>inputTable</div> : null}
-                    {inputTableKeys.map(name => {
-                        const inputTable = mrScope.inputTable.get(name);
-                        if (!inputTable) {
-                            return null;
-                        }
-                        return (
-                            <div key={name} style={{ paddingLeft: 12 }}>
-                                {name} -&gt; {printNode(inputTable!.reference)}
-                            </div>
-                        );
-                    })}
-                    {tableDefinitionsKeys.length !== 0 ? <div>tableDefinitions</div> : null}
-                    {tableDefinitionsKeys.map(name => {
-                        const tableDef = mrScope.tableDefinitions.get(name);
-                        if (!tableDef) {
-                            return null;
-                        }
-                        return (
-                            <div key={name} style={{ paddingLeft: 12 }}>
-                                {name} -&gt; {printNode(tableDef!.reference)}
-                            </div>
-                        );
-                    })}
-                    {exportColumns.length !== 0 ? <div>exportColumns</div> : null}
-                    {exportColumns.map((col, i) => (
-                        <div key={i} style={{ paddingLeft: 12 }}>
-                            {col.exportColumnName} -&gt; {col.referanceTableName || mrScope.getDefaultInputTableName()} . {col.referanceColumnName}
-                        </div>
-                    ))}
-                    {tableReferenceKeys.length !== 0 ? <div>tableReferences</div> : null}
-                    {tableReferenceKeys.map(name => (
-                        <div key={name}>
-                            <div key={name} style={{ paddingLeft: 12 }}>
-                                {name}
-                            </div>
-                            <div style={{ paddingLeft: 24 }}>
-                                {Array.from(mrScope.tableReferences.get(name) || []).map((col, i) => (
-                                    <div key={i}>
-                                        {printNode(col)}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                    ))}
-                </div>
+                {
+                    this.state.showDebug
+                        ? (
+                            <>
+                                <div>id: {mrScope.id}</div>
+                                <div>
+                                    {this.renderInputTables(mrScope)}
+                                    {this.renderTableDefinitions(mrScope)}
+                                    {this.renderExportColumns(mrScope)}
+                                    {this.renderTableReferences(mrScope)}
+                                </div>
+                            </>
+                        )
+                        : null
+                }
+                {this.renderSql()}
+                {this.renderContextMenu()}
             </div>
         );
     }

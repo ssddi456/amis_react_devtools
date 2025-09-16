@@ -261,7 +261,7 @@ export class IdentifierScope {
         this.unsupportedFeatures.push({ message, context });
     }
 
-    async getTableInfoByName(tableName: string, dbName: string | undefined): Promise<TableInfo | null> {
+    async getForeignTableInfoByName(tableName: string, dbName: string | undefined): Promise<TableInfo | null> {
         const tableSourceManager = this.tableSourceManager || this.root?.tableSourceManager;
         if (tableSourceManager) {
             return tableSourceManager.getTableInfoByName(tableName, dbName);

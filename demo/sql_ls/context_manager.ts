@@ -43,10 +43,11 @@ import {
 import { ITableSourceManager, MrScopeNodeData, tableDefType } from "./types";
 import { IdentifierScope, SymbolAndContext } from "./identifier_scope";
 import { MapReduceScope } from "./mr_scope";
-import { printNode } from "./helpers/log";
+import { logSource, printNode } from "./helpers/log";
 import { getAllEntityInfoFromNode } from "./helpers/getTableAndColumnInfoAtPosition";
 import { formatHoverRes } from "./formatHoverRes";
 import { Pos, positionFromNode } from "./helpers/pos";
+import { WithSource } from "./helpers/util";
 
 export class ContextManager {
     rootContext: IdentifierScope | null = null;
@@ -54,7 +55,7 @@ export class ContextManager {
 
     mrScopes: MapReduceScope[] = [];
 
-    mrScopeGraph: Map<string, { deps: string[], type: tableDefType }> = new Map();
+    mrScopeGraph: Map<string, WithSource<{ deps: string[], type: tableDefType }>> = new Map();
 
     constructor(public tree: ProgramContext, public tableSourceManager?: ITableSourceManager) {
         const manager = this;
@@ -243,7 +244,7 @@ export class ContextManager {
                 manager.currentContext?.addHighlightNode(ctx);
             };
 
-            enterTableNamCreate = (ctx: TableNameContext) => {
+            enterTableNameCreate = (ctx: TableNameContext) => {
                 manager.currentContext?.addHighlightNode(ctx);
             };
 
@@ -254,8 +255,8 @@ export class ContextManager {
                 if (allColumns) {
                     mrScope?.addExportColumn({
                         exportColumnName: '*', // will be all_columns from the refed table;
-                        referanceTableName: allColumns.id_(0)?.getText?.() || '',
-                        referanceColumnName: '*',
+                        referenceTableName: allColumns.id_(0)?.getText?.() || '',
+                        referenceColumnName: '*',
                         reference: allColumns,
                         defineReference: allColumns
                     });
@@ -280,8 +281,8 @@ export class ContextManager {
                         context?.addHighlightNode(i);
                         mrScope?.addExportColumn({
                             exportColumnName: i.getText(),
-                            referanceColumnName: '',
-                            referanceTableName: '',
+                            referenceColumnName: '',
+                            referenceTableName: '',
                             reference: expression,
                             defineReference: i,
                         });
@@ -400,9 +401,8 @@ export class ContextManager {
             console.group(`createMrScopeGraph: mrScope [${mrScope.mrOrder}] ${mrScope.id} ` );
             const id = mrScope.id;
             const children = mrScope.getChildScopes();
-            console.log('children', children.map(x => x.id));
             const deps = children.map(x => x.id);
-
+            
             if (mrScope.inputTables.length > 0) {
                 // try to find input from other mrScopes
                 mrScope.inputTables.forEach(input => {
@@ -416,7 +416,7 @@ export class ContextManager {
                     } else if (context instanceof SubQuerySourceContext) {
                         posRef = context.id_();
                     } else if (context instanceof CteStatementContext) {
-                        posRef = context.id_();
+                        console.assert(false, 'CteStatementContext should not be here');
                     }
 
                     if (!posRef) {
@@ -424,15 +424,13 @@ export class ContextManager {
                     }
 
                     const pos = positionFromNode(posRef);
-                    const { context: refContext } = this.getSymbolByPosition(pos) || {};
-                    const defineScope = refContext?.getDefinitionScope(input.tableName);
-                    if (defineScope) {
-                        // get real define
-                        const tableDef = defineScope.getTableByName(input.tableName);
+                    const { context: refContext, } = this.getSymbolByPosition(pos) || {};
+                    const tableDef = refContext?.lookupDefinition(input.tableName);
+                    const defineScope = refContext?.getDefinitionScope(input.tableName) || mrScope;
+                    if (tableDef) {
                         if (tableDef instanceof CteStatementContext) {
                             const mrOfDef = this.getMrScopeByQueryStatement(tableDef.queryStatementExpression());
                             if (mrOfDef && mrOfDef.id !== id && !deps.includes(mrOfDef.id)) {
-                                console.log(`createMrScopeGraph: found local table ${input.tableName} | mrScope ${mrOfDef.mrOrder}`);
                                 deps.push(mrOfDef.id);
                             }
                             return;
@@ -446,7 +444,7 @@ export class ContextManager {
                             return;
                         }
 
-                        if (deps.includes(defineScope.id)) {
+                        if (deps.includes(defineScope.id) || defineScope.id === id) {
                             console.log(`createMrScopeGraph: found input table ${input.tableName} from mrScope ${defineScope.mrOrder} (already in deps)`);
                         } else {
                             deps.push(defineScope.id);
@@ -458,38 +456,66 @@ export class ContextManager {
                 });
             }
             console.log('deps', deps);
+            console.assert(!deps.includes(id), 'mrScope cannot depend on itself');
             console.groupEnd();
             this.mrScopeGraph.set(id, {deps, type: 'local'});
+        });
+
+        // do some simplification
+
+        this.mrScopeGraph.forEach((node, id) => {
+            const mrScope = this.getMrScopeById(id);
+            if (!mrScope) {
+                return;
+            }
+
+            if (!(mrScope.context instanceof QueryStatementExpressionContext)) {
+                return;
+            }
+
+            const deps = node.deps;
+            if (deps.length === 1) {
+                const depedScope = this.getMrScopeById(deps[0]);
+                if (depedScope && depedScope.context instanceof AtomSelectStatementContext) {
+                    const depedNode = this.mrScopeGraph.get(depedScope.id);
+                    if (!depedNode) {
+                        return;
+                    }
+                    // atom select statement only pass through columns, can be simplified
+                    this.mrScopeGraph.set(id, { deps: depedNode.deps, type: 'local' });
+                    this.mrScopeGraph.delete(deps[0]);
+                }
+            }
         });
     }
 
     getMrScopeGraphNodeAndEdges(): {
         nodes: { id: string; data: MrScopeNodeData; position: { x: number; y: number } }[];
-        edges: { id: string; from: string; to: string }[];
+        edges: { id: string; from: string; to: string, sourceHandle: string, targetHandle: string }[];
     } {
-        const nodes = this.mrScopes.filter(mr => mr.mrOrder > 0).map(mr => ({
-            id: mr.id, data: {
-                id: mr.id,
-                type: 'local' as tableDefType,
-                label: `order: ${mr.mrOrder}`,
+        const nodes: { id: string; data: MrScopeNodeData; position: { x: number; y: number } }[] = [];
+
+        const edges: { id: string; from: string; to: string, sourceHandle: string, targetHandle: string }[] = [];
+        this.mrScopeGraph.forEach((node, id) => {
+            const { deps, type } = node;
+            nodes.push({ id, data: {
+                ...node,
+                id,
+                label: type === 'external' ? id : 'order ' + this.getMrScopeById(id)?.mrOrder,
                 description: '',
-            }, position: { x: 0, y: 0 } }));
-        const edges: { id: string; from: string; to: string }[] = [];
-        this.mrScopeGraph.forEach(({type, deps}, id) => {
-            if (type === 'external') {
-                nodes.push({ id, data: {
-                    id,
-                    type: 'external' as tableDefType,
-                    label: id,
-                    description: '',
-                }, position: { x: 0, y: 0 } });
-                return;
-            }
+            }, position: { x: 0, y: 0 } });
 
             deps.forEach(dep => {
-                edges.push({ id: `${dep}->${id}`, from: dep, to: id });
+                edges.push({
+                    id: `${dep}->${id}`,
+                    from: dep,
+                    to: id,
+                    sourceHandle: 'input',
+                    targetHandle: dep,
+                });
             });
         });
+        console.log('getMrScopeGraphNodeAndEdges', nodes, edges);
         return { nodes, edges };
     }
 
@@ -520,6 +546,7 @@ export class ContextManager {
                 || hoverInfo.type == 'noTable'
                 || hoverInfo.type == 'noColumn'
             ) {
+                logSource(hoverInfo);
                 const res = formatHoverRes(hoverInfo)!;
                 errors.push({
                     type: 'no_hover_info',
