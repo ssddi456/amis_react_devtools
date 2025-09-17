@@ -28,7 +28,7 @@ export class DisplayMRScope extends React.Component<DisplayMRScopeProps, Context
             y: 0,
             showDebug: props.showDebug ?? false,
             targetNode: props.mrScope.context,
-            sql: props.mrScope.context ? getFormattedSqlFromNode(props.mrScope.context) : ''
+            sql: props.mrScope.context ? getFormattedSqlFromNode(props.mrScope.context) : '',
         };
     }
 
@@ -58,22 +58,24 @@ export class DisplayMRScope extends React.Component<DisplayMRScopeProps, Context
     };
 
     copyFormattedSql = () => {
-        if (this.state.targetNode) {
-            try {
-                const formattedSql = this.state.sql;
-                navigator.clipboard.writeText(formattedSql).catch(err => {
-                    console.error('Failed to copy SQL:', err);
-                    // Fallback for older browsers
-                    const textArea = document.createElement('textarea');
-                    textArea.value = formattedSql;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textArea);
-                });
-            } catch (error) {
-                console.error('Error formatting SQL:', error);
-            }
+        try {
+            const mrScope = this.props.mrScope;
+            const node = mrScope.getDebugNode();
+            console.log('copyFormattedSql node', node);
+
+            const sql = node ? getFormattedSqlFromNode(node) : '';
+            navigator.clipboard.writeText(sql).catch(err => {
+                console.error('Failed to copy SQL:', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = sql;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            });
+        } catch (error) {
+            console.error('Error formatting SQL:', error);
         }
         this.hideContextMenu();
     };
@@ -231,11 +233,12 @@ export class DisplayMRScope extends React.Component<DisplayMRScopeProps, Context
 
     render() {
         const { mrScope } = this.props;
+        const cteName = mrScope.getCteName();
 
         return (
             <div onContextMenu={(e) => this.showContextMenu(e)}>
                 <div>MapReduce Scope [{mrScope.mrOrder}]</div>
-                <div>{printNode(mrScope.context)}</div>
+                <div>{cteName ? <span>[CTE: {cteName}]</span> : null} {printNode(mrScope.getDisplayContext())}</div>
                 {
                     this.state.showDebug
                         ? (

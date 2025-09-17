@@ -49,7 +49,7 @@ const MrScopeNode = ({ data, id }: { data: WithSource<MrScopeNodeData>; id: stri
                 padding: '10px 15px',
                 borderRadius: '8px',
                 backgroundColor: '#fff',
-                border: '2px solid #0078d4',
+                border: data.isOrphan ? '2px solid #d83b01' : '2px solid #0078d4',
                 boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
                 minWidth: '120px',
                 fontSize: '14px',
@@ -57,19 +57,19 @@ const MrScopeNode = ({ data, id }: { data: WithSource<MrScopeNodeData>; id: stri
                 color: '#323130',
                 cursor: 'pointer',
             }}
-        > 
+        >
             {
                 data.deps.map((depId, index) => {
                     // Keep position as Top but use style to spread handlers evenly
                     const totalHandlers = data.deps.length;
                     const spacing = 100 / (totalHandlers + 1); // Percentage spacing
                     const leftOffset = spacing * (index + 1);
-                    
+
                     return (
-                        <Handle 
-                            type="target" 
-                            position={Position.Top} 
-                            id={depId} 
+                        <Handle
+                            type="target"
+                            position={Position.Top}
+                            id={depId}
                             key={depId}
                             style={{
                                 left: `${leftOffset}%`,
@@ -83,9 +83,20 @@ const MrScopeNode = ({ data, id }: { data: WithSource<MrScopeNodeData>; id: stri
                     );
                 })
             }
-            {mrScope 
+            {mrScope
                 ? (
-                    <DisplayMRScope mrScope={mrScope!} />
+                    <>
+                        {
+                            data.isOrphan
+                                ? (
+                                    <div style={{ color: '#a19f9d', fontStyle: 'italic' }}>
+                                        orphaned
+                                    </div>
+                                )
+                                : null
+                        }
+                        <DisplayMRScope mrScope={mrScope!} />
+                    </>
                 )
                 : (
                     <div style={{ color: '#a19f9d', fontStyle: 'italic' }}>
@@ -93,7 +104,7 @@ const MrScopeNode = ({ data, id }: { data: WithSource<MrScopeNodeData>; id: stri
                         {/* <SourceLink source={data?.__source} /> */}
                     </div>
                 )}
-                <Handle type="source" position={Position.Bottom} id="input" />
+            <Handle type="source" position={Position.Bottom} id="input" />
         </div>
     );
 };
@@ -131,7 +142,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[], nodeSizes: Map<string
         const nodeSize = nodeSizes.get(node.id);
         const width = nodeSize?.width || defaultNodeWidth;
         const height = nodeSize?.height || defaultNodeHeight;
-        
+
         node.targetPosition = Position.Top;
         node.sourcePosition = Position.Bottom;
         node.position = {
@@ -169,7 +180,7 @@ export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNo
         setNodeSizes(prev => {
             const newSizes = new Map(prev);
             const currentSize = newSizes.get(nodeId);
-            
+
             // 只有尺寸真正变化时才更新
             if (!currentSize || currentSize.width !== size.width || currentSize.height !== size.height) {
                 newSizes.set(nodeId, size);
@@ -180,7 +191,7 @@ export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNo
     }, []);
 
     // 转换节点和边的格式
-    const reactFlowNodes: Node[] = useMemo(() => 
+    const reactFlowNodes: Node[] = useMemo(() =>
         initialNodes.map(node => ({
             id: node.id,
             type: 'mrScopeNode',
@@ -193,7 +204,7 @@ export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNo
         [initialNodes, handleNodeSizeChange]
     );
 
-    const reactFlowEdges: Edge[] = useMemo(() => 
+    const reactFlowEdges: Edge[] = useMemo(() =>
         initialEdges.map(edge => ({
             id: edge.id,
             source: edge.from,
@@ -214,7 +225,7 @@ export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNo
     );
 
     // 应用自动布局
-    const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => 
+    const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() =>
         getLayoutedElements(reactFlowNodes, reactFlowEdges, nodeSizes),
         [reactFlowNodes, reactFlowEdges, nodeSizes]
     );
@@ -294,11 +305,11 @@ export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNo
     }, []);
 
     return (
-        <div 
+        <div
             id="mr-scope-dag-flow-container"
-            style={{ 
-                width: '100%', 
-                height: '100%', 
+            style={{
+                width: '100%',
+                height: '100%',
                 minHeight: '400px',
                 backgroundColor: isFullscreen ? '#fff' : 'transparent'
             }}
@@ -317,23 +328,23 @@ export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNo
                 attributionPosition="bottom-left"
             >
                 <Controls>
-                    <ControlButton 
+                    <ControlButton
                         onClick={toggleFullscreen}
                         title={isFullscreen ? "退出全屏" : "全屏显示"}
                     >
                         {isFullscreen ? (
                             // 退出全屏图标
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path 
-                                    d="M8 16H5v-3H3v5h5v-2zm3-8V3h-1v5H5v1h5v-1zm3 0h1V3h-1v5h5v1h-5V8zm3 8v2h2v-5h-2v3h-3v-2h-2v5h5z" 
+                                <path
+                                    d="M8 16H5v-3H3v5h5v-2zm3-8V3h-1v5H5v1h5v-1zm3 0h1V3h-1v5h5v1h-5V8zm3 8v2h2v-5h-2v3h-3v-2h-2v5h5z"
                                     fill="currentColor"
                                 />
                             </svg>
                         ) : (
                             // 全屏图标
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path 
-                                    d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" 
+                                <path
+                                    d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"
                                     fill="currentColor"
                                 />
                             </svg>

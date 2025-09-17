@@ -3,7 +3,7 @@ import { TableNameContext, TableSourceContext } from "dt-sql-parser/dist/lib/hiv
 import { Position } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { getTableNameFromContext } from "./helpers/table_and_column";
 import { isPosInParserRuleContext, rangeFromNode } from "./helpers/pos";
-import { HighlightContext, ITableSourceManager, TableInfo } from "./types";
+import { HighlightContext, ITableSourceManager, TableInfo, ValidateError } from "./types";
 import { printNode, ruleIndexToDisplayName } from "./helpers/log";
 import { uuidv4 } from "./helpers/util";
 import { MapReduceScope } from "./mr_scope";
@@ -133,7 +133,7 @@ export class IdentifierScope {
             const context = range.context;
 
             const {tableId, dbName} = getTableNameFromContext(context);
-            console.log(`IdentifierScope.collectScope: context=${printNode(context)}, tableId=${tableId}, dbName=${dbName}`);
+            // console.log(`IdentifierScope.collectScope: context=${printNode(context)}, tableId=${tableId}, dbName=${dbName}`);
             if (tableId) {
                 const mrScope = this.getMrScope()?.getTableScopeByName(tableId);
                 if (mrScope) {
@@ -280,12 +280,7 @@ export class IdentifierScope {
     }
 
     validate() {
-        const errors: {
-            message: string;
-            context: ParserRuleContext | TerminalNode; 
-            level: 'error' | 'warning';
-            type: ErrorType;
-        }[] = [];
+        const errors: ValidateError[] = [];
         this.children.forEach(child => {
             errors.push(...child.validate());
         });

@@ -1,15 +1,13 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
-import { AtomSelectStatementContext, ExpressionContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { AtomSelectStatementContext, CteStatementContext, ExpressionContext, QueryStatementExpressionBodyContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { uuidv4 } from "./helpers/util";
 import { IdentifierScope } from "./identifier_scope";
 import { getAtomExpressionFromExpression, getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getOnConditionOfFromClause, isSameColumnInfo } from "./helpers/table_and_column";
 import { isPosInParserRuleContext } from "./helpers/pos";
-import { ColumnInfo, tableReferenceContext, TableSource } from "./types";
-import { logSource, printNodeTree } from "./helpers/log";
+import { ColumnInfo, MrScopeContext, tableReferenceContext, TableSource, ValidateError } from "./types";
 import { matchSubPath } from "./helpers/tree_query";
-import { sqlStringFromNode } from "./helpers/formater";
 import { ErrorType } from "./consts";
-    
+import { HiveSQL } from "dt-sql-parser";
 
 export class MapReduceScope {
     id = uuidv4();
@@ -27,7 +25,7 @@ export class MapReduceScope {
     tableReferences: Map<string, ParserRuleContext[]> = new Map();
 
     constructor(
-        public context: QueryStatementExpressionContext | AtomSelectStatementContext,
+        public context: MrScopeContext,
         public identifierScope: IdentifierScope,
         public mrOrder: number,
     ) {
@@ -76,14 +74,11 @@ export class MapReduceScope {
     }
 
     validate() {
-        const errors: {
-            message: string;
-            context: ParserRuleContext | TerminalNode;
-            level: 'error' | 'warning';
-            type: ErrorType
-        }[] = [];
+        const errors: ValidateError[] = [];
 
         const hasMultiInputTable = this.inputTables.length > 1;
+        const groupByColumns = this.getGroupByColumns();
+
         // check exportColumns name duplicate
         const columnNames = new Set<string>();
         this.exportColumns.forEach(column => {
@@ -97,7 +92,31 @@ export class MapReduceScope {
             }
             columnNames.add(column.exportColumnName);
 
+            if (column.reference instanceof ExpressionContext) {
+                const atom = getAtomExpressionFromExpression(column.reference);
+                if (atom?.function_()
+                    || atom?.constant() 
+                    || atom?.intervalExpression()
+                ) {
+                    return;
+                }
+            }
+
+            // check if directly export columns is in the group-by columns
+            // TODO: better export column reference dependances check
+            if (groupByColumns.length > 0
+                && !groupByColumns.some(groupByColumn => isSameColumnInfo(groupByColumn, column))) {
+                // check if same column define
+                errors.push({
+                    message: `Export column '${column.referenceColumnName}' is not included in the group-by columns`,
+                    context: column.reference,
+                    level: 'warning',
+                    type: ErrorType.ColumnNotInGroupBy
+                });
+            }
+
             if (!column.referenceTableName && hasMultiInputTable) {
+                console.log('this.inputTables', this.inputTables);
                 errors.push({
                     message: `In multi-input select, export column '${column.exportColumnName}' must specify the referance table name`,
                     context: column.reference,
@@ -106,6 +125,7 @@ export class MapReduceScope {
                 });
             }
         });
+
         // check input table alias duplicate
         const tableNames = new Set<string>();
         this.inputTables.forEach(table => {
@@ -120,51 +140,11 @@ export class MapReduceScope {
             tableNames.add(table.tableName);
         });
 
-        // get group by columns
-        // check if directly export columns is in the group-by columns
-        const groupByColumns = this.getGroupByColumns();
-        if (groupByColumns.length) {
-            this.exportColumns.forEach(column => {
-                if (column.reference instanceof ExpressionContext) {
-                    const atom = getAtomExpressionFromExpression(column.reference);
-                    if (atom?.function_()
-                        || atom?.constant() 
-                        || atom?.intervalExpression()
-                    ) {
-                        return;
-                    }
-                }
-                // TODO: better export column reference dependances check
-                if (!groupByColumns.some(groupByColumn => isSameColumnInfo(groupByColumn, column))) {
-                    // check if same column define
-                    errors.push({
-                        message: `Export column '${column.referenceColumnName}' is not included in the group-by columns`,
-                        context: column.reference,
-                        level: 'warning',
-                        type: ErrorType.ColumnNotInGroupBy
-                    });
-                }
-            });
-        }
-
+        
         // check orphan ctes
-        this.tableDefinitions.forEach((tableDef, name) => {
-            const referenced = this.getTableReferencesByName(name);
-            if (referenced.some((ctx) => {
-                const isCteId = matchSubPath(ctx, ['id_', 'cteStatement']) != null;
-                if (!isCteId) {
-                    logSource({
-                        type: 'debug',
-                        message: `orphan cte check: referenced ${name} from ${printNodeTree(ctx)} is not cte id: ${isCteId} ${sqlStringFromNode(ctx)}`,
-                    });
-                }
-                return matchSubPath(ctx, ['id_', 'cteStatement']) == null;
-            })) {
-                return;
-            }
-
+        this.getOrphanTableDefinitions().forEach((tableDef) => {
             errors.push({
-                message: `Table definition '${name}' is not referenced`,
+                message: `Table definition '${tableDef.tableName}' is not referenced`,
                 context: tableDef.defineReference,
                 level: 'warning',
                 type: ErrorType.OrphanTableDef
@@ -172,6 +152,21 @@ export class MapReduceScope {
         });
 
         return errors;
+    }
+
+    getOrphanTableDefinitions(): TableSource[] {
+        const ret: TableSource[] = [];
+        this.tableDefinitions.forEach((tableDef, name) => {
+            const referenced = this.getTableReferencesByName(name);
+            if (referenced.some((ctx) => {
+                return matchSubPath(ctx, ['id_', 'cteStatement']) == null;
+            })) {
+                return;
+            }
+
+            ret.push(tableDef);
+        });
+        return ret;
     }
 
     getScopeByPosition(position: { lineNumber: number, column: number }): MapReduceScope | null {
@@ -327,6 +322,18 @@ export class MapReduceScope {
         return this.identifierScope?.parent?.getMrScope() || null;
     }
 
+    getRootMrScope() {
+        let scope: MapReduceScope = this;
+        while (true) {
+            const parent = scope.getParentMrScope();
+            if (!parent) {
+                break;
+            }
+            scope = parent;
+        }
+        return scope;
+    }
+
     getChildScopes(): MapReduceScope[] {
         const scopes: MapReduceScope[] = [];
         const identifierScopes = [...this.identifierScope.children];
@@ -348,6 +355,49 @@ export class MapReduceScope {
         }
         const children = this.getChildScopes();
         children.forEach(child => child.walkScopes(fn));
+    }
+
+    isCteScope() {
+        return this.context.parent instanceof CteStatementContext;
+    }
+
+    getCteName() {
+        if (this.isCteScope()) {
+            return (this.context.parent as CteStatementContext).id_().getText();
+        }
+        return null;
+    }
+
+    getDisplayContext(): ParserRuleContext | TerminalNode | null | undefined {
+        if (this.isCteScope()) {
+            return this.context.parent;
+        }
+        return this.context;
+    }
+
+    getDebugNode(): ParserRuleContext | null {
+        const isCte = this.isCteScope();
+        // TODO: find a better way to transform a valid sql
+        const queryStatementExpression = this.getRootMrScope().context as QueryStatementExpressionContext;
+        if (isCte) {
+            const cteId = (this.context.parent as CteStatementContext).id_().getText();
+            const newQuery = new ParserRuleContext();
+            newQuery.copyFrom(queryStatementExpression);
+            newQuery.children = [...(queryStatementExpression.children || [])];
+            const sql = `select * from ${cteId}`;
+            const hiveSqlParse = new HiveSQL();
+            const ctx = hiveSqlParse.createParser(sql);
+            const tree = ctx.program();
+            const newQueryStatementExpressionContext = tree.statement(0)?.execStatement()?.queryStatementExpression()?.queryStatementExpressionBody()!;
+            newQuery.children = newQuery.children!.map(child => {
+                if (child instanceof QueryStatementExpressionBodyContext) {
+                    return newQueryStatementExpressionContext!;
+                }
+                return child;
+            });
+            return newQuery;
+        }
+        return queryStatementExpression;
     }
 
 }

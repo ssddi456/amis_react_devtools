@@ -42,7 +42,7 @@ import {
     tableInfoFromTableSource,
     tableInfoFromVirtualTableSource
 } from "./helpers/table_and_column";
-import { ITableSourceManager, MrScopeNodeData, tableDefType } from "./types";
+import { ITableSourceManager, MrScopeContext, MrScopeNodeData, tableDefType } from "./types";
 import { IdentifierScope, SymbolAndContext } from "./identifier_scope";
 import { MapReduceScope } from "./mr_scope";
 import { logSource, printNode } from "./helpers/log";
@@ -51,6 +51,7 @@ import { formatHoverRes } from "./formatHoverRes";
 import { Pos, positionFromNode } from "./helpers/pos";
 import { WithSource } from "./helpers/util";
 import { ErrorType } from "./consts";
+import { mrScopeGraphOptimize } from "./helpers/graph";
 
 export class ContextManager {
     rootContext: IdentifierScope | null = null;
@@ -58,7 +59,7 @@ export class ContextManager {
 
     mrScopes: MapReduceScope[] = [];
 
-    mrScopeGraph: Map<string, WithSource<{ deps: string[], type: tableDefType }>> = new Map();
+    mrScopeGraph: Map<string, WithSource<Omit<MrScopeNodeData, 'id' | 'description' | 'label' | 'onNodeSizeChange'>>> = new Map();
 
     constructor(public tree: ProgramContext, public tableSourceManager?: ITableSourceManager) {
         const manager = this;
@@ -79,7 +80,7 @@ export class ContextManager {
             }
         }
 
-        function enterTable(ctx: QueryStatementExpressionContext | AtomSelectStatementContext, identifierScope: IdentifierScope) {
+        function enterTable(ctx: MrScopeContext, identifierScope: IdentifierScope) {
             const mrScope = new MapReduceScope(ctx, identifierScope, manager.mrScopes.length);
             manager.mrScopes.push(mrScope);
             identifierScope.mrScope = mrScope;
@@ -107,7 +108,8 @@ export class ContextManager {
                 exitRule();
             };
             enterSelectStatement = (ctx: SelectStatementContext) => {
-                enterRule(ctx);
+                const identifierScope = enterRule(ctx);
+                enterTable(ctx, identifierScope);
             };
             exitSelectStatement = (ctx: SelectStatementContext) => {
                 exitRule();
@@ -398,14 +400,10 @@ export class ContextManager {
 
     createMrScopeGraph() {
         this.mrScopes.forEach((mrScope) => {
-            if (mrScope.mrOrder === 0) {
-                return;
-            }
             console.group(`createMrScopeGraph: mrScope [${mrScope.mrOrder}] ${mrScope.id} ` );
             const id = mrScope.id;
             const children = mrScope.getChildScopes();
             const deps = children.map(x => x.id);
-            
             if (mrScope.inputTables.length > 0) {
                 // try to find input from other mrScopes
                 mrScope.inputTables.forEach(input => {
@@ -442,7 +440,11 @@ export class ContextManager {
                         if (tableDef instanceof TableSourceContext) {
                             console.log(`createMrScopeGraph: found external table ${input.tableName} | mrScope ${mrScope.mrOrder}`);
                             const tableInfo = getTableNameFromContext(tableDef);
-                            this.mrScopeGraph.set(tableInfo.tableId, { deps: [], type: 'external' });
+                            this.mrScopeGraph.set(tableInfo.tableId, {
+                                deps: [],
+                                type: 'external',
+                                isOrphan: false,
+                            });
                             deps.push(tableInfo.tableId);
                             return;
                         }
@@ -453,7 +455,11 @@ export class ContextManager {
                             deps.push(defineScope.id);
                         }
                     } else {
-                        this.mrScopeGraph.set(input.tableName, { deps: [], type: 'external' });
+                        this.mrScopeGraph.set(input.tableName, {
+                            deps: [],
+                            type: 'external',
+                            isOrphan: false,
+                        });
                         deps.push(input.tableName);
                     }
                 });
@@ -461,35 +467,36 @@ export class ContextManager {
             console.log('deps', deps);
             console.assert(!deps.includes(id), 'mrScope cannot depend on itself');
             console.groupEnd();
-            this.mrScopeGraph.set(id, {deps, type: 'local'});
+            this.mrScopeGraph.set(id, {
+                deps,
+                type: 'local',
+                isOrphan: false,
+            });
         });
 
-        // do some simplification
-
+        // check orphan ctes
         this.mrScopeGraph.forEach((node, id) => {
             const mrScope = this.getMrScopeById(id);
             if (!mrScope) {
                 return;
             }
+            const orphanTables = mrScope.getOrphanTableDefinitions();
+            orphanTables.forEach((tableDef) => {
+                const orphanScope = this.getMrScopeByQueryStatement((tableDef.reference as CteStatementContext).queryStatementExpression?.());
+                if (orphanScope) {
+                    console.log('mark orphan mrScope', orphanScope.id, 'from tableDef', tableDef.tableName);
 
-            if (!(mrScope.context instanceof QueryStatementExpressionContext)) {
-                return;
-            }
-
-            const deps = node.deps;
-            if (deps.length === 1) {
-                const depedScope = this.getMrScopeById(deps[0]);
-                if (depedScope && depedScope.context instanceof AtomSelectStatementContext) {
-                    const depedNode = this.mrScopeGraph.get(depedScope.id);
-                    if (!depedNode) {
-                        return;
+                    const originNode = this.mrScopeGraph.get(orphanScope.id);
+                    if (originNode) {
+                        console.log('mark orphan mrScope', orphanScope.id, 'from tableDef', tableDef.tableName);
+                        originNode.isOrphan = true;
+                        this.mrScopeGraph.set(orphanScope.id, originNode);
                     }
-                    // atom select statement only pass through columns, can be simplified
-                    this.mrScopeGraph.set(id, { deps: depedNode.deps, type: 'local' });
-                    this.mrScopeGraph.delete(deps[0]);
                 }
-            }
+            });
         });
+        const rootId = this.mrScopes.find(mr => mr.mrOrder === 0)?.id!;
+        mrScopeGraphOptimize(this, rootId);
     }
 
     getMrScopeGraphNodeAndEdges(): {
@@ -499,7 +506,13 @@ export class ContextManager {
         const nodes: { id: string; data: MrScopeNodeData; position: { x: number; y: number } }[] = [];
 
         const edges: { id: string; from: string; to: string, sourceHandle: string, targetHandle: string }[] = [];
+        console.log('mrScopeGraph', this.mrScopeGraph);
         this.mrScopeGraph.forEach((node, id) => {
+            const mrScope = this.getMrScopeById(id);
+            if (mrScope && mrScope.mrOrder === 0) {
+                return;
+            }
+            
             const { deps, type } = node;
             nodes.push({ id, data: {
                 ...node,

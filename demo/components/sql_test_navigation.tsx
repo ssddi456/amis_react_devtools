@@ -98,7 +98,12 @@ export const SqlTestNavigation: React.FC<SqlTestNavigationProps> = ({
                     />
                     <span style={{ marginLeft: '5px' }}>Show Debug</span>
                 </label>
-                <a href='https://dtstack.github.io/monaco-sql-languages/' target='_blank' rel='noopener noreferrer'>ast parser</a>
+                <a href='https://dtstack.github.io/monaco-sql-languages/' target='_blank' rel='noopener noreferrer'>
+                    ast parser
+                </a>
+                <a href='https://raw.githubusercontent.com/DTStack/dt-sql-parser/refs/heads/main/src/grammar/hive/HiveSqlParser.g4' target='_blank' rel='noopener noreferrer' style={{ marginLeft: '10px' }}>
+                    g4
+                </a>
             </div>
             <div
                 style={{

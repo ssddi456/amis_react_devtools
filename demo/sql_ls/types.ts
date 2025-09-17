@@ -1,17 +1,21 @@
-import { ParserRuleContext } from "antlr4ng";
+import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import {
+    AtomSelectStatementContext,
     ColumnNameContext,
     ColumnNameCreateContext,
     ColumnNamePathContext,
     CteStatementContext,
     ExpressionContext,
     Id_Context,
+    QueryStatementExpressionContext,
+    SelectStatementContext,
     SubQuerySourceContext,
     TableNameContext,
     TableNameCreateContext,
     TableSourceContext,
     VirtualTableSourceContext,
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { ErrorType } from "./consts";
 
 
 export interface ITableSourceManager {
@@ -60,11 +64,14 @@ export type tableDefType = 'local' | 'external';
 export interface MrScopeNodeData {
     id: string;
     deps: string[];
+    isOrphan: boolean;
     type: tableDefType;
     label: string;
     description?: string;
     onNodeSizeChange?: (nodeId: string, size: { width: number; height: number }) => void;
 }
+
+export type MrScopeContext = QueryStatementExpressionContext | AtomSelectStatementContext | SelectStatementContext;
 
 export type HighlightContext = ColumnNameContext |
     ColumnNamePathContext |
@@ -73,3 +80,10 @@ export type HighlightContext = ColumnNameContext |
     TableNameCreateContext |
     ExpressionContext |
     Id_Context; // for tableReferenceContext's id
+
+export interface ValidateError {
+    message: string;
+    context: ParserRuleContext | TerminalNode;
+    level: 'error' | 'warning';
+    type: ErrorType
+}
