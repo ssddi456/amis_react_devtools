@@ -1,5 +1,17 @@
 import { ParserRuleContext } from "antlr4ng";
-import { CteStatementContext, SubQuerySourceContext, TableSourceContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import {
+    ColumnNameContext,
+    ColumnNameCreateContext,
+    ColumnNamePathContext,
+    CteStatementContext,
+    ExpressionContext,
+    Id_Context,
+    SubQuerySourceContext,
+    TableNameContext,
+    TableNameCreateContext,
+    TableSourceContext,
+    VirtualTableSourceContext,
+} from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 
 
 export interface ITableSourceManager {
@@ -53,3 +65,11 @@ export interface MrScopeNodeData {
     description?: string;
     onNodeSizeChange?: (nodeId: string, size: { width: number; height: number }) => void;
 }
+
+export type HighlightContext = ColumnNameContext |
+    ColumnNamePathContext |
+    ColumnNameCreateContext |
+    TableNameContext |
+    TableNameCreateContext |
+    ExpressionContext |
+    Id_Context; // for tableReferenceContext's id

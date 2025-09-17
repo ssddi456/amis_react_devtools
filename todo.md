@@ -35,9 +35,27 @@
 
 1. cases
     [ ] more cases
+        [ ] union
+        [ ] intersect
+        [ ] except
+        [*] subquery in from
+        [ ] subquery in where
+        [ ] subquery in select
+        [*] cte recursive
+        [ ] window function
+        [ ] over(partition by ...)
+        [*] join on ...
+        [*] join using ...
+        [ ] join natural
+        [ ] lateral join
+        [*] insert into ... select ...
+        [ ] alter table add column
+        [ ] alter table drop column
+        [ ] alter table rename column
+        [ ] alter table rename to ...
     [ ] expected result
 
 # 更好的测试方法
 
 * 在需要调试的地方添加断言 or debugger
-* 使用日志记录关键变量的值
+* logWithSouce

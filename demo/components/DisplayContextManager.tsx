@@ -13,8 +13,6 @@ export class DisplayContextManager extends React.Component<DisplayContextManager
         const mrScope = context.mrScope;
         const tableIdentifierMap = Array.from(context.tableIdentifierMap.keys());
         const tableCount = tableIdentifierMap.length;
-        const referenceMap = Array.from(context.referenceMap.keys());
-        const referenceCount = referenceMap.length;
         const referenceNotFound = Array.from(context.referenceNotFound.keys());
         const referenceNotFoundCount = referenceNotFound.length;
         const highlights = context.highlightRanges;
@@ -50,14 +48,6 @@ export class DisplayContextManager extends React.Component<DisplayContextManager
                                     }}
                                 >
                                     {table}
-                                </div>
-                            );
-                        })}
-                        {referenceCount ? <div>referenceMap</div> : null}
-                        {referenceMap.map((name) => {
-                            return (
-                                <div key={name} style={{ paddingLeft: 12 }}>
-                                    {name}
                                 </div>
                             );
                         })}

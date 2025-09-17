@@ -8,6 +8,7 @@ import { rangeFromNode } from "./pos";
 import { ExtColumnInfo, TableInfo } from "../types";
 import { printNodeTree, printNode, logSource } from "./log";
 import { matchType, matchSubPathOneOf, matchSubPath } from "./tree_query";
+import { ErrorType } from "../consts";
 import { localDbId } from "../consts";
 
 export const getEntityInfoAtPosition = async (
@@ -34,7 +35,7 @@ export const getEntityInfoAtPosition = async (
     const allIdentifiers = context.getAllIdentifiers() || {};
 
     const parent = foundNode.parent!;
-    logger('do hover entities', printNode(parent), allIdentifiers.keys());
+    // logger('do hover entities', printNode(parent), allIdentifiers.keys());
 
     const commonFields = {
         range: rangeFromNode(foundNode),
@@ -120,7 +121,7 @@ export const getEntityInfoAtPosition = async (
         };
     }
 
-    logSource({ type: 'node type not match', foundNode });
+    logSource({ type: 'debug', foundNode });
 
     return {
         type: EntityInfoType.Unknown,
@@ -143,7 +144,7 @@ export const getAllEntityInfoFromNode = async (
     const logger = isTest ? console.log : () => { };
     const allIdentifiers = context.getAllIdentifiers() || {};
 
-    logger('do hover entities', printNode(node), allIdentifiers.keys());
+    // logger('do hover entities', printNode(node), allIdentifiers.keys());
 
     const commonFields = {
         range: rangeFromNode(node),

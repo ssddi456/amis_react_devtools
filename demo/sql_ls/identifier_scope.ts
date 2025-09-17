@@ -1,12 +1,14 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
-import { TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { TableNameContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { getTableNameFromContext } from "./helpers/table_and_column";
 import { isPosInParserRuleContext, rangeFromNode } from "./helpers/pos";
-import { ITableSourceManager, TableInfo } from "./types";
+import { HighlightContext, ITableSourceManager, TableInfo } from "./types";
 import { printNode, ruleIndexToDisplayName } from "./helpers/log";
 import { uuidv4 } from "./helpers/util";
 import { MapReduceScope } from "./mr_scope";
+import { ErrorType } from "./consts";
+
 
 interface HighlightRange {
     start: number;
@@ -14,7 +16,7 @@ interface HighlightRange {
     lineNumber: number;
     column: number;
     type: string;
-    context: ParserRuleContext;
+    context: HighlightContext;
 }
 
 interface UnsupportedFeature {
@@ -32,8 +34,6 @@ export class IdentifierScope {
     uuid = uuidv4();
 
     tableIdentifierMap: Map<string, ParserRuleContext> = new Map();
-
-    referenceMap: Map<string, ParserRuleContext[]> = new Map();
 
     referenceNotFound: Map<string, ParserRuleContext[]> = new Map();
 
@@ -140,7 +140,17 @@ export class IdentifierScope {
                     mrScope.addTableReference(tableId, context);
                 }
             }
+
+            if (context instanceof TableNameContext) {
+                const tableName = context.getText();
+                const mrScope = this.getMrScope()?.getParentMrScope()?.getTableScopeByName(tableName);
+                if (mrScope) {
+                    mrScope.addTableReference(tableName, context);
+                }
+            }
         });
+
+
         console.groupEnd();
     }
 
@@ -210,7 +220,7 @@ export class IdentifierScope {
         this.highlightRanges.push(range);
     }
 
-    addHighlightNode(node: ParserRuleContext) {
+    addHighlightNode(node: HighlightContext) {
         const range = rangeFromNode(node);
         this.addHighlight({
             start: node.start?.start || 0,
@@ -274,7 +284,7 @@ export class IdentifierScope {
             message: string;
             context: ParserRuleContext | TerminalNode; 
             level: 'error' | 'warning';
-            type: string;
+            type: ErrorType;
         }[] = [];
         this.children.forEach(child => {
             errors.push(...child.validate());
@@ -286,7 +296,7 @@ export class IdentifierScope {
                     message: feature.message,
                     context: feature.context,
                     level: 'error',
-                    type: 'unsupported_feature'
+                    type: ErrorType.UnsupportedFeature
                 });
             });
         }

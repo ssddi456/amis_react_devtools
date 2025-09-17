@@ -5,6 +5,7 @@ import {
     AtomSelectStatementContext,
     ColumnNameContext,
     ColumnNameCreateContext,
+    ColumnNamePathContext,
     ConstantContext,
     CteStatementContext,
     ExpressionContext,
@@ -23,6 +24,7 @@ import {
     SelectStatementWithCTEContext,
     SubQuerySourceContext,
     TableNameContext,
+    TableNameCreateContext,
     TableSourceContext,
     VirtualTableSourceContext,
     WhereClauseContext,
@@ -48,6 +50,7 @@ import { getAllEntityInfoFromNode } from "./helpers/getTableAndColumnInfoAtPosit
 import { formatHoverRes } from "./formatHoverRes";
 import { Pos, positionFromNode } from "./helpers/pos";
 import { WithSource } from "./helpers/util";
+import { ErrorType } from "./consts";
 
 export class ContextManager {
     rootContext: IdentifierScope | null = null;
@@ -64,7 +67,7 @@ export class ContextManager {
         this.currentContext = this.rootContext;
 
         function enterRule(ctx: ParserRuleContext) {
-            console.log('enterRule', printNode(ctx));
+            // console.log('enterRule', printNode(ctx));
             const newContext = manager.currentContext!.enterScope(ctx);
             manager.currentContext = newContext;
             return newContext;
@@ -232,7 +235,7 @@ export class ContextManager {
                 manager.currentContext?.addHighlightNode(ctx);
             };
 
-            enterColumnNamePath = (ctx: ColumnNameContext) => {
+            enterColumnNamePath = (ctx: ColumnNamePathContext) => {
                 manager.currentContext?.addHighlightNode(ctx);
             };
 
@@ -244,7 +247,7 @@ export class ContextManager {
                 manager.currentContext?.addHighlightNode(ctx);
             };
 
-            enterTableNameCreate = (ctx: TableNameContext) => {
+            enterTableNameCreate = (ctx: TableNameCreateContext) => {
                 manager.currentContext?.addHighlightNode(ctx);
             };
 
@@ -533,7 +536,7 @@ export class ContextManager {
             const hoverInfo = await getAllEntityInfoFromNode(range.context, context, mrScope, isTest);
             if (!hoverInfo) {
                 errors.push({
-                    type: 'no_hover_info',
+                    type: ErrorType.RefNotFound,
                     level: 'error',
                     message: `Reference not found: ${printNode(range.context)}`,
                     context: range.context,
@@ -549,7 +552,7 @@ export class ContextManager {
                 logSource(hoverInfo);
                 const res = formatHoverRes(hoverInfo)!;
                 errors.push({
-                    type: 'no_hover_info',
+                    type: ErrorType.RefNotFound,
                     level: 'error',
                     context: range.context,
                     message: res.contents[0].value,

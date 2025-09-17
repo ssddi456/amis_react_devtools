@@ -24,7 +24,7 @@ async function tableInfoFromTableSource(
     }
 
     const tableId = context.lookupDefinition(tableName);
-    console.log('tableInfoFromTableSource tableId', tableId, tableName, tableSource);
+    // console.log('tableInfoFromTableSource tableId', tableId, tableName, tableSource);
     if (tableId === null) {
         const tableInfo = await context.getForeignTableInfoByName(tableName, undefined);
         if (tableInfo) {

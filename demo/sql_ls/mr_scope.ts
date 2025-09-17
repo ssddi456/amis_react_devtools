@@ -2,10 +2,13 @@ import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { AtomSelectStatementContext, ExpressionContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { uuidv4 } from "./helpers/util";
 import { IdentifierScope } from "./identifier_scope";
-import { getAtomExpressionFromExpression, getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getFunctionCallFromExpression, getOnConditionOfFromClause, isSameColumnInfo } from "./helpers/table_and_column";
+import { getAtomExpressionFromExpression, getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getOnConditionOfFromClause, isSameColumnInfo } from "./helpers/table_and_column";
 import { isPosInParserRuleContext } from "./helpers/pos";
 import { ColumnInfo, tableReferenceContext, TableSource } from "./types";
-import { printNode, printNodeTree } from "./helpers/log";
+import { logSource, printNodeTree } from "./helpers/log";
+import { matchSubPath } from "./helpers/tree_query";
+import { sqlStringFromNode } from "./helpers/formater";
+import { ErrorType } from "./consts";
     
 
 export class MapReduceScope {
@@ -77,7 +80,7 @@ export class MapReduceScope {
             message: string;
             context: ParserRuleContext | TerminalNode;
             level: 'error' | 'warning';
-            type: string
+            type: ErrorType
         }[] = [];
 
         const hasMultiInputTable = this.inputTables.length > 1;
@@ -89,7 +92,7 @@ export class MapReduceScope {
                     message: `Duplicate export column name '${column.exportColumnName}'`,
                     context: column.reference,
                     level: 'error',
-                    type: 'duplicate_column'
+                    type: ErrorType.DuplicateColumn
                 });
             }
             columnNames.add(column.exportColumnName);
@@ -99,7 +102,7 @@ export class MapReduceScope {
                     message: `In multi-input select, export column '${column.exportColumnName}' must specify the referance table name`,
                     context: column.reference,
                     level: 'error',
-                    type: 'no_table_ref'
+                    type: ErrorType.MustSpecificTable
                 });
             }
         });
@@ -111,7 +114,7 @@ export class MapReduceScope {
                     message: `Duplicate input table alias '${table.tableName}'`,
                     context: table.reference,
                     level: 'error',
-                    type: 'duplicate_table'
+                    type: ErrorType.DuplicateTable
                 });
             }
             tableNames.add(table.tableName);
@@ -138,11 +141,35 @@ export class MapReduceScope {
                         message: `Export column '${column.referenceColumnName}' is not included in the group-by columns`,
                         context: column.reference,
                         level: 'warning',
-                        type: 'group_by'
+                        type: ErrorType.ColumnNotInGroupBy
                     });
                 }
             });
         }
+
+        // check orphan ctes
+        this.tableDefinitions.forEach((tableDef, name) => {
+            const referenced = this.getTableReferencesByName(name);
+            if (referenced.some((ctx) => {
+                const isCteId = matchSubPath(ctx, ['id_', 'cteStatement']) != null;
+                if (!isCteId) {
+                    logSource({
+                        type: 'debug',
+                        message: `orphan cte check: referenced ${name} from ${printNodeTree(ctx)} is not cte id: ${isCteId} ${sqlStringFromNode(ctx)}`,
+                    });
+                }
+                return matchSubPath(ctx, ['id_', 'cteStatement']) == null;
+            })) {
+                return;
+            }
+
+            errors.push({
+                message: `Table definition '${name}' is not referenced`,
+                context: tableDef.defineReference,
+                level: 'warning',
+                type: ErrorType.OrphanTableDef
+            });
+        });
 
         return errors;
     }
@@ -291,11 +318,9 @@ export class MapReduceScope {
 
 
     getTableReferencesByName(name: string): ParserRuleContext[] {
-        const references = this.tableReferences.get(name);
-        if (references) {
-            return references;
-        }
-        return [];
+        const references:ParserRuleContext[] = [...this.tableReferences.get(name)||[]];
+
+        return references;
     }
 
     getParentMrScope() {
@@ -314,6 +339,15 @@ export class MapReduceScope {
             }
         }
         return scopes;
+    }
+
+    walkScopes(fn: (scope: MapReduceScope) => boolean | void) {
+        const goDeep = fn(this);
+        if (goDeep === false) {
+            return;
+        }
+        const children = this.getChildScopes();
+        children.forEach(child => child.walkScopes(fn));
     }
 
 }

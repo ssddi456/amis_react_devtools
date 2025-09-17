@@ -70,5 +70,17 @@ export const logSource = (arg: any) => {
         const source = (arg as WithSource<{}>).__source!;
         console.log(`vscode://file/${source.fileName}%3A${source.lineNumber}%3A${source.columnNumber}`);
     }
-    console.log(arg);
+
+    const keys = Object.keys(arg || {}).filter(k => {
+        return k !== '__source'
+        && k !== 'type'
+        && k !== 'message'
+    });
+
+    if (keys.length > 0) {
+        console.log(arg);
+    } else {
+        console.log(`[${arg.type}, ${arg.message}]`);
+    }
+
 };
