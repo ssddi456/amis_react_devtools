@@ -35,8 +35,8 @@
 
 1. cases
     [ ] more cases
-        [ ] union
-        [ ] intersect
+        [*] union
+        [*] intersect
         [ ] except
         [*] subquery in from
         [ ] subquery in where
@@ -49,10 +49,6 @@
         [ ] join natural
         [ ] lateral join
         [*] insert into ... select ...
-        [ ] alter table add column
-        [ ] alter table drop column
-        [ ] alter table rename column
-        [ ] alter table rename to ...
     [ ] expected result
 
 # 更好的测试方法
