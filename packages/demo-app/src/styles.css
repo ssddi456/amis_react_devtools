@@ -1,3 +1,8 @@
+
+/* Import styles from sql-devtools-ui for compatibility */
+@import url('@amis-devtools/sql-devtools-ui/src/components/text_highlight.css');
+@import url('@amis-devtools/sql-devtools-ui/src/components/MrScopeDagFlow.css');
+
 /* Demo App Styles */
 
 * {
@@ -237,7 +242,3 @@ body {
     text-align: center;
   }
 }
-
-/* Import styles from sql-devtools-ui for compatibility */
-@import url('../../../sql-devtools-ui/src/components/text_highlight.css');
-@import url('../../../sql-devtools-ui/src/components/MrScopeDagFlow.css');
