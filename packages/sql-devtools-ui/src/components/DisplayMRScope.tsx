@@ -4,7 +4,7 @@ import { ParseTree } from 'antlr4ng';
 import { printNode } from '@amis-devtools/sql-language-service/src/helpers/log';
 import { MapReduceScope } from '@amis-devtools/sql-language-service/src/mr_scope';
 import { getFormattedSqlFromNode } from '@amis-devtools/sql-language-service/src/helpers/formater';
-import { copyToClipboard } from '../../tools/copy';
+import { copyToClipboard } from '../tools/copy';
 
 interface DisplayMRScopeProps {
     mrScope: MapReduceScope;

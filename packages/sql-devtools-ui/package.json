@@ -1,10 +1,11 @@
 {
-    "name": "@amis-devtools/ui",
+    "name": "@amis-devtools/sql-devtools-ui",
     "scripts": {
         "dev": "rspack dev --config ./config/rspack.config.js"
     },
     "dependencies": {
-        "@amis-devtools/sql-language-service": "latest",
+        "typescript": "5.9.2",
+        "@amis-devtools/sql-language-service": "file:../sql-language-service",
         "react": "17.0.2",
         "@xyflow/react": "^12.8.4",
         "@dagrejs/dagre": "^1.1.5",

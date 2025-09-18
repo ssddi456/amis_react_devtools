@@ -4,8 +4,8 @@
 
   "workspaces": ["packages/*"],
   "scripts": {
-    "build": "lerna run build",
-    "dev": "lerna run dev --scope=@amis-devtools/demo-app",
-    "test": "lerna run test"
+    "build": "npx lerna run build",
+    "dev": "npx lerna run dev --scope=@amis-devtools/sql-devtools-ui",
+    "test": "npx lerna run test"
   }
 }

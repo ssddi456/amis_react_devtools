@@ -1,6 +1,6 @@
 import tableSourceManager from './data/example';
-import { copyToClipboard } from '../tools/copy';
-import { registerHivesqlLs } from '../packages/sql-language-service/src/register_ls';
+import { copyToClipboard } from './tools/copy';
+import { registerHivesqlLs } from '@amis-devtools/sql-language-service/src/register_ls';
 import { LanguageIdEnum } from 'monaco-sql-languages';
 
 const createSqlEditor = (name: string) => ({

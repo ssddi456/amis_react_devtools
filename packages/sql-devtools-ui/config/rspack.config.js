@@ -6,7 +6,7 @@ const NodePolyfill = require("node-polyfill-webpack-plugin");
 module.exports = {
     cache: true,
     entry: {
-        index: "./demo/index.tsx",
+        index: "./src/index.tsx",
     },
     target: "web",
     output: {
@@ -16,7 +16,7 @@ module.exports = {
     plugins: [
         new NodePolyfill(),
         new rspack.HtmlRspackPlugin({
-            template: "demo/template/index.ejs",
+            template: "src/template/index.ejs",
         }),
         new rspack.DefinePlugin({
             "process.env.NODE_ENV": JSON.stringify("development"),
