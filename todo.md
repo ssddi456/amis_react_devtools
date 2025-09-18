@@ -26,8 +26,12 @@
 
 1. project layout
     [*] reorganize project layout
-    [ ] split as a monorepo
-    [ ] an free to use sql development tool
+    [*] split as a monorepo
+    
+1. ui:an free to use sql development helper & usage example
+    [ ] id table
+    [ ] cte graph
+    [ ] sql collaboration
 
 1. table graph
     [ ] get table graph from sql
