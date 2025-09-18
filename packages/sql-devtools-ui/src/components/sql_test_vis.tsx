@@ -1,8 +1,8 @@
 // This file has been moved to ./components/sql_test_dag.tsx and is now removed from the demo directory.
 import React from 'react';
 import { caseFromString, LsTestCase } from '../tools/tests';
-import { createHiveSqlLanguageService } from '../../sql_ls';
-import { ContextManager } from '../../sql_ls/context_manager';
+import { createHiveSqlLanguageService } from '@amis-devtools/sql-language-service/src';
+import { ContextManager } from '@amis-devtools/sql-language-service/src/context_manager';
 import { TextHighlight } from './text_highlight';
 import tableSourceManager from '../data/example';
 import { DisplayContextManager } from './DisplayContextManager';

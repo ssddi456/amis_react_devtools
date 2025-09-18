@@ -1,0 +1,13 @@
+{
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "outDir": "./dist",
+        "rootDir": "./src"
+    },
+    "references": [
+        { "path": "../sql-language-service" }
+    ],
+    "include": [
+        "./src/**/*.{ts,tsx}"
+    ]
+}

@@ -1,14 +1,14 @@
 import { useState, useEffect, ReactElement, useCallback } from "react";
 import { LsTestCase } from '../tools/tests';
 import { languages, editor } from 'monaco-editor';
-import { createHiveSqlLanguageService } from "../../sql_ls";
+import { createHiveSqlLanguageService } from "@amis-devtools/sql-language-service/src";
 import tableSourceManager from "../data/example";
 import { DefinitionResults } from "./definition_results";
 import { ReferencesResults } from "./references_results";
 import { ValidationResults } from "./validation_results";
-import { WithSource } from "../../sql_ls/helpers/util";
+import { WithSource } from "@amis-devtools/sql-language-service/src/helpers/util";
 import { HoverResults } from "./hover_results";
-import { Pos } from "../../sql_ls/helpers/pos";
+import { Pos } from "@amis-devtools/sql-language-service/src/helpers/pos";
 
 
 // 创建高亮文本的辅助函数
