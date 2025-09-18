@@ -1,4 +1,3 @@
-import { ParseTree } from "antlr4ng";
 import type { IRange } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { TableInfo, ExtColumnInfo } from "./types";
 
@@ -87,12 +86,12 @@ export const unknownRes = (text: string, range: IRange, ext?: string[]) => {
     };
     return result;
 };
-export const createColumnRes = (node: ParseTree, range: IRange, ext?: string[]) => {
+export const createColumnRes = (node: string, range: IRange, ext?: string[]) => {
     const result = {
         contents: [
             {
                 value: [
-                    `**create Column:** ${node.getText()}`,
+                    `**create Column:** ${node}`,
                     ...(ext || [])
                 ].filter(Boolean).join('\n\n')
             },

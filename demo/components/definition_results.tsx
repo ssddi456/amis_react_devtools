@@ -1,7 +1,7 @@
 import React from 'react';
 import { languages } from 'monaco-editor';
 import { SourceLink } from './source_link';
-import { WithSource } from '../sql_ls/helpers/util';
+import { WithSource } from '../../sql_ls/helpers/util';
 
 interface DefinitionResultsProps {
     definitionResults: Array<WithSource<languages.Definition> | null | undefined>;

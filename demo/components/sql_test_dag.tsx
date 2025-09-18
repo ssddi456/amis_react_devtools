@@ -1,7 +1,7 @@
 import React from 'react';
 import { caseFromString, LsTestCase } from '../tools/tests';
-import { createHiveSqlLanguageService } from '../sql_ls';
-import { ContextManager } from '../sql_ls/context_manager';
+import { createHiveSqlLanguageService } from '../../sql_ls';
+import { ContextManager } from '../../sql_ls/context_manager';
 import { TextHighlight } from './text_highlight';
 import tableSourceManager from '../data/example';
 import { DisplayContextManager } from './DisplayContextManager';

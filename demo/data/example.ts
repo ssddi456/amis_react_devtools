@@ -1,4 +1,4 @@
-import { ITableSourceManager, TableInfo } from "../sql_ls/types";
+import { ITableSourceManager, TableInfo } from "../../sql_ls/types";
 
 interface IExampleTableSourceManager extends ITableSourceManager {
     findTableSource(dbName: string, tableName: string): Promise<TableInfo | null>;

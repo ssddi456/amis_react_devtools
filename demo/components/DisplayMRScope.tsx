@@ -1,9 +1,10 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { ParseTree } from 'antlr4ng';
-import { printNode } from '../sql_ls/helpers/log';
-import { MapReduceScope } from '../sql_ls/mr_scope';
-import { getFormattedSqlFromNode } from '../sql_ls/helpers/formater';
+import { printNode } from '../../sql_ls/helpers/log';
+import { MapReduceScope } from '../../sql_ls/mr_scope';
+import { getFormattedSqlFromNode } from '../../sql_ls/helpers/formater';
+import { copyToClipboard } from '../../tools/copy';
 
 interface DisplayMRScopeProps {
     mrScope: MapReduceScope;
@@ -57,23 +58,14 @@ export class DisplayMRScope extends React.Component<DisplayMRScopeProps, Context
         }, 0);
     };
 
-    copyFormattedSql = () => {
+    copyFormattedSql = async () => {
         try {
             const mrScope = this.props.mrScope;
             const node = mrScope.getDebugNode();
             console.log('copyFormattedSql node', node);
 
             const sql = node ? getFormattedSqlFromNode(node) : '';
-            navigator.clipboard.writeText(sql).catch(err => {
-                console.error('Failed to copy SQL:', err);
-                // Fallback for older browsers
-                const textArea = document.createElement('textarea');
-                textArea.value = sql;
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-            });
+            await copyToClipboard(sql);
         } catch (error) {
             console.error('Error formatting SQL:', error);
         }

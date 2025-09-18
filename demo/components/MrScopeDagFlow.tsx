@@ -18,12 +18,12 @@ import {
 } from '@xyflow/react';
 import dagre from '@dagrejs/dagre';
 import '@xyflow/react/dist/style.css';
-import { MrScopeNodeData } from '../sql_ls/types';
+import { MrScopeNodeData } from '../../sql_ls/types';
 import { useContextManager } from './ContextManagerContext';
 import { DisplayMRScope } from './DisplayMRScope';
 import './MrScopeDagFlow.css';
 import { SourceLink } from './source_link';
-import { WithSource } from '../sql_ls/helpers/util';
+import { WithSource } from '../../sql_ls/helpers/util';
 // 自定义节点类型
 const MrScopeNode = ({ data, id }: { data: WithSource<MrScopeNodeData>; id: string }) => {
     const { contextManager } = useContextManager();
@@ -67,8 +67,8 @@ const MrScopeNode = ({ data, id }: { data: WithSource<MrScopeNodeData>; id: stri
 
                     return (
                         <Handle
-                            type="target"
-                            position={Position.Top}
+                            type="source"
+                            position={Position.Bottom}
                             id={depId}
                             key={depId}
                             style={{
@@ -104,7 +104,7 @@ const MrScopeNode = ({ data, id }: { data: WithSource<MrScopeNodeData>; id: stri
                         {/* <SourceLink source={data?.__source} /> */}
                     </div>
                 )}
-            <Handle type="source" position={Position.Bottom} id="input" />
+            <Handle type="target" position={Position.Top} id="input" />
         </div>
     );
 };

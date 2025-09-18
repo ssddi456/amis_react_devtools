@@ -1,7 +1,7 @@
 import React from 'react';
 import { languages } from 'monaco-editor';
 import { SourceLink } from './source_link';
-import { WithSource } from '../sql_ls/helpers/util';
+import { WithSource } from '../../sql_ls/helpers/util';
 
 interface ReferencesResultsProps {
     referencesResults: Array<WithSource<languages.Location[]> | null | undefined>;

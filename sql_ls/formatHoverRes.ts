@@ -182,7 +182,7 @@ export function formatHoverRes(hoverInfo: EntityInfo, ignoreError = false): With
         case EntityInfoType.NoColumn:
             return { ...noColumnInfoRes(hoverInfo.tableInfo!, hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
         case EntityInfoType.CreateColumn:
-            return { ...createColumnRes({ getText: () => hoverInfo.text! } as ParseTree, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
+            return { ...createColumnRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
         case EntityInfoType.Function:
             return { ...functionRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
         case EntityInfoType.Unknown:

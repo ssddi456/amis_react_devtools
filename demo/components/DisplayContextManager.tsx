@@ -1,7 +1,7 @@
 import React from 'react';
-import { printNode } from '../sql_ls/helpers/log';
+import { printNode } from '../../sql_ls/helpers/log';
 import { DisplayMRScope } from './DisplayMRScope';
-import { IdentifierScope } from '../sql_ls/identifier_scope';
+import { IdentifierScope } from '../../sql_ls/identifier_scope';
 
 interface DisplayContextManagerProps {
     context: IdentifierScope

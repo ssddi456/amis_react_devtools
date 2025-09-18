@@ -1,18 +1,21 @@
-import { editor, languages, Position, Uri, MarkerSeverity } from "monaco-editor";
-import { HiveSQL, } from 'dt-sql-parser';
+import { editor, languages, Position, Uri, MarkerSeverity, IRange } from "monaco-editor";
+import { HiveSQL, TextSlice, } from 'dt-sql-parser';
 import {
     ProgramContext,
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ContextManager, createContextManager } from "./context_manager";
 import { findTokenAtPosition } from "./helpers/table_and_column";
-import { posInRange, rangeFromNode, sliceToRange } from "./helpers/pos";
+import { Pos, posFromRange, posInRange, rangeFromNode, sliceToRange } from "./helpers/pos";
 import { ITableSourceManager } from "./types";
-import { logSource, printNodeTree } from "./helpers/log";
+import { createLogger, printNodeTree } from "./helpers/log";
 import { formatHiveSQL } from './formatter';
 import { getEntityInfoAtPosition } from "./helpers/getTableAndColumnInfoAtPosition";
 import { formatHoverRes, formatDefinitionRes } from "./formatHoverRes";
 import { getIdentifierReferences } from "./helpers/getIdentifierReferences";
 import { WithSource } from "./helpers/util";
+import { matchSubPath } from "./helpers/tree_query";
+import { getFormattedSqlFromNode } from "./helpers/formater";
+import { CommandId, CommandLabel } from "./consts";
 
 interface ContextInfos {
     hiveSqlParse: HiveSQL;
@@ -69,35 +72,9 @@ export const createHiveSqlLanguageService = ({
     } = getContextWithCache(text, noCache, tableSourceManager);
 
 
-    const logger: (...args: any[]) => void = isTest ? console.log : () => { };
+    const logger = createLogger('SQL Language Service', isTest);
 
-    const getCtxFromPos = (position: Position) => {
-        if (!sqlSlices || sqlSlices.length === 0) {
-            return null;
-        }
-        for (let i = 0; i < sqlSlices.length; i++) {
-            const slice = sqlSlices[i];
-            if (posInRange(position, sliceToRange(slice))) {
-                const symbolAndContext = contextManager.getSymbolByPosition(position);
-                if (symbolAndContext) {
-                    return symbolAndContext;
-                }
-
-                const context = contextManager.getContextByPosition(position);
-                const foundNode = findTokenAtPosition(position, tree);
-                logger('foundNode', printNodeTree(foundNode));
-                const mrScope = context?.getMrScope()?.getScopeByPosition(position) || null;
-
-                logger('getCtxFromPos mrScope', '-->', mrScope, '<--');
-                return {
-                    foundNode,
-                    context,
-                    mrScope,
-                };
-            }
-        }
-        return null;
-    };
+    const getCtxFromPos = createGetCtxFromPos(sqlSlices, contextManager, tree, logger.log);
 
     return {
         doHover: async (
@@ -107,12 +84,13 @@ export const createHiveSqlLanguageService = ({
             const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
             console.group('doHover');
             const hoverInfo = await getEntityInfoAtPosition(foundNode, mrScope, context, isTest);
-            logger('getTableAndColumnInfoAtPosition', hoverInfo);
+            logger.log('getTableAndColumnInfoAtPosition', hoverInfo);
             console.groupEnd();
-            logSource(hoverInfo);
             if (!hoverInfo) {
                 return;
             }
+
+            logger.logSource(hoverInfo);
 
             return formatHoverRes(hoverInfo, true);
         },
@@ -199,5 +177,103 @@ export const createHiveSqlLanguageService = ({
         getContextManager: () => {
             return contextManager
         },
+
+        doProvideCodeActions(range: IRange): languages.CodeActionList {
+            const actions: languages.CodeAction[] = [];
+            const position = posFromRange(range);
+            const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
+            if (!foundNode || !context) {
+                return { actions, dispose: () => { } }
+            }
+            if (matchSubPath(foundNode, ['id_', 'cteStatement'])) {
+                actions.push({
+                    title: CommandLabel[CommandId.CopyTestSql],
+                    command: {
+                        id: CommandId.CopyTestSql,
+                        title: CommandLabel[CommandId.CopyTestSql],
+                        arguments: [position],
+                    }
+                });
+            }
+
+            return { actions, dispose: () => {} }
+        },
+    };
+}
+
+
+export const createHiveSqlActions = ({
+    tableSourceManager,
+    onCopyToClipboard,
+    isTest = false,
+    noCache = false
+}: {
+    tableSourceManager?: ITableSourceManager
+    onCopyToClipboard?: (text: string) => void | Promise<void>;
+    isTest?: boolean,
+    noCache?: boolean,
+}) => {
+    return [
+        {
+            id: CommandId.CopyTestSql,
+            label: CommandLabel[CommandId.CopyTestSql],
+            run: async (ed: editor.IStandaloneCodeEditor, position?: Pos) => {
+                if (!position) {
+                    position = ed.getPosition()!;
+                }
+                const text = ed.getValue();
+                const {
+                    hiveSqlParse,
+                    sqlSlices,
+                    tree,
+                    contextManager
+                } = getContextWithCache(text, noCache, tableSourceManager);
+
+                const getCtxFromPos = createGetCtxFromPos(sqlSlices, contextManager, tree, isTest ? console.log : () => { });
+
+                const { foundNode, context, mrScope } = getCtxFromPos(position) || {};
+                if (!foundNode || !context || !mrScope) {
+                    return;
+                }
+
+                const node = mrScope.getDebugNode();
+                const sql = node ? getFormattedSqlFromNode(node) : '';
+                if (onCopyToClipboard) {
+                    await onCopyToClipboard(sql);
+                } else {
+                    console.warn('copyToClipboard', sql);
+                }
+            }
+        }
+    ]
+}
+
+function createGetCtxFromPos(sqlSlices: TextSlice[] | null, contextManager: ContextManager, tree: ProgramContext, logger: (...args: any[]) => void) {
+    return (position: Pos) => {
+        if (!sqlSlices || sqlSlices.length === 0) {
+            return null;
+        }
+        for (let i = 0; i < sqlSlices.length; i++) {
+            const slice = sqlSlices[i];
+            if (posInRange(position, sliceToRange(slice))) {
+                const symbolAndContext = contextManager.getSymbolByPosition(position);
+                if (symbolAndContext) {
+                    return symbolAndContext;
+                }
+
+                const context = contextManager.getContextByPosition(position);
+                const foundNode = findTokenAtPosition(position, tree);
+                logger('foundNode', printNodeTree(foundNode));
+                const mrScope = context?.getMrScope()?.getScopeByPosition(position) || null;
+
+                logger('getCtxFromPos mrScope', '-->', mrScope, '<--');
+                return {
+                    foundNode,
+                    context,
+                    mrScope,
+                };
+            }
+        }
+        return null;
     };
 }

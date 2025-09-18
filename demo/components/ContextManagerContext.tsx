@@ -1,5 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import { ContextManager } from '../sql_ls/context_manager';
+import { ContextManager } from '../../sql_ls/context_manager';
 
 interface ContextManagerContextType {
     contextManager: ContextManager | null;

@@ -18,6 +18,9 @@ module.exports = {
         new rspack.HtmlRspackPlugin({
             template: "demo/template/index.ejs",
         }),
+        new rspack.DefinePlugin({
+            "process.env.NODE_ENV": JSON.stringify("development"),
+        })
     ],
     module: {
         rules: [

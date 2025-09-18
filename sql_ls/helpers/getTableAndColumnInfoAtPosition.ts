@@ -1,14 +1,13 @@
 import { ParserRuleContext } from "antlr4ng";
-import { TableSourceContext, HiveSqlParser, SelectItemContext, FunctionIdentifierContext, ColumnNameContext, ColumnNamePathContext, SubQuerySourceContext, TableNameContext, Id_Context, CteStatementContext, ExpressionContext, TableAllColumnsContext, VirtualTableSourceContext, PoolPathContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { TableSourceContext, HiveSqlParser, SelectItemContext, FunctionIdentifierContext, ColumnNameContext, ColumnNamePathContext, SubQuerySourceContext, TableNameContext, Id_Context, CteStatementContext, ExpressionContext, TableAllColumnsContext, VirtualTableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { IdentifierScope } from "../identifier_scope";
 import { MapReduceScope } from "../mr_scope";
 import { EntityInfo, EntityInfoType, tableInfoFromNode, } from "../formatHoverRes";
-import { tableIdAndColumnNameFromPoolPath, tableInfoFromSubQuerySource } from "./table_and_column";
+import { tableIdAndColumnNameFromPoolPath } from "./table_and_column";
 import { rangeFromNode } from "./pos";
 import { ExtColumnInfo, TableInfo } from "../types";
-import { printNodeTree, printNode, logSource } from "./log";
+import { printNodeTree, printNode, createLogger } from "./log";
 import { matchType, matchSubPathOneOf, matchSubPath } from "./tree_query";
-import { ErrorType } from "../consts";
 import { localDbId } from "../consts";
 
 export const getEntityInfoAtPosition = async (
@@ -27,19 +26,13 @@ export const getEntityInfoAtPosition = async (
         return null;
     }
 
-    const ext: string[] = [];
-    const pushExt = isTest ? (content: string) => {
-        ext.push(content);
-    } : () => { };
-    const logger = isTest ? console.log : () => { };
-    const allIdentifiers = context.getAllIdentifiers() || {};
+    const logger = createLogger('getEntityInfoAtPosition', !!isTest);
 
     const parent = foundNode.parent!;
     // logger('do hover entities', printNode(parent), allIdentifiers.keys());
 
     const commonFields = {
         range: rangeFromNode(foundNode),
-        ext,
     };
 
     // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1392
@@ -121,7 +114,7 @@ export const getEntityInfoAtPosition = async (
         };
     }
 
-    logSource({ type: 'debug', foundNode });
+    logger.logSource({ type: 'debug', foundNode });
 
     return {
         type: EntityInfoType.Unknown,
@@ -140,11 +133,10 @@ export const getAllEntityInfoFromNode = async (
     const pushExt = isTest ? (content: string) => {
         ext.push(content);
     } : () => { };
-    pushExt(printNodeTree(node));
-    const logger = isTest ? console.log : () => { };
-    const allIdentifiers = context.getAllIdentifiers() || {};
 
-    // logger('do hover entities', printNode(node), allIdentifiers.keys());
+    pushExt(printNodeTree(node));
+
+    const logger = createLogger('getAllEntityInfoFromNode', !!isTest);
 
     const commonFields = {
         range: rangeFromNode(node),

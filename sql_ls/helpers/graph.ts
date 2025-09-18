@@ -9,7 +9,6 @@ export function mrScopeGraphOptimize(contextManager: ContextManager, rootId: str
         return;
     }
     const toVisit = [rootId];
-    console.log('mrScopeGraphOptimize start', mrScopeGraph.keys());
     while (toVisit.length) {
         const id = toVisit.pop()!;
         const node = mrScopeGraph.get(id);
@@ -27,7 +26,11 @@ export function mrScopeGraphOptimize(contextManager: ContextManager, rootId: str
             continue;
         }
 
-        // do simplification
+        // do simplification, hide the single deped node which is atom select statement or select statement
+        // by pass it and connect to its deps directly
+        // this is because atom select statement only pass through columns, can be simplified
+        // and select statement may have multiple deps, but in most cases it is just one, so we do the same simplification
+        // to reduce the node count
         const deps = node.deps;
         if (deps.length === 1) {
             const depedScope = contextManager.getMrScopeById(deps[0]);
@@ -43,10 +46,11 @@ export function mrScopeGraphOptimize(contextManager: ContextManager, rootId: str
                         ...node,
                     });
                     mrScopeGraph.delete(deps[0]);
+                    toVisit.push(id);
+                    continue;
                 }
             }
         }
         toVisit.push(...node.deps);
     }
-    console.log('mrScopeGraphOptimize end', mrScopeGraph.keys());
 }

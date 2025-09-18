@@ -117,3 +117,10 @@ export function positionFromNode(node: ParserRuleContext | TerminalNode): Pos {
         column: (node.symbol.column || -1) + 1,
     };
 }
+
+export function posFromRange(range: { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number; }): Pos {
+    return {
+        lineNumber: range.startLineNumber,
+        column: range.startColumn,
+    };
+}

@@ -10,3 +10,11 @@ export enum ErrorType {
     RefNotFound = 'ref_not_found',
     UnsupportedFeature = 'unsupported_feature',
 }
+
+export enum CommandId {
+    CopyTestSql = 'hiveSql.copyTestSql',
+}
+
+export const CommandLabel: Record<CommandId, string> = {
+    [CommandId.CopyTestSql]: 'Copy test sql',
+};

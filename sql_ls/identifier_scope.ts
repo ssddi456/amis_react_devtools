@@ -2,7 +2,7 @@ import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { TableNameContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { Position } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { getTableNameFromContext } from "./helpers/table_and_column";
-import { isPosInParserRuleContext, rangeFromNode } from "./helpers/pos";
+import { isPosInParserRuleContext, Pos, rangeFromNode } from "./helpers/pos";
 import { HighlightContext, ITableSourceManager, TableInfo, ValidateError } from "./types";
 import { printNode, ruleIndexToDisplayName } from "./helpers/log";
 import { uuidv4 } from "./helpers/util";
@@ -193,7 +193,7 @@ export class IdentifierScope {
         return this.getMrScope();
     }
 
-    containsPosition(position: Position): boolean {
+    containsPosition(position: Pos): boolean {
         if (!this.range) {
             return false;
         }

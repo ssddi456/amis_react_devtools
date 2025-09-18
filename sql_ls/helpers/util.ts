@@ -29,3 +29,26 @@ export function isTableReferenceContext(ctx: ParserRuleContext): ctx is tableRef
     }
     return false;
 }
+
+
+export const debounce = (func: (...args: any[]) => void, wait: number) => {
+    let timeout: ReturnType<typeof setTimeout> | null;
+    return (...args: any[]) => {
+        if (timeout) clearTimeout(timeout);
+        timeout = setTimeout(() => {
+            func(...args);
+        }, wait);
+    };
+};
+
+export const once = <T extends (...args: any[]) => any>(fn: T): T => {
+    let called = false;
+    let result: any;
+    return function (...args: any[]) {
+        if (!called) {
+            called = true;
+            result = fn(...args);
+        }
+        return result;
+    } as T;
+}

@@ -65,7 +65,7 @@ export function printNodeTree(node: ParserRuleContext | null, separator = '\n'):
     }).join(separator);
 }
 
-export const logSource = (arg: any) => {
+const logSource = (prefix: string, arg: any, ) => {
     if (arg && '__source' in arg) {
         const source = (arg as WithSource<{}>).__source!;
         console.log(`vscode://file/${source.fileName}%3A${source.lineNumber}%3A${source.columnNumber}`);
@@ -78,9 +78,36 @@ export const logSource = (arg: any) => {
     });
 
     if (keys.length > 0) {
-        console.log(arg);
+        console.log(`[${prefix}]`, arg);
     } else {
-        console.log(`[${arg.type}, ${arg.message}]`);
+        console.log(`[${prefix}]`, arg.type, arg.message);
     }
+};
 
+export const createLogger = (prefix: string, enableDebug: boolean) => {
+    if (!enableDebug) {
+        return {
+            log: (..._args: any[]) => { },
+            logSource: (_arg: any) => { },
+            debug: (..._args: any[]) => { },
+            error: (...args: any[]) => {
+                console.error(`[${prefix}][ERROR]`, ...args);
+            }
+        }
+    };
+
+    return {
+        log: (...args: any[]) => {
+            console.log(`[${prefix}]`, ...args);
+        },
+        logSource: (arg: Object) => {
+            logSource(prefix, arg);
+        },
+        debug: (...args: any[]) => {
+            console.log(`[${prefix}][DEBUG]`, ...args);
+        },
+        error: (...args: any[]) => {
+            console.error(`[${prefix}][ERROR]`, ...args);
+        }
+    }
 };

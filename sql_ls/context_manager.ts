@@ -31,7 +31,6 @@ import {
     Window_clauseContext,
     WithClauseContext
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { Position } from "monaco-editor";
 import {
     findTokenAtPosition,
     getColumnInfoFromNode,
@@ -42,16 +41,18 @@ import {
     tableInfoFromTableSource,
     tableInfoFromVirtualTableSource
 } from "./helpers/table_and_column";
-import { ITableSourceManager, MrScopeContext, MrScopeNodeData, tableDefType } from "./types";
+import { ITableSourceManager, MrScopeContext, MrScopeNodeData } from "./types";
 import { IdentifierScope, SymbolAndContext } from "./identifier_scope";
 import { MapReduceScope } from "./mr_scope";
-import { logSource, printNode } from "./helpers/log";
+import { createLogger, printNode } from "./helpers/log";
 import { getAllEntityInfoFromNode } from "./helpers/getTableAndColumnInfoAtPosition";
 import { formatHoverRes } from "./formatHoverRes";
 import { Pos, positionFromNode } from "./helpers/pos";
 import { WithSource } from "./helpers/util";
 import { ErrorType } from "./consts";
 import { mrScopeGraphOptimize } from "./helpers/graph";
+
+const logger = createLogger('ContextManager', process.env.NODE_ENV !== 'prod');
 
 export class ContextManager {
     rootContext: IdentifierScope | null = null;
@@ -318,7 +319,7 @@ export class ContextManager {
         this.createMrScopeGraph();
     }
 
-    getContextByPosition(position: Position): IdentifierScope | null {
+    getContextByPosition(position: Pos): IdentifierScope | null {
         if (!this.rootContext) {
             return null;
         }
@@ -524,10 +525,10 @@ export class ContextManager {
             deps.forEach(dep => {
                 edges.push({
                     id: `${dep}->${id}`,
-                    from: dep,
-                    to: id,
-                    sourceHandle: 'input',
-                    targetHandle: dep,
+                    to: dep,
+                    from: id,
+                    targetHandle: 'input',
+                    sourceHandle: dep,
                 });
             });
         });
@@ -562,7 +563,7 @@ export class ContextManager {
                 || hoverInfo.type == 'noTable'
                 || hoverInfo.type == 'noColumn'
             ) {
-                logSource(hoverInfo);
+                logger.logSource(hoverInfo);
                 const res = formatHoverRes(hoverInfo)!;
                 errors.push({
                     type: ErrorType.RefNotFound,
