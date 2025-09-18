@@ -29,9 +29,14 @@
     [*] split as a monorepo
     
 1. ui:an free to use sql development helper & usage example
-    [ ] id table
-    [ ] cte graph
-    [ ] sql collaboration
+    [ ] sql editor view
+        [ ] monaco editor with hive sql ls
+    [ ] helper view
+        [ ] symbol table tab
+            [ ] cte/select
+            [ ] column
+            [ ] forerign table
+        [ ] cte graph tab
 
 1. table graph
     [ ] get table graph from sql

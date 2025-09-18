@@ -1,11 +1,17 @@
 {
   "private": true,
   "author": "ssddi456",
-
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "npx lerna run build",
     "dev": "npx lerna run dev --scope=@amis-devtools/sql-devtools-ui",
+    "dev:demo": "npx lerna run dev --scope=@amis-devtools/demo-app",
+    "dev:all": "npx lerna run dev --parallel",
     "test": "npx lerna run test"
+  },
+  "overrides": {
+    "monaco-editor": "0.53.0"
   }
 }

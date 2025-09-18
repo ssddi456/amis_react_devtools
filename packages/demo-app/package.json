@@ -1,0 +1,25 @@
+{
+    "name": "@amis-devtools/demo-app",
+    "version": "1.0.0",
+    "description": "Free to use SQL development helper & usage example",
+    "main": "dist/index.js",
+    "scripts": {
+        "dev": "rspack dev --config ./config/rspack.config.js",
+        "build": "rspack build --config ./config/rspack.config.js"
+    },
+    "dependencies": {
+        "@amis-devtools/sql-devtools-ui": "file:../sql-devtools-ui",
+        "@amis-devtools/sql-language-service": "file:../sql-language-service",
+        "react": "17.0.2",
+        "react-dom": "17.0.2",
+        "@rspack/cli": "1.5.3",
+        "@rspack/core": "1.5.3",
+        "monaco-editor": "0.53.0"
+    },
+    "devDependencies": {
+        "typescript": "5.9.2",
+        "@types/node": "^18.0.0",
+        "@types/react": "^17.0.0",
+        "@types/react-dom": "^17.0.0"
+    }
+}

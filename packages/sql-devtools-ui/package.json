@@ -19,5 +19,8 @@
         "sql-formatter": "^15.6.6",
         "vscode-json-languageservice": "^5.6.1",
         "vscode-languageserver-types": "^3.17.5"
+    },
+    "overrides": {
+        "monaco-editor": "0.53.0"
     }
 }

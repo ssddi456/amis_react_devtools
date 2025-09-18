@@ -19,7 +19,7 @@ import { ErrorType } from "./consts";
 
 
 export interface ITableSourceManager {
-    getTableInfoByName(tableName: string, dbName: string | undefined): Promise<TableInfo | null>;
+    getTableInfoByName(tableName: string, dbName: string | undefined): Promise<TableInfo | null> | TableInfo | null;
 }
 
 export interface TableInfo {

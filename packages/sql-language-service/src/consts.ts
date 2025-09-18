@@ -18,3 +18,5 @@ export enum CommandId {
 export const CommandLabel: Record<CommandId, string> = {
     [CommandId.CopyTestSql]: 'Copy test sql',
 };
+
+export { LanguageIdEnum } from 'monaco-sql-languages';

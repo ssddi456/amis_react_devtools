@@ -1,3 +1,4 @@
+import * as monaco from 'monaco-editor';
 import { editor } from 'monaco-editor';
 import { DisposableChain } from './helpers/disposable_chain';
 import { debounce, once } from './helpers/util';
@@ -29,7 +30,7 @@ export function registerHivesqlLs({
 }) {
     envSetup();
     
-    return (editorInstance: editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
+    return (editorInstance: monaco.editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
         monaco.editor.setTheme('sql-light');
         const doValidate = debounce(async () => {
             const model = editorInstance.getModel();

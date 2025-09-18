@@ -3,7 +3,7 @@ import { getLanguageService } from 'vscode-json-languageservice';
 import { TextDocument } from 'vscode-json-languageservice';
 import * as lsTypes from 'vscode-languageserver-types';
 import { toRange, posToPosition } from "./ls_helper";
-import { Pos } from "../packages/sql-language-service/src/helpers/pos";
+import { Pos } from "@amis-devtools/sql-language-service/src/helpers/pos";
 
 const amisSchema = require("amis/schema.json");
 
