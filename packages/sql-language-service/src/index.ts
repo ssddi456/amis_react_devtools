@@ -26,7 +26,7 @@ interface ContextInfos {
 
 const contextCache = new Map<string, ContextInfos>();
 
-function getContextWithCache(text: string, noCache: boolean, tableSourceManager?: ITableSourceManager): ContextInfos {
+export function getContextWithCache(text: string, noCache: boolean, tableSourceManager?: ITableSourceManager): ContextInfos {
     if (contextCache.has(text) && !noCache) {
         return contextCache.get(text)!;
     }

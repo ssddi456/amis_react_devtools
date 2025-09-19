@@ -29,14 +29,14 @@
     [*] split as a monorepo
     
 1. ui:an free to use sql development helper & usage example
-    [ ] sql editor view
-        [ ] monaco editor with hive sql ls
+    [*] sql editor view
+        [*] monaco editor with hive sql ls
     [ ] helper view
         [ ] symbol table tab
-            [ ] cte/select
+            [*] cte/select
             [ ] column
             [ ] forerign table
-        [ ] cte graph tab
+        [*] cte graph tab
 
 1. table graph
     [ ] get table graph from sql
@@ -46,13 +46,15 @@
     [ ] more cases
         [*] union
         [*] intersect
+        [ ] orderby
+        [ ] sortby
         [ ] except
         [*] subquery in from
-        [ ] subquery in where
+        [*] subquery in where
         [ ] subquery in select
         [*] cte recursive
-        [ ] window function
-        [ ] over(partition by ...)
+        [*] window function
+        [*] over(partition by ...)
         [*] join on ...
         [*] join using ...
         [ ] join natural

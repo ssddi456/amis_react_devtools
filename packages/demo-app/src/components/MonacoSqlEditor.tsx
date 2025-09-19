@@ -1,25 +1,37 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import * as monaco from 'monaco-editor';
 import { registerHivesqlLs } from '@amis-devtools/sql-language-service/src/register_ls';
 import { LanguageIdEnum } from '@amis-devtools/sql-language-service/src/consts';
 import { copyToClipboard } from '@amis-devtools/sql-devtools-ui/src/tools/copy';
+import { ITableSourceManager } from '@amis-devtools/sql-language-service/src/types';
 
 interface MonacoSqlEditorProps {
+  tableSourceManager: ITableSourceManager;
   value?: string;
   onChange?: (value: string) => void;
-  height?: number;
   readOnly?: boolean;
+  onValidate?: (errors: monaco.editor.IMarkerData[]) => void;
 }
 
-export const MonacoSqlEditor: React.FC<MonacoSqlEditorProps> = ({
+export interface MonacoSqlEditorRef {
+  getEditor: () => monaco.editor.IStandaloneCodeEditor | null;
+}
+
+export const MonacoSqlEditor = forwardRef<MonacoSqlEditorRef, MonacoSqlEditorProps>(({
+  tableSourceManager,
   value = '',
   onChange,
-  height = 400,
   readOnly = false,
-}) => {
+  onValidate,
+}, ref) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const monacoEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Expose the Monaco editor instance through the ref
+  useImperativeHandle(ref, () => ({
+    getEditor: () => monacoEditorRef.current,
+  }));
 
   useEffect(() => {
     if (editorRef.current && !monacoEditorRef.current) {
@@ -50,15 +62,11 @@ export const MonacoSqlEditor: React.FC<MonacoSqlEditorProps> = ({
 
       // Register Hive SQL language service
       const registerLs = registerHivesqlLs({
-        tableSourceManager: {
-            getTableInfoByName: () => {
-                // Mock implementation, replace with actual logic to fetch table info
-                return null;
-            }
-        },
+        tableSourceManager,
         onCopyToClipboard: (text: string) => {
           return copyToClipboard(text);
-        }
+        },
+        onValidate,
       });
 
       // Apply language service to editor
@@ -99,12 +107,12 @@ export const MonacoSqlEditor: React.FC<MonacoSqlEditorProps> = ({
     <div 
       ref={editorRef} 
       style={{ 
-        height: `${height}px`, 
+        height: '100%', 
         width: '100%',
         border: '1px solid #ddd',
         borderRadius: '4px',
-        overflow: 'hidden'
+        overflow: 'auto'
       }} 
     />
   );
-};
+});

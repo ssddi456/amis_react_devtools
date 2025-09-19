@@ -229,12 +229,13 @@ export class DisplayMRScope extends React.Component<DisplayMRScopeProps, Context
 
         return (
             <div onContextMenu={(e) => this.showContextMenu(e)}>
-                <div>MapReduce Scope [{mrScope.mrOrder}]</div>
-                <div>{cteName ? <span>[CTE: {cteName}]</span> : null} {printNode(mrScope.getDisplayContext())}</div>
+                <div>{cteName ? <span>[CTE: {cteName}]</span> : null}</div>
                 {
                     this.state.showDebug
                         ? (
                             <>
+                                <div>MapReduce Scope [{mrScope.mrOrder}]</div>
+                                <div>{printNode(mrScope.getDisplayContext())}</div>
                                 <div>id: {mrScope.id}</div>
                                 <div>
                                     {this.renderInputTables(mrScope)}

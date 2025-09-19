@@ -84,6 +84,7 @@ export const getEntityInfoAtPosition = async (
 
     // columnName -> poolPath -> id_(from default table name)
     // columnName -> poolPath -> id_(table name or alias), ., _id
+    // TODO: check if in orderby / sortby
     const columnName = matchSubPathOneOf(foundNode, [
         ['id_', 'poolPath', 'columnName'],
         ['id_', 'poolPath', 'columnNamePath'],
@@ -230,11 +231,11 @@ async function getEntityInfoFromTableSource(
     context: IdentifierScope,
     mrScope: MapReduceScope | null
 ) {
-    console.group('getEntityInfoFromTableSource');
-    console.log('node', printNode(node));
-    console.log('parent', printNode(parent));
-    console.log('mrScope', mrScope);
-    console.groupEnd();
+    // console.group('getEntityInfoFromTableSource');
+    // console.log('node', printNode(node));
+    // console.log('parent', printNode(parent));
+    // console.log('mrScope', mrScope);
+    // console.groupEnd();
 
     let tableName = '';
     if (node === parent.id_()) {
@@ -285,12 +286,6 @@ async function getEntityInfoFromTableName(
             tableInfo: foreignTableInfo,
         };
     }
-
-    console.log('getEntityInfoFromTableName no table info found for', tableName, item, mrScope);
-    // if (tableName === 't1') {
-    //     debugger;
-    //     mrScope?.getTableByName(tableName);
-    // }
 
     return {
         type: EntityInfoType.NoTable,
@@ -357,14 +352,14 @@ async function getEntityInfoFromColumnName(
         if (!item) {
             return {
                 type: EntityInfoType.NoTable,
-                text: printNode(parent),
+                text: mrScope?.getDefaultInputTableName(),
             };
         }
         const tableInfo = await tableInfoFromNode(item, context);
         if (!tableInfo) {
             return {
                 type: EntityInfoType.NoTable,
-                text: printNode(parent),
+                text: mrScope?.getDefaultInputTableName(),
             };
         }
         const columnInfo = getColumnInfoByName(tableInfo, columnName!);

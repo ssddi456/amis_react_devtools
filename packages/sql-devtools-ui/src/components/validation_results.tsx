@@ -5,9 +5,10 @@ import { WithSource } from '@amis-devtools/sql-language-service/src/helpers/util
 
 interface ValidationResultsProps {
     validationResults: WithSource<editor.IMarkerData>[] | undefined;
+    onErrorClick?: (marker: editor.IMarkerData) => void;
 }
 
-export function ValidationResults({ validationResults }: ValidationResultsProps) {
+export function ValidationResults({ validationResults, onErrorClick }: ValidationResultsProps) {
     return (
         <div>
             {validationResults ? (
@@ -38,7 +39,11 @@ export function ValidationResults({ validationResults }: ValidationResultsProps)
                                             padding: '8px',
                                             border: `1px solid ${severityColor}`,
                                             borderRadius: '4px',
-                                            backgroundColor: `${severityColor}15`
+                                            backgroundColor: `${severityColor}15`,
+                                            cursor: 'pointer',
+                                        }}
+                                        onClick={() => {
+                                            onErrorClick?.(marker);
                                         }}
                                     >
                                         <div style={{ 

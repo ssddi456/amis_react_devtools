@@ -71,7 +71,6 @@ This demo app showcases how to integrate:
 - `@amis-devtools/sql-devtools-ui` - UI components for SQL development
 - `@amis-devtools/sql-language-service` - Language service for SQL intelligence
 - `monaco-editor` - Code editor component
-- `monaco-sql-languages` - SQL language support for Monaco
 
 ## Related Packages
 

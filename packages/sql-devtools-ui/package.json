@@ -14,13 +14,12 @@
         "amis": "^6.12.0",
         "click-to-react-component": "^1.1.2",
         "dt-sql-parser": "^4.3.1",
-        "monaco-sql-languages": "^0.15.1",
         "node-polyfill-webpack-plugin": "^4.1.0",
         "sql-formatter": "^15.6.6",
         "vscode-json-languageservice": "^5.6.1",
         "vscode-languageserver-types": "^3.17.5"
     },
     "overrides": {
-        "monaco-editor": "0.53.0"
+        "monaco-editor": "0.31.1"
     }
 }

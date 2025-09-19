@@ -358,7 +358,7 @@ all_house_code as (
     from
         news_record_mirror
  	where
-  		news_type != 'xiaob_forward'
+  		news_type != 'xiao_forward'
 ),
 new_count as (
     select
@@ -404,14 +404,14 @@ visit_deal_count as (
     group by
         house_code
 ),
-xiaob_forward_count as (
+xiao_forward_count as (
     select
         house_code,
-        count(*) as xiaob_forward
+        count(*) as xiao_forward
     from
         news_record_mirror
     WHERE
-        news_type = 'xiaob_forward'
+        news_type = 'xiao_forward'
     group by
         house_code
 ),
@@ -435,17 +435,76 @@ select
     nvl(deal_count.deal, 0) as deal,
     nvl(visit_count.visit, 0) as visit,
     nvl(visit_deal_count.visit_deal, 0) as visit_deal,
-    nvl(xiaob_forward_count.xiaob_forward, 0) as xiaob_forward
+    nvl(xiao_forward_count.xiao_forward, 0) as xiao_forward
 from
     all_house_code
     left join new_count on all_house_code.house_code = new_count.house_code
     left join deal_count on all_house_code.house_code = deal_count.house_code
     left join visit_count on all_house_code.house_code = visit_count.house_code
     left join visit_deal_count on all_house_code.house_code = visit_deal_count.house_code
-    left join xiaob_forward_count on all_house_code.house_code = xiaob_forward_count.house_code
+    left join xiao_forward_count on all_house_code.house_code = xiao_forward_count.house_code
     left join price_down_count on all_house_code.house_code = price_down_count.house_code
 UNION all
 SELECT "106124389836", 1, 2, 3, 4, 5, 6 UNION all
 SELECT "106124389839", 1, 2, 3, 4, 5, 6
 ;`
+,`SELECT 
+    p.product_id,
+    p.product_name,
+    p.price,
+    p.category_id
+FROM products p
+WHERE p.price > (
+    SELECT AVG(price) 
+    FROM products 
+    WHERE category_id = p.category_id
+)
+AND EXISTS (
+    SELECT 1 
+    FROM order_items oi 
+    WHERE oi.product_id = p.product_id 
+      AND oi.created_at >= DATE_SUB(CURRENT_DATE, INTERVAL 90 DAY)
+)
+ORDER BY p.price DESC;`
+,`SELECT id, name, email, created_at
+FROM users 
+WHERE status = 'active' 
+  AND created_at > '2023-01-01'
+ORDER BY created_at DESC
+          ^
+LIMIT 100;`
+,`SELECT 
+      customer_id,
+      SUM(total_amount) as total_spent,
+      COUNT(*) as total_orders,
+      CASE 
+      ^
+          WHEN SUM(total_amount) >= 10000 THEN 'VIP'
+          WHEN SUM(total_amount) >= 1000 THEN 'Premium'
+          ELSE 'Standard'
+      END as customer_segment
+  FROM orders
+  WHERE order_date >= DATE_SUB(CURRENT_DATE, INTERVAL 12 MONTH)
+  GROUP BY customer_id
+`
+,`SELECT 
+    p.product_id,
+    p.product_name,
+    p.price,
+    p.category_id
+FROM products p
+WHERE p.price > (
+    SELECT AVG(price) 
+    FROM products 
+    WHERE category_id = p.category_id
+                        ^
+)
+AND EXISTS (
+    SELECT 1 
+    FROM order_items oi 
+    WHERE oi.product_id = p.product_id 
+                          ^
+      AND oi.created_at >= DATE_SUB(CURRENT_DATE, INTERVAL 90 DAY)
+)
+ORDER BY p.price DESC;`
 ].map(x => caseFromString(x));

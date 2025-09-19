@@ -15,6 +15,7 @@ import {
     GroupByClauseContext,
     HavingClauseContext,
     JoinSourceContext,
+    OrderByClauseContext,
     ProgramContext,
     QualifyClauseContext,
     QueryStatementExpressionContext,
@@ -22,6 +23,7 @@ import {
     SelectItemContext,
     SelectStatementContext,
     SelectStatementWithCTEContext,
+    SortByClauseContext,
     SubQuerySourceContext,
     TableNameContext,
     TableNameCreateContext,
@@ -67,18 +69,18 @@ export class ContextManager {
         this.rootContext = new IdentifierScope(tree, null, null);
         this.rootContext.tableSourceManager = tableSourceManager;
         this.currentContext = this.rootContext;
+        const contextStack: IdentifierScope[] = [];
 
-        function enterRule(ctx: ParserRuleContext) {
+        function enterRule(ctx: ParserRuleContext, parentContext: IdentifierScope | null = manager.currentContext) {
+            contextStack.push(manager.currentContext!);
             // console.log('enterRule', printNode(ctx));
-            const newContext = manager.currentContext!.enterScope(ctx);
+            const newContext = parentContext!.enterScope(ctx);
             manager.currentContext = newContext;
             return newContext;
         }
 
         function exitRule() {
-            if (manager.currentContext) {
-                manager.currentContext = manager.currentContext.parent;
-            }
+            manager.currentContext = contextStack.pop()!;
         }
 
         function enterTable(ctx: MrScopeContext, identifierScope: IdentifierScope) {
@@ -147,7 +149,6 @@ export class ContextManager {
                     ].find((x) => x !== null);
 
                     if (defaultTableInfo) {
-                        manager.currentContext?.setDefaultIdentifier(defaultTableInfo);
                         manager.currentContext?.getMrScope()?.setDefaultInputTable('', defaultTableInfo);
                     }
 
@@ -224,6 +225,30 @@ export class ContextManager {
                 enterRule(ctx);
             };
             exitQualifyClause = (ctx: QualifyClauseContext) => {
+                exitRule();
+            };
+            enterOrderByClause = (ctx: OrderByClauseContext) => {
+                // if (ctx.parent instanceof SelectStatementContext) {
+                //     const parent = manager.currentContext?.children.find(c => c.context instanceof AtomSelectStatementContext);
+                //     enterRule(ctx, parent || manager.currentContext);
+                // } else {
+                //     enterRule(ctx);
+                // }
+                enterRule(ctx);
+            };
+            exitOrderByClause = (ctx: OrderByClauseContext) => {
+                exitRule();
+            };
+            enterSortByClause = (ctx: SortByClauseContext) => {
+                // if (ctx.parent instanceof SelectStatementContext) {
+                //     const parent = manager.currentContext?.children.find(c => c.context instanceof AtomSelectStatementContext);
+                //     enterRule(ctx, parent || manager.currentContext);
+                // } else {
+                //     enterRule(ctx);
+                // }
+                enterRule(ctx);
+            };
+            exitSortByClause = (ctx: SortByClauseContext) => {
                 exitRule();
             };
 
@@ -355,14 +380,6 @@ export class ContextManager {
         return lastContext;
     }
 
-    toString() {
-        if (!this.rootContext) {
-            return 'No context';
-        }
-
-        return this.rootContext.toString();
-    }
-
     getHighlights() {
         return this.rootContext?.getHighlights() || [];
     }
@@ -443,6 +460,7 @@ export class ContextManager {
                             const tableInfo = getTableNameFromContext(tableDef);
                             this.mrScopeGraph.set(tableInfo.tableId, {
                                 deps: [],
+                                pos: positionFromNode(tableDef),
                                 type: 'external',
                                 isOrphan: false,
                             });
@@ -458,6 +476,7 @@ export class ContextManager {
                     } else {
                         this.mrScopeGraph.set(input.tableName, {
                             deps: [],
+                            pos: positionFromNode(posRef),
                             type: 'external',
                             isOrphan: false,
                         });
@@ -470,6 +489,7 @@ export class ContextManager {
             console.groupEnd();
             this.mrScopeGraph.set(id, {
                 deps,
+                pos: positionFromNode(mrScope.context),
                 type: 'local',
                 isOrphan: false,
             });
@@ -507,10 +527,42 @@ export class ContextManager {
         const nodes: { id: string; data: MrScopeNodeData; position: { x: number; y: number } }[] = [];
 
         const edges: { id: string; from: string; to: string, sourceHandle: string, targetHandle: string }[] = [];
-        console.log('mrScopeGraph', this.mrScopeGraph);
         this.mrScopeGraph.forEach((node, id) => {
             const mrScope = this.getMrScopeById(id);
-            if (mrScope && mrScope.mrOrder === 0) {
+            if (!mrScope) {
+                if (node.type === 'external') {
+                    nodes.push({ id, data: {
+                        ...node,
+                        id,
+                        label: id,
+                        description: '',
+                    }, position: { x: 0, y: 0 } });
+                } else {
+                    console.warn('Cannot find mrScope for id', id, node);
+                }
+                return;
+            }
+
+            if (mrScope.mrOrder === 0) {
+                const deps = node.deps;
+                const depDatas = deps.map(depId => this.mrScopeGraph.get(depId)).filter(x => x);
+                if (depDatas.some(x => x!.type !== 'local')) {
+                    nodes.push({ id, data: {
+                        ...node,
+                        id,
+                        label: 'root',
+                        description: '',
+                    }, position: { x: 0, y: 0 } });
+                    deps.forEach(dep => {
+                        edges.push({
+                            id: `${dep}->${id}`,
+                            to: dep,
+                            from: id,
+                            targetHandle: 'input',
+                            sourceHandle: dep,
+                        });
+                    });
+                }
                 return;
             }
             
@@ -518,7 +570,7 @@ export class ContextManager {
             nodes.push({ id, data: {
                 ...node,
                 id,
-                label: type === 'external' ? id : 'order ' + this.getMrScopeById(id)?.mrOrder,
+                label: 'order ' + this.getMrScopeById(id)?.mrOrder,
                 description: '',
             }, position: { x: 0, y: 0 } });
 
@@ -532,7 +584,7 @@ export class ContextManager {
                 });
             });
         });
-        console.log('getMrScopeGraphNodeAndEdges', nodes, edges);
+
         return { nodes, edges };
     }
 

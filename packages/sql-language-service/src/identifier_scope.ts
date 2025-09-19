@@ -1,6 +1,5 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { TableNameContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { Position } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { getTableNameFromContext } from "./helpers/table_and_column";
 import { isPosInParserRuleContext, Pos, rangeFromNode } from "./helpers/pos";
 import { HighlightContext, ITableSourceManager, TableInfo, ValidateError } from "./types";
@@ -36,8 +35,6 @@ export class IdentifierScope {
     tableIdentifierMap: Map<string, ParserRuleContext> = new Map();
 
     referenceNotFound: Map<string, ParserRuleContext[]> = new Map();
-
-    defaultIdentifier: ParserRuleContext | null = null;
 
     children: IdentifierScope[] = [];
 
@@ -79,42 +76,10 @@ export class IdentifierScope {
         return null;
     }
 
-    setDefaultIdentifier(identifier: ParserRuleContext) {
-        this.defaultIdentifier = identifier;
-    }
-
     addIdentifier(name: string, identifier: ParserRuleContext, isTempTable = false) {
         if (identifier) {
             this.tableIdentifierMap.set(name, identifier);
         }
-    }
-
-    getAllIdentifiers() {
-        const identifiers = new Map<string, ParserRuleContext>(this.tableIdentifierMap);
-        if (this.parent) {
-            const parentIdentifiers = this.parent.getAllIdentifiers();
-            parentIdentifiers.forEach((value, key) => {
-                if (!identifiers.has(key)) {
-                    identifiers.set(key, value);
-                }
-            });
-        }
-        return identifiers;
-    }
-
-    getDefaultIdentifier(): ParserRuleContext | null {
-        const defaultIdentifier = this.parent?.defaultIdentifier;
-        if (defaultIdentifier) {
-            if (defaultIdentifier instanceof TableSourceContext) {
-                const tableName = defaultIdentifier.tableOrView().getText();
-                const parentRes = this.parent?.lookupDefinition(tableName);
-                if (parentRes) {
-                    return parentRes;
-                }
-            }
-            return defaultIdentifier;
-        }
-        return null;
     }
 
     enterScope(context: ParserRuleContext) {
@@ -198,19 +163,6 @@ export class IdentifierScope {
             return false;
         }
         return isPosInParserRuleContext(position, this.context);
-    }
-
-    toString(depth: number = 0, result: string[] = []) {
-        const indent = ' '.repeat(depth * 2);
-        result.push(`${indent}(${printNode(this.context)})`);
-        const identifiers = this.tableIdentifierMap.entries();
-        Array.from(identifiers).forEach(([name, identifier]) => {
-            result.push(`${indent}  ${name} -> ${printNode(identifier)}`);
-        });
-        this.children.forEach(child => {
-            child.toString(depth + 1, result);
-        });
-        return result.join('\n');
     }
 
     addHighlight(range: HighlightRange) {

@@ -5,7 +5,6 @@ export function mrScopeGraphOptimize(contextManager: ContextManager, rootId: str
     const mrScopeGraph = contextManager.mrScopeGraph;
     let graphRoot = mrScopeGraph.get(rootId);
     if (!graphRoot) {
-        debugger;
         return;
     }
     const toVisit = [rootId];

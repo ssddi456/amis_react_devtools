@@ -1,5 +1,5 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
-import { AtomSelectStatementContext, CteStatementContext, ExpressionContext, QueryStatementExpressionBodyContext, QueryStatementExpressionContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { AtomSelectStatementContext, CteStatementContext, ExpressionContext, QueryStatementExpressionBodyContext, QueryStatementExpressionContext, SelectStatementContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { uuidv4 } from "./helpers/util";
 import { IdentifierScope } from "./identifier_scope";
 import { getAtomExpressionFromExpression, getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getOnConditionOfFromClause, isSameColumnInfo } from "./helpers/table_and_column";
@@ -97,6 +97,7 @@ export class MapReduceScope {
                 if (atom?.function_()
                     || atom?.constant() 
                     || atom?.intervalExpression()
+                    || atom?.whenExpression()
                 ) {
                     return;
                 }
@@ -174,7 +175,6 @@ export class MapReduceScope {
         if (context instanceof QueryStatementExpressionContext) {
             return this;
         }
-
         if (context instanceof AtomSelectStatementContext) {
             const selectClause = context.selectClause();
             if (selectClause && isPosInParserRuleContext(position, selectClause)) {
@@ -231,6 +231,19 @@ export class MapReduceScope {
                 return this;
             }
         }
+
+        if (context instanceof SelectStatementContext) {
+            const orderByClause = context.orderByClause();
+            if (orderByClause && isPosInParserRuleContext(position, orderByClause)) {
+                // input
+                return this.getChildScopes().find(s => s.context instanceof AtomSelectStatementContext) || this;
+            }
+            const sortByClause = context.sortByClause();
+            if (sortByClause && isPosInParserRuleContext(position, sortByClause)) {
+                // input
+                return this.getChildScopes().find(s => s.context instanceof AtomSelectStatementContext) || this;
+            }
+        }
         return null;
     }
 
@@ -270,6 +283,15 @@ export class MapReduceScope {
         const tableDef = this.tableDefinitions.get(name);
         if (tableDef) {
             return tableDef.reference;
+        }
+        // not found in current scope, check if should check parent scope
+        if (matchSubPath(this.context, ['atomSelectStatement', 'selectStatement', 'subQueryExpression', '*', 'expression', 'whereClause'])) {
+            console.log('In whereClause', this.getParentMrScope(), this.getParentMrScope()?.getParentMrScope());
+            const parentMrScope = this.getParentMrScope()?.getParentMrScope();
+            const parentRef = parentMrScope?.getTableByName(name);
+            if (parentRef) {
+                return parentRef;
+            }
         }
         return reference;
     }

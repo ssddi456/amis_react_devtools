@@ -4,29 +4,36 @@ import { DisposableChain } from './helpers/disposable_chain';
 import { debounce, once } from './helpers/util';
 import { createHiveSqlLanguageService, createHiveSqlActions } from './index';
 import { ITableSourceManager } from './types';
-import { LanguageIdEnum, setupLanguageFeatures, vsPlusTheme } from 'monaco-sql-languages';
+import { LanguageIdEnum, registerLanguage, setupLanguageFeatures, vsPlusTheme } from 'monaco-sql-languages';
 import 'monaco-sql-languages/esm/languages/hive/hive.contribution';
-
-
 const envSetup = once(() => {
     // Customize the various tokens style
     editor.defineTheme('sql-dark', vsPlusTheme.darkThemeData);
     editor.defineTheme('sql-light', vsPlusTheme.lightThemeData);
     editor.defineTheme('sql-hc', vsPlusTheme.hcBlackThemeData);
     
+    registerLanguage({
+        id: LanguageIdEnum.HIVE,
+        extensions: ['.hivesql'],
+        aliases: ['HiveSQL', 'hive', 'Hive'],
+        loader: () => import('monaco-sql-languages/esm/languages/hive/hive')
+    });
     setupLanguageFeatures(LanguageIdEnum.HIVE, {
         completionItems: true,
-        references: true,
+        references: false,
         diagnostics: false,
+        definitions: false,
     });
 });
 
 export function registerHivesqlLs({
     tableSourceManager,
     onCopyToClipboard,
+    onValidate,
 }: {
     tableSourceManager: ITableSourceManager,
     onCopyToClipboard?: (text: string) => void | Promise<void>,
+    onValidate?: (errors: editor.IMarkerData[]) => void,
 }) {
     envSetup();
     
@@ -38,7 +45,8 @@ export function registerHivesqlLs({
                 const context = createHiveSqlLanguageService({ model, tableSourceManager, });
                 const errors = await context.doValidation();
                 console.log('validation errors', errors);
-                monaco.editor.setModelMarkers(model, LanguageIdEnum.HIVE, errors.map(err => {
+                
+                const markers = errors.map(err => {
                     return {
                         severity: monaco.MarkerSeverity.Error,
                         startLineNumber: err.startLineNumber,
@@ -47,7 +55,12 @@ export function registerHivesqlLs({
                         endColumn: err.endColumn,
                         message: err.message
                     };
-                }));
+                });
+                
+                monaco.editor.setModelMarkers(model, LanguageIdEnum.HIVE, markers);
+                
+                // Call the onValidate callback if provided
+                onValidate?.(errors);
             }
         }, 300);
 

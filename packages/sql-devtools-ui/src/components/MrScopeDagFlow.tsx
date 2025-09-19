@@ -22,8 +22,8 @@ import { MrScopeNodeData } from '@amis-devtools/sql-language-service/src/types';
 import { useContextManager } from './ContextManagerContext';
 import { DisplayMRScope } from './DisplayMRScope';
 import './MrScopeDagFlow.css';
-import { SourceLink } from './source_link';
 import { WithSource } from '@amis-devtools/sql-language-service/src/helpers/util';
+
 // 自定义节点类型
 const MrScopeNode = ({ data, id }: { data: WithSource<MrScopeNodeData>; id: string }) => {
     const { contextManager } = useContextManager();
@@ -34,17 +34,34 @@ const MrScopeNode = ({ data, id }: { data: WithSource<MrScopeNodeData>; id: stri
     if (!mrScope && data.type === 'local') {
         console.error('MrScopeNode: cannot find mrScope for id', data.id);
     }
+
+    // 处理节点点击事件
+    const handleNodeClick = useCallback(() => {
+        if ((data as any).onNodeClick) {
+            (data as any).onNodeClick(id, data);
+        }
+    }, [id, data]);
+
+    // 处理节点双击事件
+    const handleNodeDoubleClick = useCallback(() => {
+        if ((data as any).onNodeDoubleClick) {
+            (data as any).onNodeDoubleClick(id, data);
+        }
+    }, [id, data]);
+
     // 测量节点尺寸并上报
     useEffect(() => {
-        if (nodeRef.current && data.onNodeSizeChange) {
+        if (nodeRef.current && (data as any).onNodeSizeChange) {
             const { offsetWidth, offsetHeight } = nodeRef.current;
-            data.onNodeSizeChange(id, { width: offsetWidth, height: offsetHeight });
+            (data as any).onNodeSizeChange(id, { width: offsetWidth, height: offsetHeight });
         }
     }, [id, data, mrScope]); // 依赖mrScopt确保内容变化时重新测量
 
     return (
         <div
             ref={nodeRef}
+            onClick={handleNodeClick}
+            onDoubleClick={handleNodeDoubleClick}
             style={{
                 padding: '10px 15px',
                 borderRadius: '8px',
@@ -168,9 +185,11 @@ interface MrScopeDagFlowProps {
         sourceHandle: string;
         targetHandle: string;
     }>;
+    onNodeClick?: (nodeId: string, nodeData: MrScopeNodeData) => void;
+    onNodeDoubleClick?: (nodeId: string, nodeData: MrScopeNodeData) => void;
 }
 
-export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNodes, edges: initialEdges }) => {
+export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNodes, edges: initialEdges, onNodeClick, onNodeDoubleClick }) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [nodeSizes, setNodeSizes] = useState<Map<string, { width: number; height: number }>>(new Map());
     const [isInitialLayoutDone, setIsInitialLayoutDone] = useState(false);
@@ -198,10 +217,12 @@ export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNo
             data: {
                 ...node.data as any,
                 onNodeSizeChange: handleNodeSizeChange,
+                onNodeClick,
+                onNodeDoubleClick,
             },
             position: node.position,
         })),
-        [initialNodes, handleNodeSizeChange]
+        [initialNodes, handleNodeSizeChange, onNodeClick, onNodeDoubleClick]
     );
 
     const reactFlowEdges: Edge[] = useMemo(() =>

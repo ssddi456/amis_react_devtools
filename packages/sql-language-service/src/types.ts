@@ -16,6 +16,7 @@ import {
     VirtualTableSourceContext,
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ErrorType } from "./consts";
+import { Pos } from "./helpers/pos";
 
 
 export interface ITableSourceManager {
@@ -63,6 +64,7 @@ export type tableDefType = 'local' | 'external';
 
 export interface MrScopeNodeData {
     id: string;
+    pos: Pos;
     deps: string[];
     isOrphan: boolean;
     type: tableDefType;

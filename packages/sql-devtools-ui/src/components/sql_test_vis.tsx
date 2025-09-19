@@ -6,6 +6,7 @@ import { ContextManager } from '@amis-devtools/sql-language-service/src/context_
 import { TextHighlight } from './text_highlight';
 import tableSourceManager from '../data/example';
 import { DisplayContextManager } from './DisplayContextManager';
+import { DisplaySymbols } from './DisplaySymbols';
 
 interface SqlTestVisProps {
     sqlTest: string;
@@ -108,6 +109,22 @@ export class SqlTestVis extends React.Component<SqlTestVisProps, SqlTestVisState
                     >
                         {context && (
                             <DisplayContextManager context={context.rootContext!} />
+                        )}
+                    </div>
+                    <div
+                        style={{
+                            flex: '1',
+                            overflowY: 'auto',
+                        }}
+                    >
+                        {context && (
+                            <DisplaySymbols 
+                                contextManager={context} 
+                                onNodeClick={(symbol) => {
+                                    console.log('Symbol clicked:', symbol);
+                                    // You can add custom logic here, e.g., highlight in editor
+                                }}
+                            />
                         )}
                     </div>
                 </div>

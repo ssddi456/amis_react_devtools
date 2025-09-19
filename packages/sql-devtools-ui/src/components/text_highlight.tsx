@@ -67,7 +67,7 @@ function normalizeHighlights(highlights: { start: number; end: number; type: str
 
 // TextHighlight component for rendering highlighted SQL text
 export const TextHighlight: React.FC<{ text: string; highlights: { start: number; end: number; type: string }[] }> = ({ text, highlights }) => {
-    const parts = [];
+    const parts: JSX.Element[] = [];
     let lastIndex = 0;
 
     const normalizedHighlights = normalizeHighlights(highlights);
