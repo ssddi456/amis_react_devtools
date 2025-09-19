@@ -1,3 +1,5 @@
+## functions
+
 1. get definition
     [ ] database
     [*] table
@@ -62,7 +64,11 @@
         [*] insert into ... select ...
     [ ] expected result
 
-# 更好的测试方法
+## showcase
+
+[ ] github pages
+
+## 更好的测试方法
 
 * 在需要调试的地方添加断言 or debugger
-* logWithSouce
+* logWithSource
