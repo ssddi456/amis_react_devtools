@@ -11,7 +11,7 @@ cd packages/demo-app
 npm run build
 
 cd -
-
+mkdir -p public
 cp -r packages/demo-app/dist/* ./public/
 
 # 删除public 以外的文件
