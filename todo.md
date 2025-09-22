@@ -8,6 +8,7 @@
     [ ] column alias
     [ ] star column
     [ ] function
+    [ ] comments
     
 1. validate
     [*] check definition

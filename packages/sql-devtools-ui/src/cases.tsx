@@ -514,4 +514,11 @@ WHERE status = 'active'
 ORDER BY alt_created_at DESC
          ^
 LIMIT 100;`
+,`SELECT 
+    p.product_id, -- some comments
+                     ^
+    p.product_name,
+    p.price,
+    p.category_id
+FROM products p`
 ].map(x => caseFromString(x));

@@ -167,7 +167,7 @@ export class IdentifierScope {
 
     addHighlight(range: HighlightRange) {
         if (range.start === range.end) {
-            throw new Error(`Highlight ranges should not have zero length: ${JSON.stringify(range)}`);
+            throw new Error(`Highlight ranges should not have zero length: ${printNode(range.context)}`);
         }
         this.highlightRanges.push(range);
     }
