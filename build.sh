@@ -32,13 +32,13 @@ cd -
 mkdir -p public
 cp -r packages/demo-app/dist/* ./public/
 
-# 删除public 以外的文件
-git ls-files | grep -v '^public/' | xargs git rm -rf
+# 删除除了public 之外的所有文件
+find . -maxdepth 1 ! -name 'public' ! -name '.' ! -name '.git' -exec rm -rf {} +
 
 # 将public 下的文件移动到根目录
-git mv public/* .
+mv public/* .
 
-git rm -rf public
+rm -rf public
 
 git add .
 
