@@ -507,4 +507,11 @@ AND EXISTS (
       AND oi.created_at >= DATE_SUB(CURRENT_DATE, INTERVAL 90 DAY)
 )
 ORDER BY p.price DESC;`
+,`SELECT id, name, email, created_at as alt_created_at
+FROM users 
+WHERE status = 'active' 
+  AND created_at > '2023-01-01'
+ORDER BY alt_created_at DESC
+         ^
+LIMIT 100;`
 ].map(x => caseFromString(x));

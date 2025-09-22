@@ -7,6 +7,13 @@ export interface Pos {
     column: number;
 }
 
+export interface Range {
+    startLineNumber: number;
+    startColumn: number;
+    endLineNumber: number;
+    endColumn: number;
+}
+
 export function sliceToRange(slice: {
     readonly startLine: number;
     /** end at ..n */
@@ -15,7 +22,7 @@ export function sliceToRange(slice: {
     readonly startColumn: number;
     /** end at ..n + 1 */
     readonly endColumn: number;
-}) {
+}): Range {
     return {
         startLineNumber: slice.startLine,
         startColumn: slice.startColumn,
@@ -97,7 +104,7 @@ export function rangeFromNode(node: ParserRuleContext | TerminalNode) {
 
 }
 
-export function posInRange(pos: Pos, range: { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number; }) {
+export function posInRange(pos: Pos, range: Range) {
     return pos.lineNumber >= range.startLineNumber &&
         pos.lineNumber <= range.endLineNumber &&
         (pos.lineNumber > range.startLineNumber || pos.column >= range.startColumn) &&
@@ -118,7 +125,7 @@ export function positionFromNode(node: ParserRuleContext | TerminalNode): Pos {
     };
 }
 
-export function posFromRange(range: { startLineNumber: number; startColumn: number; endLineNumber: number; endColumn: number; }): Pos {
+export function posFromRange(range: Range): Pos {
     return {
         lineNumber: range.startLineNumber,
         column: range.startColumn,

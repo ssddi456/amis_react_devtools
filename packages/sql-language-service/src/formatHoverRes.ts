@@ -1,9 +1,9 @@
-import { ParserRuleContext, ParseTree } from "antlr4ng";
+import { ParserRuleContext } from "antlr4ng";
 import { TableSourceContext, SubQuerySourceContext, VirtualTableSourceContext, CteStatementContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { type IRange, languages, Uri } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
+import { languages, Uri } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { IdentifierScope } from "./identifier_scope";
 import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, functionRes, unknownRes } from "./sql_res";
-import { rangeFromNode } from "./helpers/pos";
+import { rangeFromNode, Range } from "./helpers/pos";
 import { ExtColumnInfo, TableInfo } from "./types";
 import { printNode } from "./helpers/log";
 import { WithSource } from "./helpers/util";
@@ -155,9 +155,9 @@ export enum EntityInfoType {
 export interface EntityInfo {
     type: EntityInfoType;
     tableInfo?: TableInfo | null;
-    columnInfo?: ExtColumnInfo | null;
+    columnInfo?: ExtColumnInfo & { range?: Range} | null;
     text?: string;
-    range: IRange;
+    range: Range;
     ext?: string[];
     __source?: {
         fileName: string;
@@ -192,15 +192,37 @@ export function formatHoverRes(hoverInfo: EntityInfo, ignoreError = false): With
 };
 
 export const formatDefinitionRes = (uri: Uri, hoverInfo: EntityInfo): WithSource<languages.Definition> | undefined => {
-    if ((hoverInfo.type === 'table' || hoverInfo.type === 'column')
-        && hoverInfo.tableInfo && hoverInfo.tableInfo.range) {
-        return {
-            uri,
-            range: hoverInfo.tableInfo.range,
-            __source: hoverInfo.__source
-        };
+    if (hoverInfo.type === EntityInfoType.Table) {
+        if (hoverInfo.tableInfo?.range) {
+            return {
+                uri,
+                range: hoverInfo.tableInfo.range,
+                __source: hoverInfo.__source
+            };
+        } else {
+            // how?
+        }
+        return;
     }
-    return;
+    if (hoverInfo.type === EntityInfoType.Column) {
+        if (hoverInfo.columnInfo?.range) {
+            return {
+                uri,
+                range: hoverInfo.columnInfo.range,
+                __source: hoverInfo.__source
+            };
+        } else if (hoverInfo.tableInfo?.range) {
+            return {
+                uri,
+                range: hoverInfo.tableInfo.range,
+                __source: hoverInfo.__source
+            };
+        } else {
+            // how?
+        }
+        return;
+    }
+
 };
 
 

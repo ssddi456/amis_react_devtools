@@ -1,7 +1,7 @@
-import type { IRange } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { TableInfo, ExtColumnInfo } from "./types";
+import { Range } from './helpers/pos';
 
-export const noTableInfoRes = (text: string, range: IRange, ext?: string[]) => {
+export const noTableInfoRes = (text: string, range: Range, ext?: string[]) => {
     const result = {
         contents: [
             {
@@ -12,7 +12,7 @@ export const noTableInfoRes = (text: string, range: IRange, ext?: string[]) => {
     };
     return result;
 };
-export const noColumnInfoRes = (table: TableInfo, columnName: string, range: IRange, ext?: string[]) => {
+export const noColumnInfoRes = (table: TableInfo, columnName: string, range: Range, ext?: string[]) => {
     const result = {
         contents: [
             {
@@ -26,7 +26,7 @@ export const noColumnInfoRes = (table: TableInfo, columnName: string, range: IRa
     };
     return result;
 };
-export const tableAndColumn = (table: TableInfo, column: ExtColumnInfo, range: IRange, ext?: string[]) => {
+export const tableAndColumn = (table: TableInfo, column: ExtColumnInfo, range: Range, ext?: string[]) => {
     const result = {
         contents: [
             {
@@ -43,7 +43,7 @@ export const tableAndColumn = (table: TableInfo, column: ExtColumnInfo, range: I
     };
     return result;
 };
-export const tableRes = (table: TableInfo, range: IRange, ext?: string[]) => {
+export const tableRes = (table: TableInfo, range: Range, ext?: string[]) => {
     const result = {
         contents: [
             {
@@ -58,7 +58,7 @@ export const tableRes = (table: TableInfo, range: IRange, ext?: string[]) => {
     };
     return result;
 };
-export const functionRes = (text: string, range: IRange, ext?: string[]) => {
+export const functionRes = (text: string, range: Range, ext?: string[]) => {
     const result = {
         contents: [
             {
@@ -72,7 +72,7 @@ export const functionRes = (text: string, range: IRange, ext?: string[]) => {
     };
     return result;
 };
-export const unknownRes = (text: string, range: IRange, ext?: string[]) => {
+export const unknownRes = (text: string, range: Range, ext?: string[]) => {
     const result = {
         contents: [
             {
@@ -86,7 +86,7 @@ export const unknownRes = (text: string, range: IRange, ext?: string[]) => {
     };
     return result;
 };
-export const createColumnRes = (node: string, range: IRange, ext?: string[]) => {
+export const createColumnRes = (node: string, range: Range, ext?: string[]) => {
     const result = {
         contents: [
             {

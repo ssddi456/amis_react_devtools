@@ -91,8 +91,19 @@ export const getEntityInfoAtPosition = async (
         ['DOT', 'poolPath', 'columnNamePath']
     ])
     if (columnName) {
+        const checkExportColumn = matchSubPathOneOf(columnName, [
+            ['*', 'orderByClause'],
+            ['*', 'sortByClause'],
+        ]);
+
         return {
-            ...await getEntityInfoFromColumnName(foundNode, columnName as ColumnNameContext | ColumnNamePathContext, context, mrScope),
+            ...await getEntityInfoFromColumnName(
+                foundNode,
+                columnName as ColumnNameContext | ColumnNamePathContext,
+                context,
+                mrScope,
+                !!checkExportColumn
+            ),
             ...commonFields,
         };
     }
@@ -152,8 +163,18 @@ export const getAllEntityInfoFromNode = async (
     }
 
     if (node instanceof ColumnNameContext || node instanceof ColumnNamePathContext) {
+        const checkExportColumn = matchSubPathOneOf(node, [
+            ['*', 'orderByClause'],
+            ['*', 'sortByClause'],
+        ]);
         return {
-            ...await getEntityInfoFromColumnName(node.poolPath()?.id_(0) || node, node, context, mrScope),
+            ...await getEntityInfoFromColumnName(
+                node.poolPath()?.id_(0) || node,
+                node,
+                context,
+                mrScope,
+                !!checkExportColumn,
+            ),
             ...commonFields,
         };
     }
@@ -340,14 +361,38 @@ async function getEntityInfoFromColumnName(
     node: ParserRuleContext,
     parent: ColumnNameContext | ColumnNamePathContext,
     context: IdentifierScope,
-    mrScope: MapReduceScope | null
-) {
+    mrScope: MapReduceScope | null,
+    checkExportColumn: boolean = false
+): Promise<Omit<EntityInfo, 'range' | 'ext'>> {
+    console.log(node, mrScope, 'checkExportColumn', checkExportColumn);
     const poolPath = parent.poolPath();
     // 只支持 table_name.column_name or column_name for now
     const { tableId: tableIdExp, columnName } = tableIdAndColumnNameFromPoolPath(poolPath);
 
     // column_name only
     if (!tableIdExp) {
+        if (checkExportColumn) {
+            const exportColumn = mrScope?.getExportColumnByName(columnName!);
+            if (exportColumn) {
+                return {
+                    type: EntityInfoType.Column,
+                    tableInfo: {
+                        table_name: 'local export',
+                        db_name: "",
+                        table_id: -1,
+                        description: "",
+                        column_list: []
+                    },
+                    columnInfo: {
+                        column_name: columnName!,
+                        data_type_string: '',
+                        description: '',
+                        range: rangeFromNode(exportColumn.defineReference),
+                    },
+                    text: columnName!,
+                };
+            }
+        }
         const item = mrScope?.getTableByName(mrScope?.getDefaultInputTableName());
         if (!item) {
             return {

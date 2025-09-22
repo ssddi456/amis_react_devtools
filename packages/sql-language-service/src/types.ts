@@ -16,7 +16,7 @@ import {
     VirtualTableSourceContext,
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ErrorType } from "./consts";
-import { Pos } from "./helpers/pos";
+import { Pos, Range } from "./helpers/pos";
 
 
 export interface ITableSourceManager {
@@ -29,13 +29,8 @@ export interface TableInfo {
     alias?: string;
     table_id: number;
     description: string;
-    column_list: ExtColumnInfo[];
-    range?: {
-        startLineNumber: number;
-        startColumn: number;
-        endLineNumber: number;
-        endColumn: number;
-    };
+    column_list: (ExtColumnInfo & {range?: Range})[];
+    range?: Range;
 }
 
 export interface ExtColumnInfo {

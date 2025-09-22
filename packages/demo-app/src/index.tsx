@@ -16,13 +16,6 @@ import type { MrScopeNodeData } from '@amis-devtools/sql-language-service/src/ty
 import type { SymbolAndContext } from '@amis-devtools/sql-language-service/src/identifier_scope';
 import { sqlTest, tableSource } from './sqlTest';
 
-// Setup Monaco Environment for SQL editing
-(window as any).MonacoEnvironment = {
-    getWorker(workerId: string, label: string) {
-        return null;
-    }
-};
-
 type TabType = 'symbols' | 'graph' | 'validation';
 
 

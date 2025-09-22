@@ -73,6 +73,10 @@ export class MapReduceScope {
         this.exportColumns.push(column);
     }
 
+    getExportColumnByName(columnName: string) { 
+        return this.exportColumns.find(col => col.exportColumnName === columnName);
+    }
+
     validate() {
         const errors: ValidateError[] = [];
 

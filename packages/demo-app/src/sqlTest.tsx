@@ -12,6 +12,15 @@ ORDER BY created_at DESC
 LIMIT 100;`
     },
     {
+        name: "Basic SELECT with WHERE 1",
+        sql: `SELECT id, name, email, created_at as alt_created_at
+FROM users 
+WHERE status = 'active' 
+  AND created_at > '2023-01-01'
+ORDER BY alt_created_at DESC
+LIMIT 100;`
+    },
+    {
         name: "JOIN Operations",
         sql: `SELECT 
     u.id,
