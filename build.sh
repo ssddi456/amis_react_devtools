@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 git checkout -b build
@@ -7,6 +7,7 @@ npm install --workspaces
 
 cd packages/demo-app
 
+# start a sub process to build
 npm run build
 
 cd -
