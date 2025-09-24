@@ -343,6 +343,8 @@ export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNo
                 onConnect={onConnect}
                 nodeTypes={nodeTypes}
                 fitView
+                maxZoom={10}
+                minZoom={0.1}
                 fitViewOptions={{
                     padding: 0.2,
                 }}
@@ -374,8 +376,10 @@ export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNo
                 </Controls>
                 <MiniMap
                     nodeStrokeColor="#0078d4"
-                    nodeColor="#fff"
+                    nodeColor="#0078d4"
                     nodeBorderRadius={8}
+                    pannable
+                    zoomable
                 />
                 <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
             </ReactFlow>

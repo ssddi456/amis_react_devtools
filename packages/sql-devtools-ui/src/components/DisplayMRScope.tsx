@@ -4,7 +4,9 @@ import { ParseTree } from 'antlr4ng';
 import { printNode } from '@amis-devtools/sql-language-service/src/helpers/log';
 import { MapReduceScope } from '@amis-devtools/sql-language-service/src/mr_scope';
 import { getFormattedSqlFromNode } from '@amis-devtools/sql-language-service/src/helpers/formater';
+import { TextHighlight } from './text_highlight';
 import { copyToClipboard } from '../tools/copy';
+import { subqueryPlaceHolder } from '@amis-devtools/sql-language-service/src/consts';
 
 interface DisplayMRScopeProps {
     mrScope: MapReduceScope;
@@ -18,18 +20,26 @@ interface ContextMenuState {
     showDebug: boolean;
     targetNode: ParseTree | null;
     sql: string;
+    refSql: string;
 }
 
 export class DisplayMRScope extends React.Component<DisplayMRScopeProps, ContextMenuState> {
     constructor(props: DisplayMRScopeProps) {
         super(props);
+        const refNode = props.mrScope.getPosRefNode();
+        const refSql = refNode ? (getFormattedSqlFromNode(refNode).split('\n')[0] + ' ...') : '';
         this.state = {
             isVisible: false,
             x: 0,
             y: 0,
             showDebug: props.showDebug ?? false,
             targetNode: props.mrScope.context,
-            sql: props.mrScope.context ? getFormattedSqlFromNode(props.mrScope.context) : '',
+            sql: props.mrScope.context
+                ? getFormattedSqlFromNode(props.mrScope.context, {
+                    hideSubQuery: true,
+                })
+                : '',
+            refSql,
         };
     }
 
@@ -215,21 +225,41 @@ export class DisplayMRScope extends React.Component<DisplayMRScopeProps, Context
     renderSql() {
         const sql = this.state.sql || '';
         return (
+            
             <pre
                 style={{ overflowX: 'auto', maxWidth: '100%' }}
             >
-                {sql}
+                <TextHighlight
+                    text={sql}
+                    keywords={[{ match: subqueryPlaceHolder, type: 'subquery' }]}
+                />
             </pre>
         );
     }
 
     render() {
         const { mrScope } = this.props;
+        const { refSql } = this.state;
         const cteName = mrScope.getCteName();
+        const subQueryAlias = mrScope.getSubQueryAlias();
 
         return (
             <div onContextMenu={(e) => this.showContextMenu(e)}>
-                <div>{cteName ? <span>[CTE: {cteName}]</span> : null}</div>
+                <div>
+                    {cteName ? <span>[CTE: {cteName}]</span> : null}
+                    {subQueryAlias ? <span>[subquery: {subQueryAlias}]</span> : null}
+                </div>
+                {
+                    refSql
+                        ? (
+                            <div
+                                style={{ fontSize: 12, color: '#888', marginBottom: 8, fontStyle: 'italic' }}
+                            >
+                                <i>{refSql}</i>
+                            </div>
+                        )
+                        : null
+                }
                 {
                     this.state.showDebug
                         ? (

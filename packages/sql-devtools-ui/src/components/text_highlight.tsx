@@ -1,5 +1,6 @@
 import React from 'react';
 import './text_highlight.css';
+import { generateKeywordHighlights } from '../tools/highlight';
 
 
 function normalizeHighlights(highlights: { start: number; end: number; type: string }[]) {
@@ -66,13 +67,25 @@ function normalizeHighlights(highlights: { start: number; end: number; type: str
 }
 
 // TextHighlight component for rendering highlighted SQL text
-export const TextHighlight: React.FC<{ text: string; highlights: { start: number; end: number; type: string }[] }> = ({ text, highlights }) => {
+export const TextHighlight: React.FC<{
+    text: string;
+    highlights?: { start: number; end: number; type: string }[],
+    keywords?: { match: string, type: string }[],
+ }> = ({ text, highlights, keywords }) => {
     const parts: JSX.Element[] = [];
+    const [realHighlights] = React.useState<{ start: number; end: number; type: string }[]>(() => {
+        if (highlights) {
+            return normalizeHighlights(highlights);
+        }
+        if (keywords) {
+            const gHighlights = generateKeywordHighlights(text, keywords);
+            return normalizeHighlights(gHighlights);
+        }
+        return [];
+    });
     let lastIndex = 0;
 
-    const normalizedHighlights = normalizeHighlights(highlights);
-
-    normalizedHighlights.forEach(({ start, end, type }) => {
+    realHighlights.forEach(({ start, end, type }) => {
         parts.push(<span key={`${lastIndex}-${start}-text`}>{text.slice(lastIndex, start)}</span>);
         parts.push(<span key={`${start}-${end}-highlight`} className={`highlight ${type}`} title={type}>{text.slice(start, end)}</span>);
         lastIndex = end;

@@ -20,3 +20,5 @@ export const CommandLabel: Record<CommandId, string> = {
 };
 
 export { LanguageIdEnum } from 'monaco-sql-languages';
+
+export const subqueryPlaceHolder = '< subquery >';

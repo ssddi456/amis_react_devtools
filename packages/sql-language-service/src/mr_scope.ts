@@ -1,11 +1,11 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
-import { AtomSelectStatementContext, CteStatementContext, ExpressionContext, QueryStatementExpressionBodyContext, QueryStatementExpressionContext, SelectStatementContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
+import { AtomSelectStatementContext, CteStatementContext, ExpressionContext, QueryStatementExpressionBodyContext, QueryStatementExpressionContext, SelectStatementContext, SubQueryExpressionContext, SubQuerySourceContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { uuidv4 } from "./helpers/util";
 import { IdentifierScope } from "./identifier_scope";
 import { getAtomExpressionFromExpression, getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getOnConditionOfFromClause, isSameColumnInfo } from "./helpers/table_and_column";
 import { isPosInParserRuleContext } from "./helpers/pos";
 import { ColumnInfo, MrScopeContext, tableReferenceContext, TableSource, ValidateError } from "./types";
-import { matchSubPath } from "./helpers/tree_query";
+import { matchSubPath, matchSubPathOneOf } from "./helpers/tree_query";
 import { ErrorType } from "./consts";
 import { HiveSQL } from "dt-sql-parser";
 
@@ -392,6 +392,35 @@ export class MapReduceScope {
             return (this.context.parent as CteStatementContext).id_().getText();
         }
         return null;
+    }
+
+    isSubQueryScope() {
+        return this.context.parent instanceof SubQuerySourceContext
+        || this.context.parent instanceof SubQueryExpressionContext;
+    }
+
+    getSubQueryAlias(): string | null {
+        if (this.isSubQueryScope()) {
+            if (this.context.parent instanceof SubQuerySourceContext) {
+                const alias = this.context.parent.id_().getText();
+                return alias;
+            }
+            return '-'
+        }
+        return null;
+    }
+
+    getPosRefNode(): ParserRuleContext | null {
+        if (this.isCteScope()) {
+            return this.context.parent?.parent || null;
+        }
+        if (this.isSubQueryScope()) {
+            return matchSubPathOneOf(this.context, [
+                ['selectStatement', 'subQueryExpression', '*', 'expression'],
+                ['queryStatementExpression', 'subQuerySource']
+            ]) as ParserRuleContext || null;
+        }
+        return this.context.parent?.parent || null;
     }
 
     getDisplayContext(): ParserRuleContext | TerminalNode | null | undefined {
