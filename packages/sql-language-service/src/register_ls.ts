@@ -74,6 +74,13 @@ export function registerHivesqlLs({
         const doValidate = debounce(async () => {
             const model = editorInstance.getModel();
             if (model) {
+                if (model.getLanguageId() !== LanguageIdEnum.HIVE) {
+                    // Clear previous markers
+                    monaco.editor.setModelMarkers(model, LanguageIdEnum.HIVE, []);
+                    // Call the onValidate callback if provided
+                    onValidate?.([]);
+                    return;
+                }
                 const context = createHiveSqlLanguageService({ model, tableSourceManager, });
                 const errors = await context.doValidation();
                 console.log('validation errors', errors);

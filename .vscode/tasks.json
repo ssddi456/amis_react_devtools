@@ -6,7 +6,21 @@
             "type": "shell",
             "command": "npm run dev",
             "group": "none",
-            "detail": "Build the code in development mode",
+            "detail": "Build the code for development",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "runOptions": {
+                "runOn": "folderOpen"
+            }
+        },
+        {
+            "label": "build demo",
+            "type": "shell",
+            "command": "npm run dev:demo",
+            "group": "none",
+            "detail": "Build and run demo app",
             "presentation": {
                 "reveal": "always",
                 "panel": "new"

@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { render } from 'react-dom';
 import './styles.css';
 
 // Import our custom Monaco SQL editor
-import { MonacoSqlEditor, MonacoSqlEditorRef } from './components/MonacoSqlEditor';
+import { MonacoEditor, MonacoEditorRef } from './components/MonacoEditor';
+import { CustomTableEditor, loadTableInfosFromStorage } from './components/CustomTableEditor';
 import { ContextManager } from '@amis-devtools/sql-language-service/src/context_manager';
 import { ContextManagerProvider } from '@amis-devtools/sql-devtools-ui/src/components/ContextManagerContext';
 import { MrScopeDagFlow } from '@amis-devtools/sql-devtools-ui/src/components/MrScopeDagFlow';
@@ -14,9 +15,11 @@ import type { editor } from 'monaco-editor';
 import { getContextWithCache } from '@amis-devtools/sql-language-service/src';
 import type { MrScopeNodeData } from '@amis-devtools/sql-language-service/src/types';
 import type { SymbolAndContext } from '@amis-devtools/sql-language-service/src/identifier_scope';
+import type { TableInfo, ITableSourceManager } from '@amis-devtools/sql-language-service/src/types';
 import { sqlTest, tableSource } from './sqlTest';
+import { LanguageIdEnum } from '@amis-devtools/sql-language-service/src/consts';
 
-type TabType = 'symbols' | 'graph' | 'validation';
+type TabType = 'symbols' | 'graph' | 'validation' | 'custom_tables';
 
 
 const DemoApp: React.FC = () => {
@@ -26,7 +29,34 @@ const DemoApp: React.FC = () => {
     const [customSql, setCustomSql] = useState('');
     const [context, setContext] = useState<ContextManager | null>(null);
     const [errors, setErrors] = useState<editor.IMarkerData[]>([]); // To hold validation errors
-    const editorRef = React.useRef<MonacoSqlEditorRef>(null);
+    const mergedTableSource = useRef<ITableSourceManager>({
+        getTableInfoByName: tableSource.getTableInfoByName.bind(tableSource)
+    });
+    const [customTables, setCustomTables] = useState<TableInfo[]>(() => {
+        const tables = loadTableInfosFromStorage();
+        mergedTableSource.current.getTableInfoByName = (tableName: string, dbName?: string): TableInfo | null => {
+            console.log('Looking up table:', dbName, tableName);
+            // 首先在自定义表格中查找
+            const customTable = tables.find(table => table.table_name === tableName && table.db_name === dbName);
+            if (customTable) {
+                return customTable;
+            }
+            
+            // 然后在原始表格源中查找
+            const result = tableSource.getTableInfoByName(tableName, dbName);
+            
+            // 如果返回的是Promise，我们目前返回null，因为这里需要同步返回
+            // 在实际应用中，你可能需要重新设计这个接口来支持异步
+            if (result && typeof result === 'object' && 'then' in result) {
+                return null;
+            }
+            
+            return result as TableInfo | null;
+        }
+        return tables;
+    });
+
+    const editorRef = React.useRef<MonacoEditorRef>(null);
 
     // Use custom SQL if it's different from the selected example, otherwise use the example
     const currentSql = customSql || sqlTest[selectedSqlIndex].sql;
@@ -60,18 +90,46 @@ const DemoApp: React.FC = () => {
         toEditorPos(marker.startLineNumber, marker.startColumn);
     }, [toEditorPos]);
 
+    // 处理自定义表格更新
+    const handleCustomTableUpdate = useCallback((tables: TableInfo[]) => {
+        setCustomTables(tables);
+        console.log('Custom tables updated:', tables);
+        
+        // 创建合并后的表格源管理器
+        mergedTableSource.current.getTableInfoByName = (tableName: string, dbName?: string): TableInfo | null => {
+            console.log('Looking up table:', dbName, tableName);
+            // 首先在自定义表格中查找
+            const customTable = tables.find(table => table.table_name === tableName && table.db_name === dbName);
+            if (customTable) {
+                return customTable;
+            }
+            
+            // 然后在原始表格源中查找
+            const result = tableSource.getTableInfoByName(tableName, dbName);
+            
+            // 如果返回的是Promise，我们目前返回null，因为这里需要同步返回
+            // 在实际应用中，你可能需要重新设计这个接口来支持异步
+            if (result && typeof result === 'object' && 'then' in result) {
+                return null;
+            }
+            
+            return result as TableInfo | null;
+        }
+    }, []);
+
     useEffect(() => {
-        const { contextManager } = getContextWithCache(currentSql, false, tableSource);
+        const { contextManager } = getContextWithCache(currentSql, false, mergedTableSource.current);
         setContext(contextManager);
-    }, [currentSql]);
+    }, [currentSql, mergedTableSource]);
 
 
     const renderEditor = () => {
         return (
             <div className="editor-section">
-                <MonacoSqlEditor
+                <MonacoEditor
                     ref={editorRef}
-                    tableSourceManager={tableSource}
+                    language={LanguageIdEnum.HIVE}
+                    tableSourceManager={mergedTableSource.current}
                     value={currentSql}
                     onChange={handleSqlChange}
                     onValidate={setErrors}
@@ -108,6 +166,12 @@ const DemoApp: React.FC = () => {
                     className={`tab-btn ${activeTab === 'validation' ? 'active' : ''}`}
                 >
                     Errors ({errors.length})
+                </button>
+                <button
+                    onClick={() => setActiveTab('custom_tables')}
+                    className={`tab-btn ${activeTab === 'custom_tables' ? 'active' : ''}`}
+                >
+                    Custom Tables ({Object.keys(customTables).length})
                 </button>
             </nav>
 
@@ -149,6 +213,16 @@ const DemoApp: React.FC = () => {
                         <ValidationResults
                             validationResults={errors}
                             onErrorClick={onErrorClick}
+                        />
+                    </div>
+                );
+            }
+            
+            case 'custom_tables': {
+                return (
+                    <div className="tab-content">
+                        <CustomTableEditor
+                            onTableUpdate={handleCustomTableUpdate}
                         />
                     </div>
                 );

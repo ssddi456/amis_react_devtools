@@ -4,22 +4,25 @@ import { registerHivesqlLs } from '@amis-devtools/sql-language-service/src/regis
 import { LanguageIdEnum } from '@amis-devtools/sql-language-service/src/consts';
 import { copyToClipboard } from '@amis-devtools/sql-devtools-ui/src/tools/copy';
 import { ITableSourceManager } from '@amis-devtools/sql-language-service/src/types';
+import { registerJsonLs } from './jsonLs';
 
-interface MonacoSqlEditorProps {
-  tableSourceManager: ITableSourceManager;
+interface MonacoEditorProps {
+  language: string,
+  tableSourceManager?: ITableSourceManager;
   value?: string;
   onChange?: (value: string) => void;
   readOnly?: boolean;
   onValidate?: (errors: monaco.editor.IMarkerData[]) => void;
 }
 
-export interface MonacoSqlEditorRef {
+export interface MonacoEditorRef {
   getEditor: () => monaco.editor.IStandaloneCodeEditor | null;
 }
 
-export const MonacoSqlEditor = forwardRef<MonacoSqlEditorRef, MonacoSqlEditorProps>(({
+export const MonacoEditor = forwardRef<MonacoEditorRef, MonacoEditorProps>(({
   tableSourceManager,
   value = '',
+  language,
   onChange,
   readOnly = false,
   onValidate,
@@ -27,6 +30,7 @@ export const MonacoSqlEditor = forwardRef<MonacoSqlEditorRef, MonacoSqlEditorPro
   const editorRef = useRef<HTMLDivElement>(null);
   const monacoEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [startLanguage] = useState(language);
 
   // Expose the Monaco editor instance through the ref
   useImperativeHandle(ref, () => ({
@@ -38,8 +42,8 @@ export const MonacoSqlEditor = forwardRef<MonacoSqlEditorRef, MonacoSqlEditorPro
       // Create Monaco editor instance
       const editor = monaco.editor.create(editorRef.current, {
         value: value,
-        language: LanguageIdEnum.HIVE,
-        theme: 'vs-dark',
+        language: language,
+        // theme: 'vs-dark',
         readOnly: readOnly,
         automaticLayout: true,
         minimap: { enabled: true },
@@ -60,19 +64,24 @@ export const MonacoSqlEditor = forwardRef<MonacoSqlEditorRef, MonacoSqlEditorPro
 
       monacoEditorRef.current = editor;
 
-      // Register Hive SQL language service
-      const registerLs = registerHivesqlLs({
-        tableSourceManager,
-        onCopyToClipboard: (text: string) => {
-          return copyToClipboard(text);
-        },
-        onValidate,
-      });
-
-      // Apply language service to editor
-      if (registerLs && typeof registerLs === 'function') {
-        registerLs(editor, monaco);
+      if (language === LanguageIdEnum.HIVE) {
+        if (!tableSourceManager) {
+          console.warn('tableSourceManager is required for Hive SQL language service');
+        }
+        // Register Hive SQL language service
+        registerHivesqlLs({
+          tableSourceManager: tableSourceManager || { getTableInfoByName: async () => null },
+          onCopyToClipboard: (text: string) => {
+            return copyToClipboard(text);
+          },
+          onValidate,
+        })(editor, monaco);
       }
+
+      if (language === 'json') {
+        registerJsonLs()(editor, monaco);
+      }
+
 
       // Handle value changes
       const subscription = editor.onDidChangeModelContent(() => {
@@ -102,6 +111,12 @@ export const MonacoSqlEditor = forwardRef<MonacoSqlEditorRef, MonacoSqlEditorPro
       }
     }
   }, [value, isInitialized]);
+
+  useEffect(() => {
+    if (language !== startLanguage) {
+      console.warn('Language change is not supported in this editor instance. Please recreate the editor with the new language.');
+    }
+  }, [language]);
 
   return (
     <div 

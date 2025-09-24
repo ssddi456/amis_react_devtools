@@ -226,6 +226,13 @@ export class IdentifierScope {
     async getForeignTableInfoByName(tableName: string, dbName: string | undefined): Promise<TableInfo | null> {
         const tableSourceManager = this.tableSourceManager || this.root?.tableSourceManager;
         if (tableSourceManager) {
+            if (!dbName) {
+                if (tableName.includes('.')) {
+                    const parts = tableName.split('.');
+                    dbName = parts.length > 1 ? parts[0] : undefined;
+                    tableName = parts.length > 1 ? parts[1] : parts[0];
+                }
+            }
             return tableSourceManager.getTableInfoByName(tableName, dbName);
         }
         return null;
