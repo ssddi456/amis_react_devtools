@@ -35,14 +35,16 @@
     [*] sql editor view
         [*] monaco editor with hive sql ls
     [ ] helper view
-        [ ] symbol table tab
+        [+] symbol table tab
             [*] cte/select
             [ ] column
-            [ ] forerign table
+            [*] foreign table
         [*] cte graph tab
+        [ ] config tab
+    [ ] layout dragable splitter
 
 1. table graph
-    [ ] get table graph from sql
+    [*] get table graph from sql
     [*] visualize table relationships
 
 1. cases
@@ -67,7 +69,7 @@
 
 ## showcase
 
-[ ] github pages
+[*] github pages
 
 ## 更好的测试方法
 
