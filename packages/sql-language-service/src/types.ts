@@ -17,6 +17,10 @@ import {
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ErrorType } from "./consts";
 import { Pos, Range } from "./helpers/pos";
+import { editor } from "monaco-editor";
+import { ContextManager } from "./context_manager";
+import { MapReduceScope } from "./mr_scope";
+import { IdentifierScope } from "./identifier_scope";
 
 
 export interface ITableSourceManager {
@@ -56,9 +60,9 @@ export interface ColumnInfo {
 }
 
 export type tableDefType = 'local' | 'external';
-
+export type MrScopeId = string; // usually it's the start position like '12:34'
 export interface MrScopeNodeData {
-    id: string;
+    id: MrScopeId;
     pos: Pos;
     deps: string[];
     isOrphan: boolean;
@@ -83,4 +87,15 @@ export interface ValidateError {
     context: ParserRuleContext | TerminalNode;
     level: 'error' | 'warning';
     type: ErrorType
+}
+
+export interface customActionRunHandler {
+    (option: {
+        editor: editor.IStandaloneCodeEditor,
+        position?: Pos,
+        foundNode?: ParserRuleContext,
+        contextManager: ContextManager,
+        context?: IdentifierScope,
+        mrScope?: MapReduceScope,
+    }): Promise<void> | void;
 }

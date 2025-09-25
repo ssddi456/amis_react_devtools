@@ -6,7 +6,6 @@ import {
 import { ContextManager, createContextManager } from "./context_manager";
 import { findTokenAtPosition } from "./helpers/table_and_column";
 import { Pos, posFromRange, posInRange, rangeFromNode, sliceToRange } from "./helpers/pos";
-import { ITableSourceManager } from "./types";
 import { createLogger, printNodeTree } from "./helpers/log";
 import { formatHiveSQL } from './formatter';
 import { getEntityInfoAtPosition } from "./helpers/getTableAndColumnInfoAtPosition";
@@ -16,6 +15,7 @@ import { WithSource } from "./helpers/util";
 import { matchSubPath } from "./helpers/tree_query";
 import { getFormattedSqlFromNode } from "./helpers/formater";
 import { CommandId, CommandLabel } from "./consts";
+import type { customActionRunHandler, ITableSourceManager } from "./types";
 
 interface ContextInfos {
     hiveSqlParse: HiveSQL;
@@ -53,7 +53,8 @@ export const createHiveSqlLanguageService = ({
     model,
     tableSourceManager,
     isTest = false,
-    noCache = false
+    noCache = false,
+    customActions = []
 }: {
     model: {
         getValue: () => string;
@@ -62,6 +63,10 @@ export const createHiveSqlLanguageService = ({
     tableSourceManager?: ITableSourceManager
     isTest?: boolean,
     noCache?: boolean,
+    customActions?: {
+        title: string;
+        id: string;
+    }[]
 }) => {
     const text = model.getValue();
     const {
@@ -193,7 +198,14 @@ export const createHiveSqlLanguageService = ({
                         title: CommandLabel[CommandId.CopyTestSql],
                         arguments: [position],
                     }
-                });
+                }, ...customActions.map(action => ({
+                    title: action.title,
+                    command: {
+                        id: action.id,
+                        title: action.title,
+                        arguments: [position],
+                    }
+                })));
             }
 
             return { actions, dispose: () => {} }
@@ -206,32 +218,24 @@ export const createHiveSqlActions = ({
     tableSourceManager,
     onCopyToClipboard,
     isTest = false,
-    noCache = false
+    noCache = false,
+    customActions,
 }: {
     tableSourceManager?: ITableSourceManager
     onCopyToClipboard?: (text: string) => void | Promise<void>;
     isTest?: boolean,
     noCache?: boolean,
+    customActions?: {
+        id: string;
+        run: customActionRunHandler
+    }[]
 }) => {
+
     return [
         {
             id: CommandId.CopyTestSql,
-            label: CommandLabel[CommandId.CopyTestSql],
             run: async (ed: editor.IStandaloneCodeEditor, position?: Pos) => {
-                if (!position) {
-                    position = ed.getPosition()!;
-                }
-                const text = ed.getValue();
-                const {
-                    hiveSqlParse,
-                    sqlSlices,
-                    tree,
-                    contextManager
-                } = getContextWithCache(text, noCache, tableSourceManager);
-
-                const getCtxFromPos = createGetCtxFromPos(sqlSlices, contextManager, tree, isTest ? console.log : () => { });
-
-                const { foundNode, context, mrScope } = getCtxFromPos(position) || {};
+                const { foundNode, context, mrScope } = getContextFromEditor(ed, position, tableSourceManager, noCache, isTest);
                 if (!foundNode || !context || !mrScope) {
                     return;
                 }
@@ -244,8 +248,58 @@ export const createHiveSqlActions = ({
                     console.warn('copyToClipboard', sql);
                 }
             }
+        },
+        ...(customActions || [])
+            .filter(action => action && action.id && action.run)
+            .map(action => ({
+                ...action,
+                run: async (ed: editor.IStandaloneCodeEditor, position: Pos) => {
+                    const { foundNode, contextManager, context, mrScope } = getContextFromEditor(ed, position, tableSourceManager, noCache, isTest);
+                    if (!foundNode || !context || !mrScope) {
+                        return;
+                    }
+
+                    return action?.run?.({
+                        editor: ed,
+                        position,
+                        foundNode,
+                        contextManager,
+                        context,
+                        mrScope,
+                    });
+                }
+            })),
+    ];
+
+
+    function getContextFromEditor(
+        ed: editor.IStandaloneCodeEditor,
+        position?: Pos,
+        tableSourceManager?: ITableSourceManager,
+        noCache: boolean = false,
+        isTest: boolean = false,
+    ) {
+        if (!position) {
+            position = ed.getPosition()!;
         }
-    ]
+        const text = ed.getValue();
+        const {
+            sqlSlices,
+            tree,
+            contextManager
+        } = getContextWithCache(text, noCache, tableSourceManager);
+
+        const getCtxFromPos = createGetCtxFromPos(sqlSlices, contextManager, tree, isTest ? console.log : () => { });
+
+        const { foundNode, context, mrScope } = getCtxFromPos(position) || {};
+        
+        return {
+            foundNode,
+            contextManager,
+            context: context || undefined,
+            mrScope: mrScope || undefined
+        };
+    }
 }
 
 function createGetCtxFromPos(sqlSlices: TextSlice[] | null, contextManager: ContextManager, tree: ProgramContext, logger: (...args: any[]) => void) {

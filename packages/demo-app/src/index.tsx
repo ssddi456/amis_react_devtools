@@ -7,10 +7,10 @@ import { MonacoEditor, MonacoEditorRef } from './components/MonacoEditor';
 import { CustomTableEditor, loadTableInfosFromStorage } from './components/CustomTableEditor';
 import { ContextManager } from '@amis-devtools/sql-language-service/src/context_manager';
 import { ContextManagerProvider } from '@amis-devtools/sql-devtools-ui/src/components/ContextManagerContext';
-import { MrScopeDagFlow } from '@amis-devtools/sql-devtools-ui/src/components/MrScopeDagFlow';
+import { MrScopeDagFlow, MrScopeDagFlowRef } from '@amis-devtools/sql-devtools-ui/src/components/MrScopeDagFlow';
 import { DisplaySymbols } from '@amis-devtools/sql-devtools-ui/src/components/DisplaySymbols';
 import { ValidationResults } from "@amis-devtools/sql-devtools-ui/src/components/validation_results";
-
+import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import type { editor } from 'monaco-editor';
 import { getContextWithCache } from '@amis-devtools/sql-language-service/src';
 import type { MrScopeNodeData } from '@amis-devtools/sql-language-service/src/types';
@@ -55,8 +55,10 @@ const DemoApp: React.FC = () => {
         }
         return tables;
     });
+    const [graphData, setGraphData] = useState<{ nodes: any[]; edges: any[] }>({ nodes: [], edges: [] });
 
     const editorRef = React.useRef<MonacoEditorRef>(null);
+    const flowWrapperRef = React.useRef<MrScopeDagFlowRef>(null);
 
     // Use custom SQL if it's different from the selected example, otherwise use the example
     const currentSql = customSql || sqlTest[selectedSqlIndex].sql;
@@ -120,6 +122,7 @@ const DemoApp: React.FC = () => {
     useEffect(() => {
         const { contextManager } = getContextWithCache(currentSql, false, mergedTableSource.current);
         setContext(contextManager);
+        setGraphData(contextManager.getMrScopeGraphNodeAndEdges());
     }, [currentSql, mergedTableSource]);
 
 
@@ -133,6 +136,51 @@ const DemoApp: React.FC = () => {
                     value={currentSql}
                     onChange={handleSqlChange}
                     onValidate={setErrors}
+                    customActions={[
+                        {
+                            id: 'show_table_list',
+                            title: 'Reveal in Graph',
+                            run: ({
+                                foundNode,
+                                contextManager,
+                                mrScope,
+                            }) => {
+                                if (!mrScope || !contextManager) {
+                                    return;
+                                }
+                                const id = foundNode?.getText();
+                                let cteScopeId: string = '';
+                                mrScope.walkScopes((scope) => {
+                                    if (scope.getCteName() === id) {
+                                        cteScopeId = scope.id;
+                                        return false;
+                                    }
+                                });
+
+                                if (!cteScopeId) {
+                                    return;
+                                }
+                                if (flowWrapperRef.current) {
+                                    flowWrapperRef.current?.fitView({
+                                        minZoom: 0.5,
+                                        nodes: [{ id: cteScopeId }],
+                                        interpolate: 'linear',
+                                    });
+                                }
+
+                                setActiveTab('graph');
+                                setShowHelper(true);
+
+                                setTimeout(() => {
+                                    flowWrapperRef.current?.fitView({
+                                        minZoom: 0.5,
+                                        nodes: [{ id: cteScopeId }],
+                                        interpolate: 'linear',
+                                    });
+                                }, 100);
+                            }
+                        }
+                    ]}
                 />
             </div>
         );
@@ -194,12 +242,10 @@ const DemoApp: React.FC = () => {
                 );
 
             case 'graph': {
-
-                const graphData = context.getMrScopeGraphNodeAndEdges();
-
                 return (
                     <div className="tab-content">
                         <MrScopeDagFlow
+                            ref={flowWrapperRef}
                             nodes={graphData.nodes}
                             edges={graphData.edges}
                             onNodeDoubleClick={onNodeClick}
@@ -278,5 +324,7 @@ const DemoApp: React.FC = () => {
 
 const root = document.querySelector('#root');
 if (root) {
-    render(<DemoApp />, root);
+    render(
+        <DemoApp />
+    , root);
 }

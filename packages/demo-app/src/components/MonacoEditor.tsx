@@ -3,7 +3,7 @@ import * as monaco from 'monaco-editor';
 import { registerHivesqlLs } from '@amis-devtools/sql-language-service/src/register_ls';
 import { LanguageIdEnum } from '@amis-devtools/sql-language-service/src/consts';
 import { copyToClipboard } from '@amis-devtools/sql-devtools-ui/src/tools/copy';
-import { ITableSourceManager } from '@amis-devtools/sql-language-service/src/types';
+import { customActionRunHandler, ITableSourceManager } from '@amis-devtools/sql-language-service/src/types';
 import { registerJsonLs } from './jsonLs';
 
 interface MonacoEditorProps {
@@ -13,6 +13,11 @@ interface MonacoEditorProps {
   onChange?: (value: string) => void;
   readOnly?: boolean;
   onValidate?: (errors: monaco.editor.IMarkerData[]) => void;
+  customActions?: {
+    id: string;
+    title: string;
+    run: customActionRunHandler
+  }[];
 }
 
 export interface MonacoEditorRef {
@@ -26,6 +31,7 @@ export const MonacoEditor = forwardRef<MonacoEditorRef, MonacoEditorProps>(({
   onChange,
   readOnly = false,
   onValidate,
+  customActions = [],
 }, ref) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const monacoEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -75,6 +81,7 @@ export const MonacoEditor = forwardRef<MonacoEditorRef, MonacoEditorProps>(({
             return copyToClipboard(text);
           },
           onValidate,
+          customActions,
         })(editor, monaco);
       }
 

@@ -3,7 +3,7 @@ import { editor } from 'monaco-editor';
 import { DisposableChain } from './helpers/disposable_chain';
 import { debounce, once } from './helpers/util';
 import { createHiveSqlLanguageService, createHiveSqlActions } from './index';
-import { ITableSourceManager } from './types';
+import { customActionRunHandler, ITableSourceManager } from './types';
 import { LanguageIdEnum, registerLanguage, setupLanguageFeatures, vsPlusTheme } from 'monaco-sql-languages';
 import 'monaco-sql-languages/esm/languages/hive/hive.contribution';
 const envSetup = once(() => {
@@ -62,13 +62,22 @@ export function registerHivesqlLs({
     tableSourceManager,
     onCopyToClipboard,
     onValidate,
+    customActions = [],
 }: {
     tableSourceManager: ITableSourceManager,
     onCopyToClipboard?: (text: string) => void | Promise<void>,
     onValidate?: (errors: editor.IMarkerData[]) => void,
+    customActions?: {
+        id: string;
+        title: string;
+        run: customActionRunHandler
+    }[]
 }) {
     envSetup();
-    
+
+    const createLs = (model: editor.ITextModel) => 
+        createHiveSqlLanguageService({ model, tableSourceManager, customActions })
+
     return (editorInstance: monaco.editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
         monaco.editor.setTheme('sql-light');
         const doValidate = debounce(async () => {
@@ -81,7 +90,7 @@ export function registerHivesqlLs({
                     onValidate?.([]);
                     return;
                 }
-                const context = createHiveSqlLanguageService({ model, tableSourceManager, });
+                const context = createLs(model)
                 const errors = await context.doValidation();
                 console.log('validation errors', errors);
                 
@@ -144,7 +153,7 @@ export function registerHivesqlLs({
         // }));
         disposables.add(monaco.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
             provideHover: (model, position) => {
-                const context = createHiveSqlLanguageService({ model, tableSourceManager, });
+                const context = createLs(model)
                 const ret = context.doHover(position);
                 return ret;
             }
@@ -160,7 +169,7 @@ export function registerHivesqlLs({
         // }));
         disposables.add(monaco.languages.registerDefinitionProvider(LanguageIdEnum.HIVE, {
             provideDefinition: (model, position) => {
-                const context = createHiveSqlLanguageService({ model, tableSourceManager, });
+                const context = createLs(model)
                 const ret = context.doDefinition(position);
                 return ret;
             }
@@ -168,7 +177,7 @@ export function registerHivesqlLs({
 
         disposables.add(monaco.languages.registerReferenceProvider(LanguageIdEnum.HIVE, {
             provideReferences: (model, position) => {
-                const context = createHiveSqlLanguageService({ model, tableSourceManager, });
+                const context = createLs(model)
                 const ret = context.doReferences(position);
                 return ret;
             }
@@ -177,7 +186,7 @@ export function registerHivesqlLs({
 
         disposables.add(monaco.languages.registerCodeActionProvider(LanguageIdEnum.HIVE, {
             provideCodeActions(model, range) {
-                const context = createHiveSqlLanguageService({ model, tableSourceManager, });
+                const context = createLs(model)
                 const ret = context.doProvideCodeActions(range);
                 return ret;
             },
@@ -185,7 +194,7 @@ export function registerHivesqlLs({
 
         disposables.add(monaco.languages.registerDocumentFormattingEditProvider(LanguageIdEnum.HIVE, {
             provideDocumentFormattingEdits: (model, options) => {
-                const context = createHiveSqlLanguageService({ model, tableSourceManager, });
+                const context = createLs(model)
                 const formatted = context.formatHiveSQL(model.getValue());
                 return [
                     {
@@ -199,6 +208,7 @@ export function registerHivesqlLs({
         createHiveSqlActions({
             tableSourceManager,
             onCopyToClipboard,
+            customActions,
         })
             .forEach(action => {
                 disposables.add(monaco.editor.registerCommand(action.id, (accessor, ...args) => {

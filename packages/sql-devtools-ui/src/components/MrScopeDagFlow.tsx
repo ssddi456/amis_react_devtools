@@ -15,6 +15,9 @@ import {
     NodeTypes,
     Handle,
     Position,
+    ReactFlowProvider,
+    useReactFlow,
+    FitViewOptions,
 } from '@xyflow/react';
 import dagre from '@dagrejs/dagre';
 import '@xyflow/react/dist/style.css';
@@ -189,10 +192,22 @@ interface MrScopeDagFlowProps {
     onNodeDoubleClick?: (nodeId: string, nodeData: MrScopeNodeData) => void;
 }
 
-export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNodes, edges: initialEdges, onNodeClick, onNodeDoubleClick }) => {
+export interface MrScopeDagFlowRef {
+    fitView: (options?: FitViewOptions) => void;
+}
+
+const MrScopeDagFlowInner = React.forwardRef<MrScopeDagFlowRef, MrScopeDagFlowProps>(({ nodes: initialNodes, edges: initialEdges, onNodeClick, onNodeDoubleClick }, ref) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [nodeSizes, setNodeSizes] = useState<Map<string, { width: number; height: number }>>(new Map());
     const [isInitialLayoutDone, setIsInitialLayoutDone] = useState(false);
+    const reactFlow = useReactFlow();
+    const fitView = useCallback((options?: FitViewOptions) => {
+        reactFlow.fitView(options);
+    }, [reactFlow, initialNodes]);
+
+    React.useImperativeHandle(ref, () => ({
+        fitView,
+    }), [fitView]);
 
     // 处理节点尺寸变化的回调
     const handleNodeSizeChange = useCallback((nodeId: string, size: { width: number; height: number }) => {
@@ -385,4 +400,15 @@ export const MrScopeDagFlow: React.FC<MrScopeDagFlowProps> = ({ nodes: initialNo
             </ReactFlow>
         </div>
     );
-};
+});
+
+export const MrScopeDagFlow: React.ForwardRefExoticComponent<
+    MrScopeDagFlowProps & {
+        ref: React.Ref<MrScopeDagFlowRef>;
+    }> = React.forwardRef((props, ref) => {
+    return (
+        <ReactFlowProvider>
+            <MrScopeDagFlowInner {...props} ref={ref} />
+        </ReactFlowProvider>
+    );
+});

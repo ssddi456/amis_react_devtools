@@ -1,17 +1,17 @@
 import { ParserRuleContext, TerminalNode } from "antlr4ng";
 import { AtomSelectStatementContext, CteStatementContext, ExpressionContext, QueryStatementExpressionBodyContext, QueryStatementExpressionContext, SelectStatementContext, SubQueryExpressionContext, SubQuerySourceContext, TableSourceContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { uuidv4 } from "./helpers/util";
 import { IdentifierScope } from "./identifier_scope";
 import { getAtomExpressionFromExpression, getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getOnConditionOfFromClause, isSameColumnInfo } from "./helpers/table_and_column";
 import { isPosInParserRuleContext } from "./helpers/pos";
-import { ColumnInfo, MrScopeContext, tableReferenceContext, TableSource, ValidateError } from "./types";
+import { ColumnInfo, MrScopeContext, MrScopeId, tableReferenceContext, TableSource, ValidateError } from "./types";
 import { matchSubPath, matchSubPathOneOf } from "./helpers/tree_query";
 import { ErrorType } from "./consts";
 import { HiveSQL } from "dt-sql-parser";
+import { printNode } from "./helpers/log";
 
 export class MapReduceScope {
-    id = uuidv4();
-
+    /** MapReduceScope id, keep consistent when sql is same */
+    id: MrScopeId;
     inputTable: Map<string, TableSource> = new Map();
     inputTables: TableSource[] = [];
 
@@ -29,7 +29,7 @@ export class MapReduceScope {
         public identifierScope: IdentifierScope,
         public mrOrder: number,
     ) {
-        
+        this.id = printNode(context);
     }
 
     setDefaultInputTable(name: string, table: ParserRuleContext) {
@@ -377,10 +377,16 @@ export class MapReduceScope {
     walkScopes(fn: (scope: MapReduceScope) => boolean | void) {
         const goDeep = fn(this);
         if (goDeep === false) {
-            return;
+            return false;
         }
         const children = this.getChildScopes();
-        children.forEach(child => child.walkScopes(fn));
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            const childGoNext = child.walkScopes(fn);
+            if (childGoNext === false) {
+                return false;
+            }
+        }
     }
 
     isCteScope() {

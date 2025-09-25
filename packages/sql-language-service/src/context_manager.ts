@@ -43,7 +43,7 @@ import {
     tableInfoFromTableSource,
     tableInfoFromVirtualTableSource
 } from "./helpers/table_and_column";
-import { ITableSourceManager, MrScopeContext, MrScopeNodeData } from "./types";
+import { ITableSourceManager, MrScopeContext, MrScopeId, MrScopeNodeData } from "./types";
 import { IdentifierScope, SymbolAndContext } from "./identifier_scope";
 import { MapReduceScope } from "./mr_scope";
 import { createLogger, printNode } from "./helpers/log";
@@ -61,9 +61,9 @@ export class ContextManager {
     currentContext: IdentifierScope | null = null;
 
     mrScopes: MapReduceScope[] = [];
-
+    // this is a cache for mrScope graph nodes
     mrScopeGraph: Map<string, WithSource<Omit<MrScopeNodeData, 'id' | 'description' | 'label' | 'onNodeSizeChange'>>> = new Map();
-
+    
     constructor(public tree: ProgramContext, public tableSourceManager?: ITableSourceManager) {
         const manager = this;
         this.rootContext = new IdentifierScope(tree, null, null);
@@ -524,10 +524,10 @@ export class ContextManager {
         nodes: { id: string; data: MrScopeNodeData; position: { x: number; y: number } }[];
         edges: { id: string; from: string; to: string, sourceHandle: string, targetHandle: string }[];
     } {
-        const nodes: { id: string; data: MrScopeNodeData; position: { x: number; y: number } }[] = [];
+        const nodes: { id: MrScopeId; data: MrScopeNodeData; position: { x: number; y: number } }[] = [];
 
         const edges: { id: string; from: string; to: string, sourceHandle: string, targetHandle: string }[] = [];
-        this.mrScopeGraph.forEach((node, id) => {
+        this.mrScopeGraph.forEach((node, id: MrScopeId) => {
             const mrScope = this.getMrScopeById(id);
             if (!mrScope) {
                 if (node.type === 'external') {
@@ -591,6 +591,23 @@ export class ContextManager {
     getMrScopeById(id: string): MapReduceScope | null {
         const mrScope = this.mrScopes.find(mr => mr.id === id);
         return mrScope || null;
+    }
+
+    getVisibleMrScopeById(id: string) {
+        let mrScope = this.getMrScopeById(id);
+        if (!mrScope) {
+            return null;
+        }
+        while (true) {
+            if (this.mrScopeGraph.has(id)) {
+                return mrScope;
+            }
+            mrScope = mrScope.getParentMrScope() || null;
+            if (!mrScope) {
+                return null;
+            }
+            id = mrScope.id;
+        }
     }
 
     async validate(isTest: boolean = false) {
