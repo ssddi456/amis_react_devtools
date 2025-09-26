@@ -1,1 +1,0 @@
-a hive sql development helper & usage example
