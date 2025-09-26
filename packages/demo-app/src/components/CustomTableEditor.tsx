@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import JSON5 from 'json5';
 import { MonacoEditor } from './MonacoEditor';
 import type { TableInfo } from '@amis-devtools/sql-language-service/src/types';
+import { createStorage } from '../template/storage';
 import './CustomTableEditor.css';
 
 interface CustomTableEditorProps {
@@ -65,18 +66,8 @@ const isValidTableInfo = (obj: any): obj is TableInfo => {
         );
 };
 
-export const loadTableInfosFromStorage = (): TableInfo[] => {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-            return tableInfosFromString(stored);
-        }
-    } catch (err) {
-        console.error('Failed to load from storage:', err);
-    }
-    return [];
-}
-
+const { load, save } = createStorage<TableInfo[]>(STORAGE_KEY, tableInfosFromString, []);
+export const loadTableInfosFromStorage = load;
 export const CustomTableEditor: React.FC<CustomTableEditorProps> = ({ onTableUpdate }) => {
     const [jsonContent, setJsonContent] = useState<string>('');
 
@@ -104,7 +95,7 @@ export const CustomTableEditor: React.FC<CustomTableEditorProps> = ({ onTableUpd
         setJsonContent(value);
         
         // 保存到localStorage
-        localStorage.setItem(STORAGE_KEY, value);
+        save(value);
 
         onTableUpdate?.(tableInfosFromString(value));
     }, [onTableUpdate]);

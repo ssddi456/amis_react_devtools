@@ -10,7 +10,6 @@ import { ContextManagerProvider } from '@amis-devtools/sql-devtools-ui/src/compo
 import { MrScopeDagFlow, MrScopeDagFlowRef } from '@amis-devtools/sql-devtools-ui/src/components/MrScopeDagFlow';
 import { DisplaySymbols } from '@amis-devtools/sql-devtools-ui/src/components/DisplaySymbols';
 import { ValidationResults } from "@amis-devtools/sql-devtools-ui/src/components/validation_results";
-import { ReactFlowProvider, useReactFlow } from '@xyflow/react';
 import type { editor } from 'monaco-editor';
 import { getContextWithCache } from '@amis-devtools/sql-language-service/src';
 import type { MrScopeNodeData } from '@amis-devtools/sql-language-service/src/types';
@@ -18,15 +17,18 @@ import type { SymbolAndContext } from '@amis-devtools/sql-language-service/src/i
 import type { TableInfo, ITableSourceManager } from '@amis-devtools/sql-language-service/src/types';
 import { sqlTest, tableSource } from './sqlTest';
 import { LanguageIdEnum } from '@amis-devtools/sql-language-service/src/consts';
+import { createStorage } from './template/storage';
 
 type TabType = 'symbols' | 'graph' | 'validation' | 'custom_tables';
 
+const STORAGE_KEY = 'custom-tables-sql';
+const { load: loadSql, save: saveSql } = createStorage<string>(STORAGE_KEY, (s) => s, '');
 
 const DemoApp: React.FC = () => {
     const [showHelper, setShowHelper] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('graph');
     const [selectedSqlIndex, setSelectedSqlIndex] = useState(0);
-    const [customSql, setCustomSql] = useState('');
+    const [customSql, setCustomSql] = useState(loadSql);
     const [context, setContext] = useState<ContextManager | null>(null);
     const [errors, setErrors] = useState<editor.IMarkerData[]>([]); // To hold validation errors
     const mergedTableSource = useRef<ITableSourceManager>({
@@ -65,6 +67,7 @@ const DemoApp: React.FC = () => {
 
     const handleSqlChange = (value: string) => {
         setCustomSql(value);
+        saveSql(value);
     };
 
     const handleExampleSelect = (index: number) => {
