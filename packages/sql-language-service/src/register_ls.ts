@@ -6,6 +6,7 @@ import { createHiveSqlLanguageService, createHiveSqlActions } from './index';
 import { customActionRunHandler, ITableSourceManager } from './types';
 import { LanguageIdEnum, registerLanguage, setupLanguageFeatures, vsPlusTheme } from 'monaco-sql-languages';
 import 'monaco-sql-languages/esm/languages/hive/hive.contribution';
+import { Pos } from './helpers/pos';
 const envSetup = once(() => {
     // Customize the various tokens style
     editor.defineTheme('sql-dark', vsPlusTheme.darkThemeData);
@@ -212,7 +213,7 @@ export function registerHivesqlLs({
         })
             .forEach(action => {
                 disposables.add(monaco.editor.registerCommand(action.id, (accessor, ...args) => {
-                    action.run(editorInstance, ...args);
+                    action.run(editorInstance, args?.[0] as Pos);
                 }));
             });
 

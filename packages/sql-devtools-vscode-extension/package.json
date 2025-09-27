@@ -1,0 +1,36 @@
+{
+  "name": "@amis-devtools/sql-devtools-vscode-extension",
+  "displayName": "SQL DevTools VSCode Extension",
+  "description": "A Visual Studio Code extension for Hive SQL development, providing features like code completion, syntax checking, and more.",
+  "version": "0.1.0",
+  "publisher": "your-publisher-name",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "activationEvents": [
+    "onLanguage:hivesql"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "hivesql",
+        "aliases": ["HiveSQL", "hive", "Hive"],
+        "extensions": [".hivesql"],
+        "configuration": "./language-configuration.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./tsconfig.json",
+    "dev": "tsc -watch -p ./tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2",
+    "@types/vscode": "1.104.0"
+  },
+  "dependencies": {
+    "@amis-devtools/sql-language-service": "file:../sql-language-service"
+  }
+}

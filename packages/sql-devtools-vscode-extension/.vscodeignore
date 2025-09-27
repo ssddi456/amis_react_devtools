@@ -1,0 +1,16 @@
+# Ignore all files except for the following
+.vscodeignore
+README.md
+vsc-extension-quickstart.md
+package.json
+tsconfig.json
+src/**/*.ts
+src/**/*.js
+src/**/*.json
+src/**/*.html
+src/**/*.css
+src/**/*.png
+src/**/*.jpg
+src/**/*.gif
+src/**/*.svg
+src/**/*.md

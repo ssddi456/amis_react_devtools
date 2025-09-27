@@ -1,13 +1,10 @@
 {
     "extends": "../../tsconfig.base.json",
-    "references": [
-        { "path": "../sql-devtools-ui" }
-    ],
     "compilerOptions": {
         "outDir": "./dist",
         "rootDir": "./src"
     },
     "include": [
-        "./src/**/*.{ts,tsx}"
+        "src/**/*.ts"
     ]
 }

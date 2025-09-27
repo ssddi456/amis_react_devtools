@@ -9,6 +9,7 @@
     "dev": "npx lerna run dev --scope=@amis-devtools/sql-devtools-ui",
     "dev:demo": "npx lerna run dev --scope=@amis-devtools/demo-app",
     "dev:all": "npx lerna run dev --parallel",
+    "dev:extension": "npx lerna run dev --scope=@amis-devtools/sql-devtools-vscode-extension",
     "test": "npx lerna run test"
   }
 }

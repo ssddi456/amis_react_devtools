@@ -9,10 +9,16 @@
     [ ] star column
     [ ] function
     [ ] comments
-    
+
+1. completion
+    [ ] table
+    [ ] table alias
+    [ ] column
+
 1. validate
     [*] check definition
     [*] group by
+        [ ] with distinct
     [*] using
     [ ] join on scope
     [*] duplicate column alias
@@ -31,7 +37,7 @@
     [*] reorganize project layout
     [*] split as a monorepo
     
-1. ui:an free to use sql development helper & usage example
+1. webui:an free to use sql development helper & usage example
     [*] sql editor view
         [*] monaco editor with hive sql ls
     [ ] helper view
@@ -42,6 +48,15 @@
         [*] cte graph tab
         [ ] config tab
     [ ] layout dragable splitter
+
+1. vscode extension
+    [ ] basic extension
+    [ ] package as vscode extension
+    [ ] publish to marketplace
+    [ ] custom actions
+        [ ] show table graph
+        [ ] show symbol table
+        [ ] copy test sql to clipboard
 
 1. table graph
     [*] get table graph from sql

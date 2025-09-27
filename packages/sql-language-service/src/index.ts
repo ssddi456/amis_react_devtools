@@ -1,4 +1,4 @@
-import { editor, languages, Position, Uri, MarkerSeverity, IRange } from "monaco-editor";
+import type { editor, languages, Uri, MarkerSeverity, IRange } from "monaco-editor";
 import { HiveSQL, TextSlice, } from 'dt-sql-parser';
 import {
     ProgramContext,
@@ -83,7 +83,7 @@ export const createHiveSqlLanguageService = ({
 
     return {
         doHover: async (
-            position: Position,
+            position: Pos,
             isTest?: boolean
         ) => {
             const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
@@ -101,7 +101,7 @@ export const createHiveSqlLanguageService = ({
         },
 
         doSyntaxHover: (
-            position: Position,
+            position: Pos,
         ): languages.Hover | undefined => {
             const { foundNode } = getCtxFromPos(position) || {};
             if (!foundNode) {
@@ -122,7 +122,7 @@ export const createHiveSqlLanguageService = ({
             const SyntaxErrors = hiveSqlParse.validate(text);
             SyntaxErrors.forEach(err => {
                 validations.push({
-                    severity: MarkerSeverity.Error,
+                    severity: 8 as MarkerSeverity.Error,
                     ...sliceToRange(err),
                     message: err.message
                 })
@@ -132,7 +132,7 @@ export const createHiveSqlLanguageService = ({
             errors.forEach(err => {
                 validations.push({
                     ...err,
-                    severity: MarkerSeverity.Error,
+                    severity: 8 as MarkerSeverity.Error,
                     ...rangeFromNode(err.context),
                     message: err.message
                 })
@@ -142,7 +142,7 @@ export const createHiveSqlLanguageService = ({
         },
 
         doDefinition: async (
-            position: Position,
+            position: Pos,
             isTest?: boolean
         ) => {
             const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
@@ -156,8 +156,8 @@ export const createHiveSqlLanguageService = ({
         },
 
         doReferences(
-            position: Position,
-        ): WithSource<languages.Location[]> | undefined {
+            position: Pos,
+        ): languages.Location[] | undefined {
             const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
             if (!foundNode || !context) {
                 return;
@@ -234,7 +234,10 @@ export const createHiveSqlActions = ({
     return [
         {
             id: CommandId.CopyTestSql,
-            run: async (ed: editor.IStandaloneCodeEditor, position?: Pos) => {
+            run: async (ed: {
+                getValue: () => string;
+                getPosition: () => Pos | null;
+            }, position?: Pos) => {
                 const { foundNode, context, mrScope } = getContextFromEditor(ed, position, tableSourceManager, noCache, isTest);
                 if (!foundNode || !context || !mrScope) {
                     return;
@@ -253,14 +256,16 @@ export const createHiveSqlActions = ({
             .filter(action => action && action.id && action.run)
             .map(action => ({
                 ...action,
-                run: async (ed: editor.IStandaloneCodeEditor, position: Pos) => {
+                run: async (ed: {
+                    getValue: () => string;
+                    getPosition: () => Pos | null;
+                }, position: Pos) => {
                     const { foundNode, contextManager, context, mrScope } = getContextFromEditor(ed, position, tableSourceManager, noCache, isTest);
                     if (!foundNode || !context || !mrScope) {
                         return;
                     }
 
                     return action?.run?.({
-                        editor: ed,
                         position,
                         foundNode,
                         contextManager,
@@ -269,11 +274,20 @@ export const createHiveSqlActions = ({
                     });
                 }
             })),
-    ];
+    ] as {
+        id: string;
+        run: (ed: {
+            getValue: () => string;
+            getPosition: () => Pos | null;
+        }, position: Pos) => Promise<void>;
+    }[];
 
 
     function getContextFromEditor(
-        ed: editor.IStandaloneCodeEditor,
+        ed: {
+            getValue: () => string;
+            getPosition: () => Pos | null;
+        },
         position?: Pos,
         tableSourceManager?: ITableSourceManager,
         noCache: boolean = false,

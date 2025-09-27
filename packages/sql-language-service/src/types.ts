@@ -91,7 +91,6 @@ export interface ValidateError {
 
 export interface customActionRunHandler {
     (option: {
-        editor: editor.IStandaloneCodeEditor,
         position?: Pos,
         foundNode?: ParserRuleContext,
         contextManager: ContextManager,

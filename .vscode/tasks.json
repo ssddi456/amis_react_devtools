@@ -10,9 +10,6 @@
             "presentation": {
                 "reveal": "always",
                 "panel": "new"
-            },
-            "runOptions": {
-                "runOn": "folderOpen"
             }
         },
         {
@@ -27,6 +24,17 @@
             },
             "runOptions": {
                 "runOn": "folderOpen"
+            }
+        },
+        {
+            "label": "build extension",
+            "type": "shell",
+            "command": "npm run dev:extension",
+            "group": "none",
+            "detail": "Build and run extension app",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
             }
         }
     ]
