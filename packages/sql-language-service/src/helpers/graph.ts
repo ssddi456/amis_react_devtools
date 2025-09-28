@@ -12,6 +12,7 @@ export function mrScopeGraphOptimize(contextManager: ContextManager, rootId: str
     const toVisit = [rootId];
     while (toVisit.length) {
         const id = toVisit.pop()!;
+        visited.add(id);
         const node = mrScopeGraph.get(id);
         if (!node) {
             continue;
