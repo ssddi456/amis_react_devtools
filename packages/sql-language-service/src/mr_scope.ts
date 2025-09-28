@@ -102,6 +102,7 @@ export class MapReduceScope {
                     || atom?.constant() 
                     || atom?.intervalExpression()
                     || atom?.whenExpression()
+                    || atom?.expressionsInParenthesis()
                 ) {
                     return;
                 }
