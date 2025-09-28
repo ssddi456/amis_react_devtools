@@ -2,6 +2,8 @@ import { AtomSelectStatementContext, SelectStatementContext } from "dt-sql-parse
 import type { ContextManager } from "../context_manager";
 
 export function mrScopeGraphOptimize(contextManager: ContextManager, rootId: string) {
+    // Cycle detection using DFS
+    const visited = new Set<string>();
     const mrScopeGraph = contextManager.mrScopeGraph;
     let graphRoot = mrScopeGraph.get(rootId);
     if (!graphRoot) {
@@ -16,12 +18,12 @@ export function mrScopeGraphOptimize(contextManager: ContextManager, rootId: str
         }
         const mrScope = contextManager.getMrScopeById(id);
         if (!mrScope) {
-            toVisit.push(...node.deps);
+            toVisit.push(...node.deps.filter(dep => !visited.has(dep)));
             continue;
         }
 
         if (mrScope.context instanceof AtomSelectStatementContext) {
-            toVisit.push(...node.deps);
+            toVisit.push(...node.deps.filter(dep => !visited.has(dep)));
             continue;
         }
 
@@ -45,11 +47,13 @@ export function mrScopeGraphOptimize(contextManager: ContextManager, rootId: str
                         ...node,
                     });
                     mrScopeGraph.delete(deps[0]);
-                    toVisit.push(id);
+                    if (!visited.has(id)) {
+                        toVisit.push(id);
+                    }
                     continue;
                 }
             }
         }
-        toVisit.push(...node.deps);
+        toVisit.push(...node.deps.filter(dep => !visited.has(dep)));
     }
 }
