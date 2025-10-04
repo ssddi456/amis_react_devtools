@@ -28,18 +28,11 @@ module.exports = {
                         },
                     },
                 },
-            },
-            {
-                test: /\.css$/,
-                type: 'css',
             }
         ],
     },
     externals: {
         vscode: 'commonjs vscode',
-        "monaco-editor": `(() => {
-            return;
-        })()`,
     },
     devtool: 'source-map',
     experiments: {
