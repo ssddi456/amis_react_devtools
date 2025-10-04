@@ -11,8 +11,7 @@ import { editor, languages } from "monaco-editor";
 import { getLanguageService, TextDocument } from 'vscode-json-languageservice';
 import { once } from "@amis-devtools/sql-language-service/src/helpers/util";
 
-
-const hiveTableInfoItemSchema ={
+const hiveTableInfoItemSchema = {
     type: 'object',
     properties: {
         db_name: {

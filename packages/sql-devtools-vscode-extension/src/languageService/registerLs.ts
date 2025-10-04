@@ -12,7 +12,6 @@ export function registerHivesqlLs({
     tableSourceManager,
     onCopyToClipboard,
     customActions = [],
-    context: vsContext,
 }: {
     tableSourceManager: ITableSourceManager,
     onCopyToClipboard?: (text: string) => void | Promise<void>,
@@ -21,7 +20,6 @@ export function registerHivesqlLs({
         title: string;
         run: customActionRunHandler
     }[],
-    context: vscode.ExtensionContext,
 }) {
 
     const createLs = (model: vscode.TextDocument) =>

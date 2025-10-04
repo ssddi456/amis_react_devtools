@@ -610,6 +610,10 @@ export class ContextManager {
         }
     }
 
+    getCompletions(foundNode: ParserRuleContext, mrScope?: MapReduceScope | null, context?: IdentifierScope): any[] {
+        return [];
+    }
+
     async validate(isTest: boolean = false) {
         const errors = this.rootContext?.validate() || [];
 

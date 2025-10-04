@@ -15,8 +15,16 @@
     "languages": [
       {
         "id": "hivesql",
-        "aliases": ["HiveSQL", "hive", "Hive"],
-        "extensions": [".hivesql", ".hive", ".sql"],
+        "aliases": [
+          "HiveSQL",
+          "hive",
+          "Hive"
+        ],
+        "extensions": [
+          ".hivesql",
+          ".hive",
+          ".sql"
+        ],
         "configuration": "./hive.language-configuration.json"
       }
     ],
@@ -26,7 +34,79 @@
         "scopeName": "source.hivesql",
         "path": "./syntaxes/hive.tmLanguage.json"
       }
-    ]
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "SQL DevTools Configuration",
+      "properties": {
+        "sqlDevTools.enableCompletion": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable SQL code completion."
+        },
+        "sqlDevTools.enableSyntaxCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable SQL syntax checking."
+        },
+        "sqlDevTools.tableInfos": {
+          "type": "array",
+          "default": [],
+          "description": "table information.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "db_name": {
+                "type": "string",
+                "description": "Database name"
+              },
+              "table_name": {
+                "type": "string",
+                "description": "Table name"
+              },
+              "table_id": {
+                "type": "number",
+                "description": "Unique identifier for the table"
+              },
+              "description": {
+                "type": "string",
+                "description": "Description of the table"
+              },
+              "column_list": {
+                "type": "array",
+                "description": "List of columns in the table",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "column_name": {
+                      "type": "string",
+                      "description": "Column name"
+                    },
+                    "data_type_string": {
+                      "type": "string",
+                      "description": "Data type of the column"
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Comment about the column"
+                    }
+                  },
+                  "required": [
+                    "column_name",
+                    "data_type_string"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "db_name",
+              "table_name",
+              "column_list"
+            ]
+          }
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

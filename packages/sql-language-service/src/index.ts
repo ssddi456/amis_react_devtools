@@ -82,6 +82,35 @@ export const createHiveSqlLanguageService = ({
     const getCtxFromPos = createGetCtxFromPos(sqlSlices, contextManager, tree, logger.log);
 
     return {
+        doComplete: (position: Pos): languages.CompletionList | undefined => {
+            const { foundNode, mrScope, context } = getCtxFromPos(position) || {};
+            console.group('doComplete');
+            logger.log('foundNode', foundNode);
+            logger.log('mrScope', mrScope);
+            logger.log('context', context);
+            console.groupEnd();
+            if (!foundNode || !context) {
+                return;
+            }
+            const completions = contextManager.getCompletions(foundNode, mrScope, context);
+            if (!completions || completions.length === 0) {
+                return;
+            }
+
+            logger.log('completions', completions);
+
+            return {
+                incomplete: false,
+                suggestions: completions.map<languages.CompletionItem>(item => ({
+                    label: item.label,
+                    kind: item.kind,
+                    detail: item.detail,
+                    documentation: item.documentation,
+                    insertText: item.insertText,
+                    range: rangeFromNode(foundNode),
+                }))
+            };
+        },
         doHover: async (
             position: Pos,
             isTest?: boolean
