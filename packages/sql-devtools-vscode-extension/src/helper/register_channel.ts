@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as util from 'util';
 
-const logPath = path.join(__dirname, '../dist/sql-devtools-vscode-extension.log');
+const logPath = path.join(__filename, './sql-devtools-vscode-extension.log');
 console.log(logPath);
 if (!fs.existsSync(logPath)) {
     fs.writeFileSync(logPath, '');
