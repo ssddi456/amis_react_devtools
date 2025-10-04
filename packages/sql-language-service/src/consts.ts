@@ -19,6 +19,9 @@ export const CommandLabel: Record<CommandId, string> = {
     [CommandId.CopyTestSql]: 'Copy test sql',
 };
 
-export { LanguageIdEnum } from 'monaco-sql-languages';
+// the value from export { LanguageIdEnum } from 'monaco-sql-languages';
+export enum LanguageIdEnum {
+    HIVE = "hivesql",
+}
 
 export const subqueryPlaceHolder = '< subquery >';

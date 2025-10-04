@@ -1,5 +1,6 @@
-dist/
+dist
 node_modules/
 .DS_Store
 .swc
 */data/*.json
+tsconfig.tsbuildinfo

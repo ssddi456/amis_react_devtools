@@ -1,6 +1,6 @@
 import { ParserRuleContext } from "antlr4ng";
 import { TableSourceContext, SubQuerySourceContext, VirtualTableSourceContext, CteStatementContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
-import { languages, Uri } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
+import type { languages, Uri } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { IdentifierScope } from "./identifier_scope";
 import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, functionRes, unknownRes } from "./sql_res";
 import { rangeFromNode, Range } from "./helpers/pos";

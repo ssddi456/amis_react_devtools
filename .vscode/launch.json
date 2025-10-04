@@ -6,6 +6,9 @@
             "type": "extensionHost",
             "request": "launch",
             "runtimeExecutable": "${execPath}",
+            "sourceMapPathOverrides": {
+                "webpack://@amis-devtools/sql-devtools-vscode-extension/*": "${workspaceFolder}/packages/sql-devtools-vscode-extension/*"
+            },
             "args": [
                 "--extensionDevelopmentPath=${workspaceRoot}/packages/sql-devtools-vscode-extension"
             ],

@@ -2,7 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "checkJs": true,
+    "resolvePackageJsonImports": true
   },
   "references": [
     {
@@ -10,6 +12,6 @@
     }
   ],
   "include": [
-    "./src/**/*.{ts,tsx}"
+    "./src/**/*.ts"
   ]
 }

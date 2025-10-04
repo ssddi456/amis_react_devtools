@@ -16,19 +16,28 @@
       {
         "id": "hivesql",
         "aliases": ["HiveSQL", "hive", "Hive"],
-        "extensions": [".hivesql"],
-        "configuration": "./language-configuration.json"
+        "extensions": [".hivesql", ".hive", ".sql"],
+        "configuration": "./hive.language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "hivesql",
+        "scopeName": "source.hivesql",
+        "path": "./syntaxes/hive.tmLanguage.json"
       }
     ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./tsconfig.json",
-    "dev": "tsc -watch -p ./tsconfig.json"
+    "compile": "rspack build --config ./config/rspack.config.js",
+    "dev": "rspack build -w --config ./config/rspack.config.js"
   },
   "devDependencies": {
     "typescript": "5.9.2",
-    "@types/vscode": "1.104.0"
+    "@types/vscode": "1.104.0",
+    "@rspack/cli": "1.5.3",
+    "@rspack/core": "1.5.3"
   },
   "dependencies": {
     "@amis-devtools/sql-language-service": "file:../sql-language-service"

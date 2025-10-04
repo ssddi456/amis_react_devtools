@@ -1,5 +1,4 @@
-import * as monaco from 'monaco-editor';
-import { editor } from 'monaco-editor';
+import type { editor } from 'monaco-editor';
 import { DisposableChain } from './helpers/disposable_chain';
 import { debounce, once } from './helpers/util';
 import { createHiveSqlLanguageService, createHiveSqlActions } from './index';
@@ -7,12 +6,8 @@ import { customActionRunHandler, ITableSourceManager } from './types';
 import { LanguageIdEnum, registerLanguage, setupLanguageFeatures, vsPlusTheme } from 'monaco-sql-languages';
 import 'monaco-sql-languages/esm/languages/hive/hive.contribution';
 import { Pos } from './helpers/pos';
-const envSetup = once(() => {
-    // Customize the various tokens style
-    editor.defineTheme('sql-dark', vsPlusTheme.darkThemeData);
-    editor.defineTheme('sql-light', vsPlusTheme.lightThemeData);
-    editor.defineTheme('sql-hc', vsPlusTheme.hcBlackThemeData);
-    
+
+const envSetup = once(() => {    
     registerLanguage({
         id: LanguageIdEnum.HIVE,
         extensions: ['.hivesql'],
@@ -79,8 +74,12 @@ export function registerHivesqlLs({
     const createLs = (model: editor.ITextModel) => 
         createHiveSqlLanguageService({ model, tableSourceManager, customActions })
 
-    return (editorInstance: monaco.editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
+    return (editorInstance: editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
+        monaco.editor.defineTheme('sql-dark', vsPlusTheme.darkThemeData);
+        monaco.editor.defineTheme('sql-light', vsPlusTheme.lightThemeData);
+        monaco.editor.defineTheme('sql-hc', vsPlusTheme.hcBlackThemeData);
         monaco.editor.setTheme('sql-light');
+    
         const doValidate = debounce(async () => {
             const model = editorInstance.getModel();
             if (model) {

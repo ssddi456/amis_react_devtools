@@ -9,7 +9,7 @@ import { MapReduceScope } from "./mr_scope";
 import { ErrorType } from "./consts";
 
 
-interface HighlightRange {
+export interface HighlightRange {
     start: number;
     end: number;
     lineNumber: number;

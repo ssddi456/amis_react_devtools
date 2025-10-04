@@ -26,9 +26,9 @@
         {
             "label": "build extension",
             "type": "shell",
-            "command": "npm run dev:extension",
+            "command": "npm run compile:extension",
             "group": "none",
-            "detail": "Build and run extension app",
+            "detail": "Build extension app",
             "presentation": {
                 "reveal": "always",
                 "panel": "new"

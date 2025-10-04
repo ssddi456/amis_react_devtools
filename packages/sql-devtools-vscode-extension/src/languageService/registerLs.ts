@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
+import { CancellationToken, FormattingOptions, MarkdownString, TextDocument } from 'vscode';
 import { LanguageIdEnum } from '@amis-devtools/sql-language-service/src/consts';
 import { createHiveSqlLanguageService, createHiveSqlActions } from '@amis-devtools/sql-language-service/src/';
 import { customActionRunHandler, ITableSourceManager } from "@amis-devtools/sql-language-service/src/types";
 import { debounce } from '@amis-devtools/sql-language-service/src/helpers/util';
 import { DisposableChain } from '@amis-devtools/sql-language-service/src/helpers/disposable_chain';
-import { CancellationToken, FormattingOptions, MarkdownString, TextDocument } from 'vscode';
-import { positionToPos, posRangeToRange, rangeToPosRange } from '../helper/pos';
 import { Pos } from '@amis-devtools/sql-language-service/src/helpers/pos';
+import { positionToPos, posRangeToRange, posRangeToRangeSame, rangeToPosRange } from '../helper/pos';
 
 export function registerHivesqlLs({
     tableSourceManager,
@@ -29,7 +29,10 @@ export function registerHivesqlLs({
             model: {
                 getValue: () => model.getText(),
                 uri: model.uri.toString()
-            }, tableSourceManager, customActions
+            },
+            tableSourceManager,
+            customActions,
+            isTest: true,
         });
 
 
@@ -48,10 +51,7 @@ export function registerHivesqlLs({
             const markers = errors.map<vscode.Diagnostic>(err => {
                 return {
                     severity: vscode.DiagnosticSeverity.Error,
-                    range: new vscode.Range(
-                        new vscode.Position(err.startLineNumber, err.startColumn),
-                        new vscode.Position(err.endLineNumber, err.endColumn)
-                    ),
+                    range: posRangeToRange(err),
                     message: err.message
                 };
             });
@@ -61,12 +61,25 @@ export function registerHivesqlLs({
     }, 300);
 
     const disposables = new DisposableChain();
+    const getCurrentDocument = () =>     vscode.window.activeTextEditor?.document;
 
+    disposables.add(diagnosticCollection);
     disposables.add(vscode.workspace.onDidChangeTextDocument((e) => {
-        if (e.document === vsContext.workspaceState.get<vscode.TextDocument>('currentModel')) {
+        if (e.document === getCurrentDocument()) {
             doValidate(e.document);
         }
     }));
+    disposables.add(vscode.workspace.onDidOpenTextDocument((e) => {
+        const currentModel = getCurrentDocument();
+        if (currentModel?.languageId === LanguageIdEnum.HIVE) {
+            doValidate(currentModel);
+        }
+    }));
+
+    const currentModel = getCurrentDocument();
+    if (currentModel?.languageId === LanguageIdEnum.HIVE) {
+        doValidate(currentModel);
+    }
 
     disposables.add(vscode.languages.registerHoverProvider(LanguageIdEnum.HIVE, {
         provideHover: async (model, position): Promise<vscode.Hover | undefined> => {
@@ -89,16 +102,22 @@ export function registerHivesqlLs({
             if (!definitionRes) {
                 return;
             }
+
+            // console.group('provideDefinition');
+            // console.log('definitionRes', definitionRes);
+            // console.log('url', model.uri.toString());
+            // (Array.isArray(definitionRes) ? definitionRes : [definitionRes]).forEach(res => console.log({range: posRangeToRange(res.range)}));
+            // console.groupEnd();
+
             if (Array.isArray(definitionRes)) {
-                return definitionRes.map(res => ({
-                    uri: res.uri,
-                    range: posRangeToRange(res.range)
-                }));
+                return definitionRes.map(res => new vscode.Location(res.uri,
+                    posRangeToRangeSame(res.range)
+                ));
             }
-            return  {
-                uri: definitionRes.uri,
-                range: posRangeToRange(definitionRes.range)
-            }
+            console.log('single definition', definitionRes);
+            return new vscode.Location(model.uri,
+                posRangeToRangeSame(definitionRes.range)
+            )
         }
     }));
 
@@ -106,8 +125,8 @@ export function registerHivesqlLs({
         provideReferences: async (model, position) => {
             const context = createLs(model);
             const references = context.doReferences(positionToPos(position));
-            return references?.map(ref => 
-                new vscode.Location(ref.uri, posRangeToRange(ref.range))
+            return references?.map(ref =>
+                new vscode.Location(model.uri, posRangeToRangeSame(ref.range))
             );
         }
     }));

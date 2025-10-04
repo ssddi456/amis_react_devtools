@@ -17,7 +17,6 @@ import {
 } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import { ErrorType } from "./consts";
 import { Pos, Range } from "./helpers/pos";
-import { editor } from "monaco-editor";
 import { ContextManager } from "./context_manager";
 import { MapReduceScope } from "./mr_scope";
 import { IdentifierScope } from "./identifier_scope";
