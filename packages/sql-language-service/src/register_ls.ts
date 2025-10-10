@@ -4,10 +4,9 @@ import { debounce, once } from './helpers/util';
 import { createHiveSqlLanguageService, createHiveSqlActions } from './index';
 import { customActionRunHandler, ITableSourceManager } from './types';
 import { LanguageIdEnum, registerLanguage, setupLanguageFeatures, vsPlusTheme } from 'monaco-sql-languages';
-import 'monaco-sql-languages/esm/languages/hive/hive.contribution';
 import { Pos } from './helpers/pos';
 
-const envSetup = once(() => {    
+export const envSetup = once(() => {    
     registerLanguage({
         id: LanguageIdEnum.HIVE,
         extensions: ['.hivesql'],
@@ -20,38 +19,6 @@ const envSetup = once(() => {
         diagnostics: false,
         definitions: false,
     });
-
-    const originalMonacoEnvironment = (window as any).MonacoEnvironment;
-    const getWorker = (workerId: string, label: string) => {
-        if (label === 'hivesql') {
-            return new Worker(
-                new URL(
-                "monaco-sql-languages/esm/languages/hive/hive.worker",
-                // @ts-ignore
-                import.meta.url
-                )
-            );
-        }
-        return null;
-    }
-
-    if (!originalMonacoEnvironment) {
-        (window as any).MonacoEnvironment = {
-            getWorker
-        };
-    } else if (!originalMonacoEnvironment.getWorker) {
-        (window as any).MonacoEnvironment.getWorker = getWorker;
-    } else {
-        const originalGetWorker = originalMonacoEnvironment.getWorker;
-        (window as any).MonacoEnvironment.getWorker = (workerId: string, label: string) => {
-            const currRet = getWorker(workerId, label);
-            if (currRet) {
-                return currRet;
-            }
-            return originalGetWorker(workerId, label);
-        };
-    }
-
 });
 
 export function registerHivesqlLs({
@@ -69,7 +36,6 @@ export function registerHivesqlLs({
         run: customActionRunHandler
     }[]
 }) {
-    envSetup();
 
     const createLs = (model: editor.ITextModel) => 
         createHiveSqlLanguageService({ model, tableSourceManager, customActions })

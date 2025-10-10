@@ -181,7 +181,7 @@ export const createHiveSqlLanguageService = ({
                 return;
             }
 
-            return formatDefinitionRes(model.uri as Uri, hoverInfo);
+            return formatDefinitionRes(model.uri as any, hoverInfo);
         },
 
         doReferences(

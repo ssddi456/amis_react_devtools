@@ -120,41 +120,9 @@ export const getJSONLs = (model: editor.ITextModel) => {
     };
 }
 
-const setupEnv = once(() => {
-    const originalMonacoEnvironment = (window as any).MonacoEnvironment;
-    const getWorker = (workerId: string, label: string) => {
-        console.log('getWorker', workerId, label);
-
-        if (label === 'json') {
-            // @ts-ignore
-            return new Worker(new URL('monaco-editor/esm/vs/language/json/json.worker', import.meta.url));
-        }
-        return null;
-    }
-
-    if (!originalMonacoEnvironment) {
-        (window as any).MonacoEnvironment = {
-            getWorker
-        };
-    } else if (!originalMonacoEnvironment.getWorker) {
-        (window as any).MonacoEnvironment.getWorker = getWorker;
-    } else {
-        const originalGetWorker = originalMonacoEnvironment.getWorker;
-        (window as any).MonacoEnvironment.getWorker = (workerId: string, label: string) => {
-            const currRet = getWorker(workerId, label);
-            if (currRet) {
-                return currRet;
-            }
-            return originalGetWorker(workerId, label);
-        };
-    }
-})
-
-
 const languageId = 'json';
 
 export const registerJsonLs = () => {
-    setupEnv();
 
     return (editorInstance: editor.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
         const disposables = new DisposableChain();

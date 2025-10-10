@@ -14,11 +14,23 @@ import { createStorage } from './template/storage';
 type TabType = 'symbols' | 'graph' | 'validation' | 'custom_tables';
 const STORAGE_KEY = 'custom-tables-sql';
 const { load: loadSql, save: saveSql } = createStorage<string>(STORAGE_KEY, (s) => s, '');
+
+// 获取 URL 参数
+const getUrlParams = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return {
+        sqlId: urlParams.get('sql_id')
+    };
+};
+
 export const App: React.FC = () => {
     const [showHelper, setShowHelper] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('graph');
     const [selectedSqlIndex, setSelectedSqlIndex] = useState(0);
-    const [customSql, setCustomSql] = useState(loadSql);
+    
+    // 如果有 sql_id 参数，不加载 localStorage
+    const { sqlId } = getUrlParams();
+    const [customSql, setCustomSql] = useState(sqlId ? '' : loadSql);
     const [context, setContext] = useState<ContextManager | null>(null);
     const [errors, setErrors] = useState<editor.IMarkerData[]>([]); // To hold validation errors
     
@@ -32,7 +44,10 @@ export const App: React.FC = () => {
 
     const handleSqlChange = (value: string) => {
         setCustomSql(value);
-        saveSql(value);
+        // 如果有 sql_id 参数，不自动保存到 localStorage
+        if (!sqlId) {
+            saveSql(value);
+        }
     };
 
     const handleExampleSelect = (index: number) => {
@@ -95,15 +110,19 @@ export const App: React.FC = () => {
             }, event.origin);
         }
     });
-    window.open('http://localhost:3031', 'sql_editor');
+    window.open('http://localhost:3031?sql_id=123', 'sql_editor');
 
     */
     useEffect(() => {
-        // 如果有window.opener，发送编辑器就绪消息
+        // 如果有window.opener，发送编辑器就绪消息，并回传 sql_id
         if (window.opener) {
-            window.opener.postMessage({ type: 'sql_editor_ready' }, '*');
+            const readyMessage: any = { type: 'sql_editor_ready' };
+            if (sqlId) {
+                readyMessage.sql_id = sqlId;
+            }
+            window.opener.postMessage(readyMessage, '*');
         }
-    }, []);
+    }, [sqlId]);
 
     // 监听来自父窗口的消息
     useEffect(() => {
@@ -114,7 +133,10 @@ export const App: React.FC = () => {
             }
             if (type === 'sql_editor_content_change' && event.data?.content) {
                 setCustomSql(event.data.content);
-                saveSql(event.data.content);
+                // 如果有 sql_id 参数，不自动保存到 localStorage
+                if (!sqlId) {
+                    saveSql(event.data.content);
+                }
             }
             if (type === 'sql_editor_table_source_change' && event.data?.tableSource) {
                 // setCustomTables(event.data.tableSource);
@@ -127,7 +149,7 @@ export const App: React.FC = () => {
         return () => {
             window.removeEventListener('message', handleMessage);
         };
-    }, []);
+    }, [sqlId]);
 
     useEffect(() => {
         const { contextManager } = getContextWithCache(currentSql, false, tableSource);

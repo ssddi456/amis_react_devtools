@@ -1,18 +1,19 @@
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
-import * as monaco from 'monaco-editor';
-import { registerHivesqlLs } from '@amis-devtools/sql-language-service/src/register_ls';
+import loader from "@monaco-editor/loader";
+import * as Monaco from 'monaco-editor';
+import { type editor } from 'monaco-editor';
+import { envSetup, registerHivesqlLs } from '@amis-devtools/sql-language-service/src/register_ls';
 import { LanguageIdEnum } from '@amis-devtools/sql-language-service/src/consts';
 import { copyToClipboard } from '@amis-devtools/sql-devtools-ui/src/tools/copy';
 import { customActionRunHandler, ITableSourceManager } from '@amis-devtools/sql-language-service/src/types';
 import { registerJsonLs } from './jsonLs';
-
 interface MonacoEditorProps {
   language: string,
   tableSourceManager?: ITableSourceManager;
   value?: string;
   onChange?: (value: string) => void;
   readOnly?: boolean;
-  onValidate?: (errors: monaco.editor.IMarkerData[]) => void;
+  onValidate?: (errors: editor.IMarkerData[]) => void;
   customActions?: {
     id: string;
     title: string;
@@ -20,9 +21,17 @@ interface MonacoEditorProps {
   }[];
 }
 
+loader.config({
+  monaco: Monaco,
+  'vs/nls': { availableLanguages: { '*': 'zh-CN' } },
+});
+
+loader.init();
+
 export interface MonacoEditorRef {
-  getEditor: () => monaco.editor.IStandaloneCodeEditor | null;
+  getEditor: () => editor.IStandaloneCodeEditor | null;
 }
+
 
 export const MonacoEditor = forwardRef<MonacoEditorRef, MonacoEditorProps>(({
   tableSourceManager,
@@ -34,9 +43,10 @@ export const MonacoEditor = forwardRef<MonacoEditorRef, MonacoEditorProps>(({
   customActions = [],
 }, ref) => {
   const editorRef = useRef<HTMLDivElement>(null);
-  const monacoEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const monacoEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [startLanguage] = useState(language);
+  const [monaco, setMonacoInitialized] = useState<typeof import("monaco-editor") | null>(null);
 
   // Expose the Monaco editor instance through the ref
   useImperativeHandle(ref, () => ({
@@ -44,7 +54,14 @@ export const MonacoEditor = forwardRef<MonacoEditorRef, MonacoEditorProps>(({
   }));
 
   useEffect(() => {
-    if (editorRef.current && !monacoEditorRef.current) {
+    envSetup();
+    loader.init().then((monaco) => {
+      setMonacoInitialized(monaco);
+    });
+  }, [])
+
+  useEffect(() => {
+    if (editorRef.current && monaco && !monacoEditorRef.current) {
       // Create Monaco editor instance
       const editor = monaco.editor.create(editorRef.current, {
         value: value,
@@ -100,6 +117,7 @@ export const MonacoEditor = forwardRef<MonacoEditorRef, MonacoEditorProps>(({
 
       setIsInitialized(true);
 
+
       // Cleanup function
       return () => {
         subscription.dispose();
@@ -107,7 +125,7 @@ export const MonacoEditor = forwardRef<MonacoEditorRef, MonacoEditorProps>(({
         monacoEditorRef.current = null;
       };
     }
-  }, []);
+  }, [editorRef.current, monaco]);
 
   // Update editor value when prop changes
   useEffect(() => {
@@ -125,16 +143,18 @@ export const MonacoEditor = forwardRef<MonacoEditorRef, MonacoEditorProps>(({
     }
   }, [language]);
 
+
+
   return (
-    <div 
-      ref={editorRef} 
-      style={{ 
-        height: '100%', 
+    <div
+      ref={editorRef}
+      style={{
+        height: '100%',
         width: '100%',
         border: '1px solid #ddd',
         borderRadius: '4px',
         overflow: 'auto'
-      }} 
+      }}
     />
   );
 });

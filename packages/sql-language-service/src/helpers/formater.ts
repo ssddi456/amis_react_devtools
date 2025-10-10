@@ -1,7 +1,6 @@
 import { ParseTree } from 'antlr4ng';
 import { formatHiveSQL } from '../formatter';
-import { SubQuerySourceContext } from 'dt-sql-parser/dist/lib/hive/HiveSqlParser';
-import { matchSubPath, matchSubPathOneOf } from './tree_query';
+import { matchSubPathOneOf } from './tree_query';
 import { subqueryPlaceHolder } from '../consts';
 
 
@@ -19,9 +18,7 @@ export function sqlStringFromNode(ctx: ParseTree | null, options: GenerateSqlOpt
     let result = '';
     for (let i = 0; i < ctx.getChildCount(); i++) {
         const child = ctx.getChild(i);
-        if (child && options.hideSubQuery && ctx instanceof SubQuerySourceContext) {
-            debugger;
-        }
+
         if (
             child && 
             options.hideSubQuery &&

@@ -17,7 +17,8 @@
         "node-polyfill-webpack-plugin": "^4.1.0",
         "sql-formatter": "^15.6.6",
         "vscode-json-languageservice": "^5.6.1",
-        "vscode-languageserver-types": "^3.17.5"
+        "vscode-languageserver-types": "^3.17.5",
+        "monaco-editor": "0.54.0"
     },
     "overrides": {
         "monaco-editor": "0.54.0"
