@@ -3,5 +3,6 @@
     "javascript.updateImportsOnFileMove.enabled": "always",
     "typescript.updateImportsOnFileMove.enabled": "always",
     "typescript.updateImportsOnPaste.enabled": true,
-    "typescript.inlayHints.functionLikeReturnTypes.enabled": true
+    "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
+    "github.copilot.chat.localeOverride": "zh-CN"
 }

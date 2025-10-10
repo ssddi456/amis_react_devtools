@@ -1,4 +1,6 @@
 import { ITableSourceManager, TableInfo } from "@amis-devtools/sql-language-service/src/types";
+import { createStorage } from "./template/storage";
+import JSON5 from "json5";
 
 // SQL test collection for function showcase
 export const sqlTest: { sql: string; name: string; }[] = [
@@ -249,6 +251,69 @@ ORDER BY level, first_name;`
     }
 ].filter(example => example.show !== false);
 
+
+export const TABLE_STORAGE_KEY = 'custom-tables';
+
+export const DEFAULT_TABLE_JSON = `
+// 示例表格配置
+// [{
+//     "db_name": "custom",
+//     "table_name": "example_table",
+//     "table_id": 1,
+//     "description": "示例自定义表格",
+//     "column_list": [
+//             {
+//                 "column_name": "id",
+//                 "data_type_string": "bigint",
+//                 "description": "主键ID"
+//             },
+//             {
+//                 "column_name": "name", 
+//                 "data_type_string": "string",
+//                 "description": "名称"
+//             },
+//             {
+//                 "column_name": "created_at",
+//                 "data_type_string": "timestamp", 
+//                 "description": "创建时间"
+//             }
+//         ]
+//     }
+// }]
+[]
+`;
+
+export const tableInfosFromString = (str: string): TableInfo[] => {
+    try {
+        const parsed = JSON5.parse(str);
+        if (Array.isArray(parsed)) {
+            return parsed.filter(isValidTableInfo) as TableInfo[];
+        }
+    } catch (err) {
+        console.error('Failed to parse table infos from string:', err);
+    }
+    return [];
+};
+// 验证TableInfo结构
+const isValidTableInfo = (obj: any): obj is TableInfo => {
+    return obj &&
+        typeof obj.db_name === 'string' &&
+        typeof obj.table_name === 'string' &&
+        typeof obj.description === 'string' &&
+        Array.isArray(obj.column_list) &&
+        obj.column_list.every((col: any) => 
+            col &&
+            typeof col.column_name === 'string' &&
+            typeof col.data_type_string === 'string' &&
+            typeof col.description === 'string'
+        );
+};
+
+const { load, save } = createStorage<TableInfo[]>(TABLE_STORAGE_KEY, tableInfosFromString, []);
+
+export const loadTableInfosFromStorage = load;
+export const saveTableInfosToStorage = save;
+
 const tableInfos: Record<string, TableInfo> = {
     users: {
         db_name: "example",
@@ -353,8 +418,15 @@ const tableInfos: Record<string, TableInfo> = {
     }
 }
 
-export const tableSource: ITableSourceManager = {
+
+interface CustomTableSourceManager extends ITableSourceManager {
+    reloadTableInfos: (info?: TableInfo[]) => void;
+    getTableCount: () => number;
+}
+
+export const tableSource: CustomTableSourceManager = {
     getTableInfoByName: (tableName: string, dbName: string | undefined): TableInfo | null => {
+        console.log('Getting table info for:', tableName, dbName);
         // Try to find table by exact name first
         if (tableInfos[tableName]) {
             return tableInfos[tableName];
@@ -378,5 +450,26 @@ export const tableSource: ITableSourceManager = {
         }
         
         return null;
+    },
+    reloadTableInfos: (extTables?: TableInfo[]) => {
+        const tableInfosFromStorage = loadTableInfosFromStorage();
+        tableInfosFromStorage.forEach(table => {
+            const key = table.table_name;
+            tableInfos[key] = table;
+        });
+        if (extTables && Array.isArray(extTables)) {
+            extTables.forEach(table => {
+                if (isValidTableInfo(table)) {
+                    const key = table.table_name;
+                    tableInfos[key] = table;
+                }
+            });
+        }
+        console.log('Table infos reloaded. Current tables:', Object.keys(tableInfos));
+    },
+    getTableCount: () => {
+        return Object.keys(tableInfos).length;
     }
-}
+};
+
+tableSource.reloadTableInfos();

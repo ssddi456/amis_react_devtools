@@ -20,6 +20,6 @@
         "vscode-languageserver-types": "^3.17.5"
     },
     "overrides": {
-        "monaco-editor": "0.31.1"
+        "monaco-editor": "0.54.0"
     }
 }

@@ -11,7 +11,7 @@
         "@amis-devtools/sql-devtools-ui": "file:../sql-devtools-ui",
         "@amis-devtools/sql-language-service": "file:../sql-language-service",
         "json5": "^2.2.3",
-        "monaco-editor": "0.31.1",
+        "monaco-editor": "0.54.0",
         "react": "17.0.2",
         "react-dom": "17.0.2",
         "vscode-json-languageservice": "^5.6.1"
