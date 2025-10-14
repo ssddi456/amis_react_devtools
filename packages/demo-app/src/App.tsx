@@ -8,8 +8,10 @@ import type { editor } from 'monaco-editor';
 import { MrScopeDagFlowRef } from '@amis-devtools/sql-devtools-ui/src/components/MrScopeDagFlow';
 import { MonacoEditorRef, MonacoEditor } from './components/MonacoEditor';
 import { TabNavigationPanel } from './components/TabNavigationPanel';
+import { TooltipIcon } from './components/TooltipIcon';
 import { tableSource, sqlTest } from './sqlTest';
 import { createStorage } from './template/storage';
+import GitHubButton from 'react-github-btn'
 
 type TabType = 'symbols' | 'graph' | 'validation' | 'custom_tables';
 const STORAGE_KEY = 'custom-tables-sql';
@@ -27,13 +29,13 @@ export const App: React.FC = () => {
     const [showHelper, setShowHelper] = useState(false);
     const [activeTab, setActiveTab] = useState<TabType>('graph');
     const [selectedSqlIndex, setSelectedSqlIndex] = useState(0);
-    
+
     // 如果有 sql_id 参数，不加载 localStorage
     const { sqlId } = getUrlParams();
     const [customSql, setCustomSql] = useState(sqlId ? '' : loadSql);
     const [context, setContext] = useState<ContextManager | null>(null);
     const [errors, setErrors] = useState<editor.IMarkerData[]>([]); // To hold validation errors
-    
+
     const [graphData, setGraphData] = useState<{ nodes: any[]; edges: any[]; }>({ nodes: [], edges: [] });
 
     const editorRef = React.useRef<MonacoEditorRef>(null);
@@ -237,6 +239,14 @@ export const App: React.FC = () => {
         <div className="demo-app">
             <header className="app-header">
                 <h1>SQL Development Helper</h1>
+                <GitHubButton
+                    href="https://github.com/ssddi456/amis_react_devtools"
+                    data-color-scheme="no-preference: light_high_contrast; light: light; dark: dark;"
+                    data-show-count="true"
+                    aria-label="Star ssddi456/amis_react_devtools on GitHub"
+                >
+                    Star
+                </GitHubButton>
             </header>
             <main className="app-main">
                 <div className="editor-header">
@@ -255,13 +265,31 @@ export const App: React.FC = () => {
                             ))}
                         </select>
                     </div>
-                    <button
-                        onClick={() => setShowHelper(!showHelper)}
-                        className={`helper-btn ${showHelper ? 'active' : ''}`}
-                        title={showHelper ? 'Hide' : 'Show'}
-                    >
-                        {showHelper ? 'Hide helper' : 'Show helper'}
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <TooltipIcon
+                            content={
+                                <div style={{ lineHeight: '1.4' }}>
+                                    <div><strong>光标操作快捷键:</strong></div>
+                                    <div>• Ctrl/Cmd + 点击: 跳转到定义</div>
+                                    <div>• F12: 跳转到定义</div>
+                                    <div>• Shift + F12: 查找所有引用</div>
+                                    <div>• Alt + F12: 查看定义</div>
+                                    <div>• Hover: 显示详细信息</div>
+                                    <div>• Control + - /Alt + ⬅️: 回退到上一个位置</div>
+                                    <div>• Control + Shift + - /Alt + ➡️: 前进到下一个位置</div>
+                                </div>
+                            }
+                            position="bottom"
+                        />
+                        &nbsp;
+                        <button
+                            onClick={() => setShowHelper(!showHelper)}
+                            className={`helper-btn ${showHelper ? 'active' : ''}`}
+                            title={showHelper ? 'Hide' : 'Show'}
+                        >
+                            {showHelper ? 'Hide helper' : 'Show helper'}
+                        </button>
+                    </div>
                 </div>
                 <div className='editor-container'>
                     {renderEditor()}

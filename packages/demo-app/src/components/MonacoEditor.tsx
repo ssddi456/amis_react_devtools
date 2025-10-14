@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
 import loader from "@monaco-editor/loader";
 import * as Monaco from 'monaco-editor';
-import { type editor } from 'monaco-editor';
+import { IRange, type editor } from 'monaco-editor';
 import { envSetup, registerHivesqlLs } from '@amis-devtools/sql-language-service/src/register_ls';
 import { LanguageIdEnum } from '@amis-devtools/sql-language-service/src/consts';
 import { copyToClipboard } from '@amis-devtools/sql-devtools-ui/src/tools/copy';
@@ -10,12 +10,7 @@ import { registerJsonLs } from './jsonLs';
 
 // 导航历史类型定义
 interface NavigationPosition {
-  selection: {
-    startLineNumber: number;
-    startColumn: number;
-    endLineNumber: number;
-    endColumn: number;
-  };
+  selection: IRange;
   revealPosition: {
     lineNumber: number;
     column: number;
@@ -150,6 +145,7 @@ function checkOS() {
 }
 
 const platform: osEnum = checkOS();
+console.log('platform:', platform);
 
 export const MonacoEditor = forwardRef<MonacoEditorRef, MonacoEditorProps>(({
   tableSourceManager,
@@ -295,7 +291,7 @@ export const MonacoEditor = forwardRef<MonacoEditorRef, MonacoEditorProps>(({
             monaco.KeyMod.Alt | monaco.KeyCode.LeftArrow,
           ],
           [osEnum.Mac]: [
-            monaco.KeyMod.CtrlCmd | monaco.KeyCode.Minus,
+            monaco.KeyMod.WinCtrl | monaco.KeyCode.Minus,
           ],
           [osEnum.Other]: [
             monaco.KeyMod.Alt | monaco.KeyCode.LeftArrow,
@@ -314,7 +310,7 @@ export const MonacoEditor = forwardRef<MonacoEditorRef, MonacoEditorProps>(({
             monaco.KeyMod.Alt | monaco.KeyCode.RightArrow,
           ],
           [osEnum.Mac]: [
-            monaco.KeyMod.CtrlCmd | monaco.KeyCode.Shift | monaco.KeyCode.Minus,
+            monaco.KeyMod.WinCtrl | monaco.KeyMod.Shift | monaco.KeyCode.Minus,
           ],
           [osEnum.Other]: [
             monaco.KeyMod.Alt | monaco.KeyCode.RightArrow,
