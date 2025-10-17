@@ -4,3 +4,4 @@ node_modules/
 .swc
 */data/*.json
 tsconfig.tsbuildinfo
+*.vsix
