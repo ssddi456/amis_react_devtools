@@ -15,7 +15,6 @@ import GitHubButton from 'react-github-btn'
 
 type TabType = 'symbols' | 'graph' | 'validation' | 'custom_tables';
 const STORAGE_KEY = 'custom-tables-sql';
-const { load: loadSql, save: saveSql } = createStorage<string>(STORAGE_KEY, (s) => s, '');
 
 // 获取 URL 参数
 const getUrlParams = () => {
@@ -32,6 +31,8 @@ export const App: React.FC = () => {
 
     // 如果有 sql_id 参数，不加载 localStorage
     const { sqlId } = getUrlParams();
+    const { load: loadSql, save: saveSql } = createStorage<string>(STORAGE_KEY + (sqlId ? ':' + sqlId : ''), (s) => s, '');
+
     const [customSql, setCustomSql] = useState(sqlId ? '' : loadSql);
     const [context, setContext] = useState<ContextManager | null>(null);
     const [errors, setErrors] = useState<editor.IMarkerData[]>([]); // To hold validation errors
@@ -46,10 +47,7 @@ export const App: React.FC = () => {
 
     const handleSqlChange = (value: string) => {
         setCustomSql(value);
-        // 如果有 sql_id 参数，不自动保存到 localStorage
-        if (!sqlId) {
-            saveSql(value);
-        }
+        saveSql(value);
     };
 
     const handleExampleSelect = (index: number) => {
@@ -135,10 +133,7 @@ export const App: React.FC = () => {
             }
             if (type === 'sql_editor_content_change' && event.data?.content) {
                 setCustomSql(event.data.content);
-                // 如果有 sql_id 参数，不自动保存到 localStorage
-                if (!sqlId) {
-                    saveSql(event.data.content);
-                }
+                saveSql(event.data.content);
             }
             if (type === 'sql_editor_table_source_change' && event.data?.tableSource) {
                 // setCustomTables(event.data.tableSource);

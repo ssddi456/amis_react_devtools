@@ -56,25 +56,32 @@ export function registerHivesqlLs({
                     onValidate?.([]);
                     return;
                 }
-                const context = createLs(model)
-                const errors = await context.doValidation();
-                console.log('validation errors', errors);
                 
-                const markers = errors.map(err => {
-                    return {
-                        severity: monaco.MarkerSeverity.Error,
-                        startLineNumber: err.startLineNumber,
-                        startColumn: err.startColumn,
-                        endLineNumber: err.endLineNumber,
-                        endColumn: err.endColumn,
-                        message: err.message
-                    };
-                });
-                
-                monaco.editor.setModelMarkers(model, LanguageIdEnum.HIVE, markers);
-                
-                // Call the onValidate callback if provided
-                onValidate?.(errors);
+                try {
+                    const context = createLs(model)
+                    const errors = await context.doValidation();
+                    console.log('validation errors', errors);
+                    
+                    const markers = errors.map(err => {
+                        return {
+                            severity: monaco.MarkerSeverity.Error,
+                            startLineNumber: err.startLineNumber,
+                            startColumn: err.startColumn,
+                            endLineNumber: err.endLineNumber,
+                            endColumn: err.endColumn,
+                            message: err.message
+                        };
+                    });
+                    
+                    monaco.editor.setModelMarkers(model, LanguageIdEnum.HIVE, markers);
+                    
+                    // Call the onValidate callback if provided
+                    onValidate?.(errors);
+                } catch (error) {
+                    console.error('when Validation, exception:', error);
+                    monaco.editor.setModelMarkers(model, LanguageIdEnum.HIVE, []);
+                    onValidate?.([]);
+                }
             }
         }, 300);
 
