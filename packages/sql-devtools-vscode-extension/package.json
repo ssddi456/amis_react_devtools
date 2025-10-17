@@ -109,7 +109,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "PACK_EXTENSION=1 npm run compile",
     "compile": "rspack build --config ./config/rspack.config.js",
     "dev": "rspack build -w --config ./config/rspack.config.js",
     "vscode:build": "npx @vscode/vsce package"

@@ -1,3 +1,4 @@
+const { rspack } = require('@rspack/core');
 const path = require('path');
 
 /** @type {import('@rspack/core').Configuration} */
@@ -38,4 +39,9 @@ module.exports = {
     experiments: {
         css: true,
     },
+    plugins: [
+        new rspack.DefinePlugin({
+            'process.env.PACK_EXTENSION': process.env.PACK_EXTENSION
+        })
+    ],
 };

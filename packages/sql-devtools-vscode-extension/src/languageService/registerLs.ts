@@ -6,7 +6,7 @@ import { customActionRunHandler, ITableSourceManager } from "@amis-devtools/sql-
 import { debounce } from '@amis-devtools/sql-language-service/src/helpers/util';
 import { DisposableChain } from '@amis-devtools/sql-language-service/src/helpers/disposable_chain';
 import { Pos } from '@amis-devtools/sql-language-service/src/helpers/pos';
-import { positionToPos, posRangeToRange, posRangeToRangeSame, rangeToPosRange } from '../helper/pos';
+import { positionToPos, posRangeToRange, rangeToPosRange } from '../helper/pos';
 
 export function registerHivesqlLs({
     tableSourceManager,
@@ -109,12 +109,12 @@ export function registerHivesqlLs({
 
             if (Array.isArray(definitionRes)) {
                 return definitionRes.map(res => new vscode.Location(res.uri,
-                    posRangeToRangeSame(res.range)
+                    posRangeToRange(res.range)
                 ));
             }
             console.log('single definition', definitionRes);
             return new vscode.Location(model.uri,
-                posRangeToRangeSame(definitionRes.range)
+                posRangeToRange(definitionRes.range)
             )
         }
     }));
@@ -124,7 +124,7 @@ export function registerHivesqlLs({
             const context = createLs(model);
             const references = context.doReferences(positionToPos(position));
             return references?.map(ref =>
-                new vscode.Location(model.uri, posRangeToRangeSame(ref.range))
+                new vscode.Location(model.uri, posRangeToRange(ref.range))
             );
         }
     }));

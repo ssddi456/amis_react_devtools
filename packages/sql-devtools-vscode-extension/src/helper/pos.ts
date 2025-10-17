@@ -19,14 +19,7 @@ export function rangeToPosRange(range: vscode.Range): Range {
 
 export function posRangeToRange(range: Range): vscode.Range {
     return new vscode.Range(
-        new vscode.Position(range.startLineNumber - 1, range.startColumn - 1),
-        new vscode.Position(range.endLineNumber - 1, range.endColumn - 1)
-    );
-}
-
-export function posRangeToRangeSame(range: Range): vscode.Range {
-    return new vscode.Range(
         new vscode.Position(range.startLineNumber - 1, Math.max(range.startColumn - 1, 0)),
-        new vscode.Position(range.endLineNumber - 1, range.endColumn)
+        new vscode.Position(range.endLineNumber - 1, range.endColumn - 1)
     );
 }
