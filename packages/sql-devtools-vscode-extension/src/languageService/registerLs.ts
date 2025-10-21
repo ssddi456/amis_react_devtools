@@ -68,9 +68,17 @@ export function registerHivesqlLs({
         }
     }));
     disposables.add(vscode.workspace.onDidOpenTextDocument((e) => {
+        if (e?.languageId === LanguageIdEnum.HIVE) {
+            doValidate(e);
+        }
+    }));
+
+    disposables.add(vscode.workspace.onDidChangeConfiguration(event => {
         const currentModel = getCurrentDocument();
-        if (currentModel?.languageId === LanguageIdEnum.HIVE) {
-            doValidate(currentModel);
+        if (event.affectsConfiguration('sqlDevtools.tableInfos')
+            && currentModel?.languageId === LanguageIdEnum.HIVE
+        ) {
+            setTimeout(() => doValidate(currentModel), 100);
         }
     }));
 

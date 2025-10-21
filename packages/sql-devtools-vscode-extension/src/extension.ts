@@ -5,12 +5,15 @@ import './helper/register_channel';
 
 console.log('Extension "sql-devtools-vscode-extension" is loaded');
 
+const configPrefix = 'sqlDevTools';
+
 export function activate(context: vscode.ExtensionContext) {
     console.log('Congratulations, your extension "sql-devtools-vscode-extension" is now active!');
 
-    const config = vscode.workspace.getConfiguration('sqlDevtools');
-    console.log('Current configuration:', config);
+    const config = vscode.workspace.getConfiguration(configPrefix);
     let tableInfos = (config.get('tableInfos') || []) as TableInfo[];
+    console.log('tableInfos', tableInfos);
+
     const tableSourceManager: ITableSourceManager = {
         // Implement the methods required by ITableSourceManager
         getTableInfoByName(tableName, dbName) {
@@ -20,8 +23,8 @@ export function activate(context: vscode.ExtensionContext) {
     };
 
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
-        if (event.affectsConfiguration('sqlDevtools.tableInfos')) {
-            const updatedConfig = vscode.workspace.getConfiguration('sqlDevtools');
+        if (event.affectsConfiguration(`${configPrefix}.tableInfos`)) {
+            const updatedConfig = vscode.workspace.getConfiguration(configPrefix);
             tableInfos = (updatedConfig.get('tableInfos') || []) as TableInfo[];
             console.log('Updated tableInfos configuration:', tableInfos);
         }
