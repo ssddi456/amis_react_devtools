@@ -9,6 +9,10 @@
     [ ] star column
     [ ] function
     [ ] comments
+    [ ] column to column
+
+1. hover info
+    [ ] support url in doc
 
 1. completion
     [ ] table
@@ -17,12 +21,14 @@
 
 1. validate
     [*] check definition
+        [ ] exclude insert into xxx
     [*] group by
         [ ] with distinct
     [*] using
     [ ] join on scope
     [*] duplicate column alias
     [*] duplicate table alias
+
 
 1. get references
     [*] get table references
