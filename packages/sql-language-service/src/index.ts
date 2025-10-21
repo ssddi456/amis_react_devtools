@@ -30,11 +30,17 @@ export function getContextWithCache(text: string, noCache: boolean, tableSourceM
     if (contextCache.has(text) && !noCache) {
         return contextCache.get(text)!;
     }
+    const startTime = new Date().getTime();
+
     const hiveSqlParse = new HiveSQL();
     const sqlSlices = hiveSqlParse.splitSQLByStatement(text);
     const ctx = hiveSqlParse.createParser(text);
     const tree = ctx.program();
     const contextManager = createContextManager(tree, tableSourceManager);
+
+    const costTime = (new Date().getTime() - startTime);
+    console.log('create context costTime', costTime, 'ms');
+
     const ret: ContextInfos = {
         hiveSqlParse,
         sqlSlices,
@@ -156,6 +162,10 @@ export const createHiveSqlLanguageService = ({
                     message: err.message
                 })
             });
+
+            if (SyntaxErrors.length > 0) {
+                return validations;
+            }
 
             const errors = await contextManager.validate(isTest) || [];
             errors.forEach(err => {
