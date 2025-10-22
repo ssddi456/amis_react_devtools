@@ -114,12 +114,20 @@ export const getEntityInfoAtPosition = async (
     // https://github.com/DTStack/dt-sql-parser/blob/main/src/grammar/hive/HiveSqlParser.g4#L1514
     if (matchSubPath(foundNode, ['id_', 'selectItem'])) {
         const parent = foundNode.parent! as SelectItemContext;
-        // 往前查找 (columnName | expression)
-        return {
-            type: EntityInfoType.Unknown,
-            text: foundNode.getText(),
-            ...commonFields,
-        };
+        const siblings = parent.children || [];
+        const nodeIdx = siblings.indexOf(foundNode);
+        const isLastId = nodeIdx === siblings.length - 1;
+        const kwAs = (foundNode.parent as SelectItemContext).KW_AS();
+        const isInAs = kwAs !== null && nodeIdx > siblings.indexOf(kwAs);
+        const isAlias = isLastId || isInAs;
+        if (isAlias) {
+            // 往前查找 (columnName | expression)
+            return {
+                type: EntityInfoType.Alias,
+                text: foundNode.getText(),
+                ...commonFields,
+            };
+        }
     }
 
     if (matchSubPath(foundNode, ['id_', 'functionIdentifier'])) {
