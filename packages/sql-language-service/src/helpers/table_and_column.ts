@@ -295,7 +295,7 @@ export function getFunctionCallFromExpression(ctx: ParserRuleContext): ParserRul
     return func;
 }
 
-export function tableIdAndColumnNameFromPoolPath(poolPath: PoolPathContext | null): { tableId: string | undefined; columnName: string } {
+export function tableIdAndColumnNameFromPoolPath(poolPath: ParserRuleContext | null): { tableId: string | undefined; columnName: string } {
     if (!poolPath) {
         return { tableId: undefined, columnName: '' };
     }

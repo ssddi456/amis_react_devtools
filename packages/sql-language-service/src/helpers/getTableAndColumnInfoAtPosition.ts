@@ -17,11 +17,14 @@ export const getEntityInfoAtPosition = async (
     isTest?: boolean
 ): Promise<EntityInfo | null> => {
     if (!foundNode || !context || (
-        !matchType(foundNode, 'id_')
-        && !matchType(foundNode, 'DOT')
-        && !matchType(foundNode, 'columnNamePath')
-        && !matchType(foundNode, 'poolPath')
-        && !matchType(foundNode, 'constant')
+        !matchSubPathOneOf(foundNode, [
+            ['id_'],
+            ['STAR'],
+            ['DOT'],
+            ['columnNamePath'],
+            ['poolPath'],
+            ['constant'],
+        ])
     )) {
         return null;
     }
@@ -126,6 +129,24 @@ export const getEntityInfoAtPosition = async (
         };
     }
 
+    if (matchSubPath(foundNode, ['STAR', 'tableAllColumns', 'selectItem'])) {
+        const parent = matchSubPath(foundNode, ['STAR', 'tableAllColumns']) as TableAllColumnsContext;
+        const checkExportColumn = matchSubPathOneOf(foundNode, [
+            ['*', 'orderByClause'],
+            ['*', 'sortByClause'],
+        ]);
+        return {
+            ...await getEntityInfoFromAllColumnName(
+                foundNode,
+                parent,
+                context,
+                mrScope,
+                !!checkExportColumn
+            ),
+            ...commonFields
+        }
+    }
+
     logger.logSource({ type: 'debug', foundNode });
 
     return {
@@ -227,6 +248,8 @@ export const getAllEntityInfoFromNode = async (
         };
     }
 
+    logger.logSource({ type: 'debug', node: printNode(node) });
+
     if (node instanceof TableAllColumnsContext) {
         return {
             type: EntityInfoType.Column,
@@ -305,6 +328,13 @@ async function getEntityInfoFromTableName(
         return {
             type: EntityInfoType.Table,
             tableInfo: foreignTableInfo,
+        };
+    }
+
+    if (matchSubPath(node, ['*', 'insertClause'])) {
+        return {
+            type: EntityInfoType.InsertTable,
+            text: tableName,
         };
     }
 
@@ -452,6 +482,88 @@ async function getEntityInfoFromColumnName(
         columnInfo,
     };
 }
+
+
+async function getEntityInfoFromAllColumnName(
+    node: ParserRuleContext,
+    parent: ColumnNameContext | ColumnNamePathContext | TableAllColumnsContext,
+    context: IdentifierScope,
+    mrScope: MapReduceScope | null,
+    checkExportColumn: boolean = false
+): Promise<Omit<EntityInfo, 'range' | 'ext'>> {
+    console.log(node, mrScope, 'checkExportColumn', checkExportColumn);
+    const poolPath = 'poolPath' in parent ? parent.poolPath() : parent;
+    // 只支持 table_name.column_name or column_name for now
+    const { tableId: tableIdExp, columnName } = tableIdAndColumnNameFromPoolPath(poolPath);
+
+    // column_name only
+    if (!tableIdExp) {
+        if (checkExportColumn) {
+            const exportColumn = mrScope?.getExportColumnByName(columnName!);
+            if (exportColumn) {
+                return {
+                    type: EntityInfoType.Column,
+                    tableInfo: {
+                        table_name: 'local export',
+                        db_name: "",
+                        table_id: -1,
+                        description: "",
+                        column_list: []
+                    },
+                    columnInfo: {
+                        column_name: columnName!,
+                        data_type_string: '',
+                        description: '',
+                        range: rangeFromNode(exportColumn.defineReference),
+                    },
+                    text: columnName!,
+                };
+            }
+        }
+        const item = mrScope?.getTableByName(mrScope?.getDefaultInputTableName());
+        if (!item) {
+            return {
+                type: EntityInfoType.NoTable,
+                text: mrScope?.getDefaultInputTableName(),
+            };
+        }
+        const tableInfo = await tableInfoFromNode(item, context);
+        if (!tableInfo) {
+            return {
+                type: EntityInfoType.NoTable,
+                text: mrScope?.getDefaultInputTableName(),
+            };
+        }
+        
+        return {
+            type: EntityInfoType.Table,
+            tableInfo,
+        };
+    }
+
+    const item = mrScope?.getTableByName(tableIdExp);
+    const tableInfo = item && await tableInfoFromNode(item, context);
+    if (!tableInfo) {
+        return {
+            type: EntityInfoType.NoTable,
+            text: tableIdExp,
+        };
+    }
+    const tableId = 'poolPath' in parent ? parent.poolPath()?.id_(0) : parent.id_();
+    if (node == tableId) {
+        return {
+            type: EntityInfoType.Table,
+            tableInfo,
+            text: tableIdExp,
+        };
+    }
+    return {
+        type: EntityInfoType.Table,
+        tableInfo,
+    };
+}
+
+
 
 function getEntityInfoFromFunction(node: FunctionIdentifierContext) {
     return {

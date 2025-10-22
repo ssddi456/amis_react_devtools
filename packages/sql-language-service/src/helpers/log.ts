@@ -84,7 +84,7 @@ const logSource = (prefix: string, arg: any, ) => {
     }
 };
 
-export const createLogger = (prefix: string, enableDebug: boolean) => {
+export const createLogger = (prefix: string, enableDebug: boolean = process.env.NODE_ENV !== 'prod') => {
     if (!enableDebug) {
         return {
             log: (..._args: any[]) => { },

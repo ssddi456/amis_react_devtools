@@ -3,6 +3,7 @@ import { copyToClipboard } from './tools/copy';
 import { registerHivesqlLs } from '@amis-devtools/sql-language-service/src/register_ls';
 import { LanguageIdEnum } from 'monaco-sql-languages';
 
+// replace with newer monaco-editor
 const createSqlEditor = (name: string) => ({
     "type": "editor",
     "name": name,

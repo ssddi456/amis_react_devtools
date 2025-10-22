@@ -1,6 +1,7 @@
 const path = require("path");
 const rspack = require("@rspack/core");
 const NodePolyfill = require("node-polyfill-webpack-plugin");
+const MonacoWebpackPlugin = require('monaco-editor-webpack-plugin');
 
 /** @type {import('@rspack/cli').Configuration}  */
 module.exports = {
@@ -20,6 +21,11 @@ module.exports = {
         }),
         new rspack.DefinePlugin({
             "process.env.NODE_ENV": JSON.stringify("development"),
+        }),
+        new MonacoWebpackPlugin({
+            // Configure features and languages as needed
+            // For example, to include only specific languages:
+            // languages: ['json'],
         })
     ],
     module: {

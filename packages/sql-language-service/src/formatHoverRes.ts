@@ -2,7 +2,7 @@ import { ParserRuleContext } from "antlr4ng";
 import { TableSourceContext, SubQuerySourceContext, VirtualTableSourceContext, CteStatementContext } from "dt-sql-parser/dist/lib/hive/HiveSqlParser";
 import type { languages, Uri } from "monaco-sql-languages/esm/fillers/monaco-editor-core";
 import { IdentifierScope } from "./identifier_scope";
-import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, functionRes, unknownRes } from "./sql_res";
+import { tableRes, tableAndColumn, noTableInfoRes, noColumnInfoRes, createColumnRes, functionRes, unknownRes, insertRes } from "./sql_res";
 import { rangeFromNode, Range } from "./helpers/pos";
 import { ExtColumnInfo, TableInfo } from "./types";
 import { printNode } from "./helpers/log";
@@ -148,6 +148,7 @@ export enum EntityInfoType {
     Unknown = 'unknown',
     NoTable = 'noTable',
     NoColumn = 'noColumn',
+    InsertTable = 'insertTable',
     CreateColumn = 'createColumn',
     Function = 'function',
 }
@@ -185,6 +186,8 @@ export function formatHoverRes(hoverInfo: EntityInfo, ignoreError = false): With
             return { ...createColumnRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
         case EntityInfoType.Function:
             return { ...functionRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
+        case EntityInfoType.InsertTable:
+            return { ...insertRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };
         case EntityInfoType.Unknown:
         default:
             return { ...unknownRes(hoverInfo.text!, hoverInfo.range, hoverInfo.ext), __source: hoverInfo.__source };

@@ -13,30 +13,6 @@ import { SqlTestNavigation } from './components/sql_test_navigation';
 import { SqlTestVis } from './components/sql_test_vis';
 import { SqlTestDag } from './components/sql_test_dag';
 
-(window as any).MonacoEnvironment = {
-  getWorker(workerId: string, label: string) {
-    if (label === 'json') {
-      return new Worker(
-        new URL(
-          "monaco-editor/esm/vs/language/json/json.worker",
-          // @ts-ignore
-          import.meta.url
-        )
-      );
-    }
-    if (label === 'hivesql') {
-      return new Worker(
-        new URL(
-          "monaco-sql-languages/esm/languages/hive/hive.worker",
-          // @ts-ignore
-          import.meta.url
-        )
-      );
-    }
-    return null;
-  }
-}
-
 const AppComponent = amisRender(
   {
     type: "page",
@@ -114,28 +90,27 @@ const App = () => {
   return (
     <div className="container">
       <ClickToComponent />
-      {AppComponent}
+      {/* {AppComponent} */}
       {/*
        */}
-      <div style={{ padding: '16px', borderBottom: '1px solid #e1e1e1' }}>
+      <div style={{ margin: 16, borderBottom: '1px solid #e1e1e1' }}>
         <SqlTestNavigation
           sqlTest={sqlTest}
           onChange={setSqlTestIdx}
         />
       </div>
       <div
-        style={{ margin: '10px 0', height: '100vh', display: 'flex', flexDirection: 'column' }}
+        style={{ margin: 16, height: '100vh', display: 'flex', flexDirection: 'column' }}
       >
         <div style={{ flex: 0 }}>
           <button
             onClick={() => setViewMode('context')}
             style={{
               padding: '8px 16px',
-              marginRight: '8px',
               border: '1px solid #0078d4',
               backgroundColor: viewMode === 'context' ? '#0078d4' : 'white',
               color: viewMode === 'context' ? 'white' : '#0078d4',
-              borderRadius: '4px',
+              borderTopLeftRadius: 4,
               cursor: 'pointer',
               fontSize: '14px',
             }}
@@ -149,7 +124,7 @@ const App = () => {
               border: '1px solid #0078d4',
               backgroundColor: viewMode === 'dag' ? '#0078d4' : 'white',
               color: viewMode === 'dag' ? 'white' : '#0078d4',
-              borderRadius: '4px',
+              borderTopRightRadius: 4,
               cursor: 'pointer',
               fontSize: '14px',
             }}

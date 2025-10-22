@@ -54,7 +54,7 @@ import { WithSource } from "./helpers/util";
 import { ErrorType } from "./consts";
 import { mrScopeGraphOptimize } from "./helpers/graph";
 
-const logger = createLogger('ContextManager', process.env.NODE_ENV !== 'prod');
+const logger = createLogger('ContextManager');
 
 export class ContextManager {
     rootContext: IdentifierScope | null = null;

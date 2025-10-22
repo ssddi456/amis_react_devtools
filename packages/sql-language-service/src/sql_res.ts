@@ -72,6 +72,20 @@ export const functionRes = (text: string, range: Range, ext?: string[]) => {
     };
     return result;
 };
+export const insertRes = (text: string, range: Range, ext?: string[]) => {
+    const result = {
+        contents: [
+            {
+                value: [
+                    `**insert table:** ${text}`,
+                    ...(ext || [])
+                ].filter(Boolean).join('\n\n')
+            },
+        ],
+        range,
+    };
+    return result;
+};
 export const unknownRes = (text: string, range: Range, ext?: string[]) => {
     const result = {
         contents: [

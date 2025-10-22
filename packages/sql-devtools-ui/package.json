@@ -20,6 +20,9 @@
         "vscode-languageserver-types": "^3.17.5",
         "monaco-editor": "0.54.0"
     },
+    "devDependencies": {
+        "monaco-editor-webpack-plugin": "7.1.0"
+    },
     "overrides": {
         "monaco-editor": "0.54.0"
     }

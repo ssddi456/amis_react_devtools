@@ -1,13 +1,14 @@
 import { languages, type editor, } from "monaco-editor";
 import { getJSONType, toCompletionItemKind, isInsertReplaceEdit, toTextEdit, toMarkedStringArray } from "./amis_json_ls";
 import { toRange } from "./ls_helper";
-
+// replace with newer monaco-editor
 const languageId = 'json';
 export default {
-    "type": "editor",
+    "type": "container",
     "name": "json_schema",
     "label": "编辑器",
     "language": languageId,
+    "schemas": [{}],
     allowFullscreen: true,
     "editorDidMount": (editor: editor.IStandaloneCodeEditor, monaco: typeof import("monaco-editor")) => {
 

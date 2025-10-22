@@ -69,9 +69,9 @@ export const SqlTestNavigation: React.FC<SqlTestNavigationProps> = ({
 
     return (
         <div
-            style={{ margin: '10px 0', height: '100vh', display: 'flex', flexDirection: 'column' }}
+            style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}
         >
-            <h3 style={{ flex: 0 }}>All tests</h3>
+            <h3 style={{ flex: 0, marginTop: 0 }}>All tests</h3>
             <div
                 style={{ flex: 0 }}
             >
