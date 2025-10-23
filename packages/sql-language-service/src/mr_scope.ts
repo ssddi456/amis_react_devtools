@@ -4,7 +4,7 @@ import { IdentifierScope } from "./identifier_scope";
 import { getAtomExpressionFromExpression, getColumnInfoFromNode, getColumnsFromRollupOldSyntax, getOnConditionOfFromClause, isSameColumnInfo } from "./helpers/table_and_column";
 import { isPosInParserRuleContext } from "./helpers/pos";
 import { ColumnInfo, MrScopeContext, MrScopeId, tableReferenceContext, TableSource, ValidateError } from "./types";
-import { matchSubPath, matchSubPathOneOf } from "./helpers/tree_query";
+import { matchSubPath, matchSubPathOneOf, matchType } from "./helpers/tree_query";
 import { ErrorType } from "./consts";
 import { HiveSQL } from "dt-sql-parser";
 import { printNode } from "./helpers/log";
@@ -111,7 +111,9 @@ export class MapReduceScope {
             // check if directly export columns is in the group-by columns
             // TODO: better export column reference dependances check
             if (groupByColumns.length > 0
-                && !groupByColumns.some(groupByColumn => isSameColumnInfo(groupByColumn, column))) {
+                && !matchType(column.reference, 'expression')
+                && !groupByColumns.some(groupByColumn => isSameColumnInfo(groupByColumn, column))
+            ) {
                 // check if same column define
                 errors.push({
                     message: `Export column '${column.referenceColumnName}' is not included in the group-by columns`,
@@ -121,7 +123,10 @@ export class MapReduceScope {
                 });
             }
 
-            if (!column.referenceTableName && hasMultiInputTable) {
+            if (!column.referenceTableName
+                && !matchType(column.reference, 'expression')
+                && hasMultiInputTable
+            ) {
                 console.log('this.inputTables', this.inputTables);
                 errors.push({
                     message: `In multi-input select, export column '${column.exportColumnName}' must specify the referance table name`,
