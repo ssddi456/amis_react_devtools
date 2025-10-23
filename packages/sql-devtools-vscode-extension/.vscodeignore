@@ -1,9 +1,0 @@
-# Ignore all files except for the following
-.vscodeignore
-README.md
-package.json
-tsconfig.json
-src/**/*
-config/**/*
-test/**/*
-*.vsix
